@@ -23,10 +23,16 @@ usege
 
 [Merge and Gen] Merge and load models to generate images
 
-[Save merged model] Save the currently loaded merged model.
+[Save merged model] Save the currently loaded merged model.(A new merge is performed. This is because saving a loaded model saves it as a single-precision model.)
 
 [Sequential Merge and Generation] Performs sequential merge image generation. For example, if you run the program with "0.25,0.5,0.75", it will generate images with the respective merge ratio.For block merge, enter 26 numbers separated by newlines and separated by commas
 ![xy_grid-0355-1880406603 0-merge, two ladies,green twintails,flat chest,lolita (long dress_1 3),(put  hands together_1 3),red pigtails,mirror,smile,look ea](https://user-images.githubusercontent.com/122196982/213196391-1a040bfa-1ade-409a-804f-427a3fb8bf8f.jpg)
+
+About Cache
+The cache is used to store models in memory to speed up sequential merges and other operations.
+Cache settings can be configured from web-ui's setting menu.
+
+This script uses some of the web-ui and mbw-merge scripts.
 
 このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
 これまでマージしたモデルはいったん保存して気に入らなければ削除するということが必要でしたが、このextentionを使うことでHDDやSSDの消耗を防ぐことができます。
@@ -43,7 +49,7 @@ https://github.com/bbc-mc/sdweb-merge-block-weighted-gui
 
 [Merge and Gen] ボタン：マージしたのち画像を生成します
 
-[Save merged model]現在読み込まれているマージモデルを保存します
+[Save merged model]現在読み込まれているマージモデルを保存します(新規にマージを行います。これはロードされたモデルを保存すると単精度のモデルとして保存されるためです)
 
 [Sequential Merge and Generation]連続マージ画像生成を行います。例えば「0.25,0.5,0.75」で走らせると、それぞれのマージ率で画像を生成します。seedを「-1」に設定している場合でも同じseedで生成します。
 ![xy_grid-0355-1880406603 0-merge, two ladies,green twintails,flat chest,lolita (long dress_1 3),(put  hands together_1 3),red pigtails,mirror,smile,look ea](https://user-images.githubusercontent.com/122196982/213196391-1a040bfa-1ade-409a-804f-427a3fb8bf8f.jpg)
@@ -51,4 +57,6 @@ https://github.com/bbc-mc/sdweb-merge-block-weighted-gui
 キャッシュについて
 モデルをメモリ上に保存することにより連続マージなどを高速化することができます。
 キャッシュの設定はweb-uiのsettingから行ってください。
+
+このスクリプトではweb-uiとmbw-mergeのスクリプトを一部使用しています
 
