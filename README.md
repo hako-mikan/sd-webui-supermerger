@@ -9,6 +9,7 @@ This extension enables the model to be loaded for image generation without savin
 Models can be merged in block-by-block. In the past, merged models had to be saved once and deleted if they were not to your liking, but this extension saves time and prevents wear and tear on HDDs and SSDs.
 
 See below for installation instructions
+
 https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Extensions
 
 For more information on Merge Block Weighted, please refer to the following
@@ -31,6 +32,7 @@ usege
 これまでマージしたモデルはいったん保存して気に入らなければ削除するということが必要でしたが、このextentionを使うことでHDDやSSDの消耗を防ぐことができます。
 
 階層別マージについては下記を参照してください
+
 https://github.com/bbc-mc/sdweb-merge-block-weighted-gui
 
 使い方
