@@ -17,7 +17,8 @@ https://github.com/bbc-mc/sdweb-merge-block-weighted-gui
 
 usege
 
-[merge] button: After merging, the model is loaded as a model for generation. Note that a different model is loaded than the model information in the upper left corner. (This will be reset when you re-select the model in the model selection screen in the upper left corner.
+[merge] button: After merging, the model is loaded as a model for generation. 
+###　Note that a different model is loaded than the model information in the upper left corner. (This will be reset when you re-select the model in the model selection screen in the upper left corner.
 
 [gen] button: Generates an image using the settings in the text2image tab
 
