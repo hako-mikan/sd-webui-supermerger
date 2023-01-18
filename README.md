@@ -6,7 +6,7 @@ model merge extention for stable diffusion web ui
 This an extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 
 This extension enables the model to be loaded for image generation without saving when the model is merged.
-It is also available by block. In the past, merged models had to be saved once and deleted if they were not to your liking, but this extension saves time and prevents wear and tear on HDDs and SSDs.
+Models can be merged in block-by-block. In the past, merged models had to be saved once and deleted if they were not to your liking, but this extension saves time and prevents wear and tear on HDDs and SSDs.
 
 See below for installation instructions
 https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Extensions
