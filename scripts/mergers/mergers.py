@@ -91,6 +91,9 @@ def runrun(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo=""):
     p.seed = seed
     p.width = w
     p.height = h
+    p.seed_resize_from_w=0
+    p.seed_resize_from_h=0
+    p.denoising_strength=None
 
     if type(p.prompt) == list:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
@@ -106,7 +109,6 @@ def runrun(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo=""):
     image = processed.images[0]
     infotext = create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds)
     infotext = infotext + ","+mergeinfo
-
     images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, infotext, p=p)
     shared.state.end()
     global temp_p
