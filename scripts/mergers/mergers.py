@@ -108,7 +108,14 @@ def runrun(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo=""):
     processed:Processed = processing.process_images(p)
     image = processed.images[0]
     infotext = create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds)
-    infotext = infotext + ","+mergeinfo
+    if infotext.count("Steps: ")>1:
+        infotext = infotext[:infotext.rindex("Steps")]
+
+    infotexts = infotext.split(",")
+    for i,x in enumerate(infotexts):
+        if "Model:"in x:
+            infotexts[i] = " Model: "+mergeinfo
+    infotext= ",".join(infotexts)
     images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, infotext, p=p)
     shared.state.end()
     global temp_p
