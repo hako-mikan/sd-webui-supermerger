@@ -1,6 +1,10 @@
 # sd-webui-supermerger
 model merge extention for stable diffusion web ui
 
+updated 2023.01.20.2350(JST)
+png infoがうまく保存できない問題を解決しました。
+Problem solved where png info could not be saved properly.
+
 日本語説明は後半にあります。
 
 This an extension for [stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
