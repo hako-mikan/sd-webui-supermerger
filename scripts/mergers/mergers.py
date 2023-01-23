@@ -114,7 +114,7 @@ def runrun(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo=""):
     infotexts = infotext.split(",")
     for i,x in enumerate(infotexts):
         if "Model:"in x:
-            infotexts[i] = " Model: "+mergeinfo
+            infotexts[i] = " Model: "+mergeinfo.replace(","," ")
     infotext= ",".join(infotexts)
     images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, infotext, p=p)
     shared.state.end()
