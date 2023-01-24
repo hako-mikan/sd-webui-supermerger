@@ -7,7 +7,7 @@
 Problem solved where png info could not be saved properly.  
 png infoがうまく保存できない問題を解決しました。
 
-2023.01.25.0115(JST)  
+2023.01.25.0000(JST)  
 added several features 
 - added new merge mode "Triple sum","sum Twice"  
 - added XY plot
@@ -15,8 +15,6 @@ added several features
 - 新しいマージモードを追加しました "Triple sum","sum Twice"  
 - XY plot機能を追加しました
 
-After updating, restart webui-user.bat; Reload UI will not reflect the update.  
-更新後、webui-user.batを再起動してください。Reload UIでは更新が反映されません。
 # 
 
 日本語説明は[後半](#概要)後半にあります。
@@ -63,11 +61,12 @@ Change only specific blocks in MBW. Choose alpha or beta for the opposite axis. 
 ##### Input example
 IN01, OUT10 OUT11, OUT03-OUT06, OUT07-OUT11, NOT M00 OUT03-OUT06
 in this case
-1: Only IN01 changes
-2: OUT10 and OUT11 change
-3: OUT06 to OUT03 change
-4: OUT11 to OUT07 change
-5: All but M00 and OUT03 to OUT06 change 
+- 1: Only IN01 changes
+- 2: OUT10 and OUT11 change
+- 3: OUT06 to OUT03 change
+- 4: OUT11 to OUT07 change
+- 5: All but M00 and OUT03 to OUT06 change
+
 Be careful not to forget the "0"
 ![xy_grid-0006-2934360860 0](https://user-images.githubusercontent.com/122196982/214343111-e82bb20a-799b-4026-8e3c-dd36e26841e3.jpg)
 ### About Cache
@@ -88,7 +87,7 @@ This script uses some of the web-ui and mbw-merge scripts.
 #### Add difference
 差分マージです。MBWが有効になっている場合はMBWのbaseがアルファとして使われます
 #### Triple sum
-マージを3モデル同時に行います。alpha,betaが使用されます。モデル選択窓が3つあったので追加した機能ですが、有効に働くかはわかりません。MBWでも使えます。それぞれMBWのalpha,betaを入力してください。
+マージを3モデル同時に行います。alpha,betaが使用されます。モデル選択窓が3つあったので追加した機能ですが、有効に働かうかはわかりません。MBWでも使えます。それぞれMBWのalpha,betaを入力してください。
 #### sum Twice
 Weight sumを2回行います。alpha,betaが使用されます。MBWモードでも使えます。それぞれMBWのalpha,betaを入力してください。
 
@@ -111,21 +110,22 @@ text2imageタブの設定で画像生成を行います
 ### Sequential XY Merge and Generation
 連続マージ画像生成を行います。すべてのマージモードで有効です。
 #### alpha,beta
-アルファ、ベータを変更します。各要素は半角カンマで区切ります。
+アルファ、ベータを変更します。
 #### seed
-シードを変更します。-1と入力すると、反対の軸方向には固定されたseedになります。各要素は半角カンマで区切ります。
+シードを変更します。-1と入力すると、反対の軸方向には固定されたseedになります。
 #### model_A,B,C
-モデルを変更します。モデル選択窓で選択されたモデルは無視されます。各要素は半角カンマで区切ります。
+モデルを変更します。モデル選択窓で選択されたモデルは無視されます。
 #### pinpoint blocks
 MBWにおいて特定のブロックのみを変化させます。反対の軸はalphaまたはbetaを選んでください。ブロックIDを入力すると、そのブロックのみalpha(beta)が変わります。他のタイプと同様にカンマで区切ります。スペースまたはハイフンで区切ることで複数のブロックを同時に変化させることもできます。最初にNOTをつけることで変化対象が反転します。NOT IN09-OUT02とすると、IN09-OUT02以外が変化します。NOTは最初に入力しないと効果がありません。
 ##### 入力例
 IN01,OUT10 OUT11, OUT03-OUT06,OUT07-OUT11,NOT M00 OUT03-OUT06
 この場合
-1:IN01のみ変化
-2:OUT10およびOUT11が変化
-3:OUT03からOUT06が変化
-4:OUT07からOUT11が変化
-5:M00およびOUT03からOUT06以外が変化
+- 1:IN01のみ変化
+- 2:OUT10およびOUT11が変化
+- 3:OUT03からOUT06が変化
+- 4:OUT07からOUT11が変化
+- 5:M00およびOUT03からOUT06以外が変化  
+
 となります。0の打ち忘れに注意してください。
 ![xy_grid-0006-2934360860 0](https://user-images.githubusercontent.com/122196982/214343111-e82bb20a-799b-4026-8e3c-dd36e26841e3.jpg)
 
