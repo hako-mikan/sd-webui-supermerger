@@ -15,7 +15,8 @@ added several features
 - 新しいマージモードを追加しました "Triple sum","sum Twice"  
 - XY plot機能を追加しました
 
-After updating, restart webui-user.bat; Reload UI will not reflect the update.  更新後、webui-user.batを再起動してください。Reload UIでは更新が反映されません。
+After updating, restart webui-user.bat; Reload UI will not reflect the update.
+更新後、webui-user.batを再起動してください。Reload UIでは更新が反映されません。
 # 
 
 日本語説明は[後半](#概要)後半にあります。
