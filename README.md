@@ -86,7 +86,7 @@ This script uses some of the web-ui and mbw-merge scripts.
 #### Add difference
 差分マージです。MBWが有効になっている場合はMBWのbaseがアルファとして使われます
 #### Triple sum
-マージを3モデル同時に行います。alpha,betaが使用されます。モデル選択窓が3つあったので追加した機能ですが、有効に働かうかはわかりません。MBWでも使えます。それぞれMBWのalpha,betaを入力してください。
+マージを3モデル同時に行います。alpha,betaが使用されます。モデル選択窓が3つあったので追加した機能ですが、有効に働くかはわかりません。MBWでも使えます。それぞれMBWのalpha,betaを入力してください。
 #### sum Twice
 Weight sumを2回行います。alpha,betaが使用されます。MBWモードでも使えます。それぞれMBWのalpha,betaを入力してください。
 
