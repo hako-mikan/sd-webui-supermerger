@@ -1,7 +1,7 @@
 # sd-webui-supermerger
 model merge extention for stable diffusion web ui
 
-testing [new version](https://github.com/hako-mikan/sd-webui-supermerger/tree/ver2) adding new features 
+testing [new version](https://github.com/hako-mikan/sd-webui-supermerger/tree/ver2) adding new features   
 機能追加した [new version](https://github.com/hako-mikan/sd-webui-supermerger/tree/ver2)をテスト中です。 
 
 updated 2023.01.20.2350(JST)
