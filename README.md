@@ -5,7 +5,7 @@ testing [new version](https://github.com/hako-mikan/sd-webui-supermerger/tree/ve
 機能追加した [new version](https://github.com/hako-mikan/sd-webui-supermerger/tree/ver2)をテスト中です。 
 
 updated 2023.01.20.2350(JST)
-png infoがうまく保存できない問題を解決しました。
+png infoがうまく保存できない問題を解決しました。  
 Problem solved where png info could not be saved properly.
 
 日本語説明は後半にあります。
