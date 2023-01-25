@@ -1,6 +1,9 @@
 # sd-webui-supermerger
 model merge extention for stable diffusion web ui
 
+testing [new version] adding new features (https://github.com/hako-mikan/sd-webui-supermerger/tree/ver2)
+機能追加した [new version]をテスト中です。 (https://github.com/hako-mikan/sd-webui-supermerger/tree/ver2)
+
 updated 2023.01.20.2350(JST)
 png infoがうまく保存できない問題を解決しました。
 Problem solved where png info could not be saved properly.
