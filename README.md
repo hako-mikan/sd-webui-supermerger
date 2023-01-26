@@ -3,9 +3,9 @@
 - Merge models can be loaded directly for generation without saving
 
 # Recent Update
-2023.01.20.2350(JST)  
-Problem solved where png info could not be saved properly.  
-png infoがうまく保存できない問題を解決しました。
+2023.01.26.2100(JST)  
+XY plotにおいてタイプMBWが使用できない不具合を修正しました  
+Fixed a bug that type of MBW could work in XY plot
 
 2023.01.25.0000(JST)  
 added several features 
