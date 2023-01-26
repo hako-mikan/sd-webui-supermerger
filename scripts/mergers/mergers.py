@@ -171,7 +171,7 @@ def genxyplot(xmen:str,ymen:str,xtype,ytype,weights_a,weights_b,model_a,model_b,
                 weights_a_in,alpha = weightser(z[0])
                 weights_b_in,beta = weightser(z[1])
             else:
-                weights_a,alpha = weightser(z)
+                weights_a_in,alpha = weightser(z)
         if "model_A" in zt:model_a = z
         if "model_B" in zt:model_b = z
         if "model_C" in zt:model_c = z
@@ -211,8 +211,8 @@ def genxyplot(xmen:str,ymen:str,xtype,ytype,weights_a,weights_b,model_a,model_b,
         ys=ys[:ycount]
         print(f"stopped at x={xcount},y={ycount}")
 
-    if "mbw" in xtype and beta: xs = [f"alpha:({x[0]}),beta({x[1]})" for x in xs ]
-    if "mbw" in ytype and beta: ys = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
+    if "mbw" in xtype and usebeta: xs = [f"alpha:({x[0]}),beta({x[1]})" for x in xs ]
+    if "mbw" in ytype and usebeta: ys = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
 
     xs[0]=xtype+" = "+xs[0] #draw X label
     if ytype!=types[0] or "model" in ytype:ys[0]=ytype+" = "+ys[0]  #draw Y label
