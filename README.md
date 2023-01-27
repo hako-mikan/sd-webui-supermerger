@@ -3,11 +3,8 @@
 - Merge models can be loaded directly for generation without saving
 
 # Recent Update
-2023.01.28.0100(JST)
-MBWモードでSave current modelボタンが正常に動作しない問題を解決しました  
-ファイル名が長すぎて保存時にエラーが出る問題を解決しました
-Problem solved where the "Save current model" button would not work properly in MBW mode　　
-Problem solved where an error would occur when saving a file with too long a file name
+2023.01.28.0100(JST)  
+MBWモードでSave current modelボタンが正常に動作しない問題を解決しました  ファイル名が長すぎて保存時にエラーが出る問題を解決しました  Problem solved where the "Save current model" button would not work properly in MBW mode  Problem solved where an error would occur when saving a file with too long a file name
 
 2023.01.26.2100(JST)  
 XY plotにおいてタイプMBWが使用できない不具合を修正しました  
