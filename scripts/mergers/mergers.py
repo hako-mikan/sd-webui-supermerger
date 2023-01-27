@@ -289,7 +289,7 @@ currentmodel=""):
 
     usebeta = modes[2] in mode or modes[3] in mode
     mergedmodel = [weights_a,weights_b,model_a, model_b,model_c, device, base_alpha,base_beta, output_file,mode, overwrite,True,useblocks].copy()
-    caster(mergedmodel,hear)
+    caster(mergedmodel,True)
     if model_a =="" or model_b =="" or ((not modes[0] in mode) and model_c=="") : 
         return "ERROR: Necessary model is not selected",None,None,None,None,currentmodel
     if useblocks:
@@ -428,7 +428,7 @@ currentmodel=""):
     sd_hijack.model_hijack.hijack(shared.sd_model)
     
     savelog(currentmodel,mergedmodel)
-
+    caster(mergedmodel,True)
     if save:
         comments = savemodel(theta_0,currentmodel,output_file,overwrite)
     else:
@@ -454,6 +454,7 @@ currentmodel=""):
 
 def savemerged(output_file,overwrite):
     global mergedmodel
+    print(mergedmodel)
     if len(mergedmodel)!=13:
         print(mergedmodel)
         return "ERROR:no info for merged model",None
@@ -470,7 +471,11 @@ def savemodel(state_dict,currentmodel,output_file,overwrite):
     else:
         output_file = output_file if ".ckpt" in output_file else output_file + ".ckpt"
     ckpt_dir = shared.cmd_opts.ckpt_dir or sd_models.model_path
- 
+
+    if len(output_file) > 255:
+       output_file.replace(".ckpet","")
+       output_file=output_file[:250]+".ckpt"
+
     output_file = os.path.join(ckpt_dir, output_file)
 
     # check if output file already exists
@@ -600,7 +605,8 @@ def filenamecutter(name):
 
 path_root = scripts.basedir()
 
-def savelog(name,setting):
+def savelog(name,settings):
+    setting = settings.copy()
     filepath = os.path.join(path_root, "mergelog.csv")
     log = open(filepath, 'a')
     for i,x in enumerate(setting):
