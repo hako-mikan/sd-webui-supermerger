@@ -601,7 +601,13 @@ def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha
     else:
         currentmodel =f"{model_a} x (1-alpha) \n {model_b} x alpha"
 
+    if "alpha" in xtype:alpha = "X"
+    if "beta" in xtype:beta = "X" 
+    if "alpha" in ytype:alpha = "Y"
+    if "beta" in ytype:beta = "Y"
     vals = f"\nalpha = {alpha},beta = {beta}" if not useblocks else f"\n{wa}\n{wb}"
+
+
     currentmodel = currentmodel+vals
     return currentmodel
 
@@ -655,7 +661,7 @@ def draw_origin(grid, text,width,height,width_one):
     fontsize = (width+height)//25
     fnt = get_font(fontsize)
 
-    while d.multiline_textsize(text, font=fnt)[0] > width_one*0.8 and fontsize > 0:
+    while d.multiline_textsize(text, font=fnt)[0] > width_one*0.75 and fontsize > 0:
         fontsize -=1
         fnt = get_font(fontsize)
     d.multiline_text((1,1), text, font=fnt, fill=color_active,align="center")
