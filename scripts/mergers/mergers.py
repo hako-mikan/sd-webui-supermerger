@@ -36,7 +36,7 @@ def freezetime():
     state_mergen = True
 
 hear = False
-hearm = True
+hearm = False
 def caster(news,hear):
     if hear: print(news)
 
@@ -72,6 +72,10 @@ def genxyplot(xmen:str,ymen:str,xtype,ytype,weights_a,weights_b,model_a,model_b,
     if model_b ==""and (not "model_B" in xtype or not "model_B" in ytype):return "ERROR: model_B is not selected",*None5
     if model_c =="" and usebeta and (not "model_C" in xtype or not "model_C" in ytype):return "ERROR: model_C is not selected",*None5
     if xtype == ytype: return "ERROR: same type selected for X,Y",*None5
+
+    if useblocks:
+        weights_a_in=weights_a
+        weights_b_in=weights_b
 
     #for X only plot, use same seed
     if seed == -1: seed = int(random.randrange(4294967294))
