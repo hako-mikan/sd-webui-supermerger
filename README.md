@@ -3,17 +3,18 @@
 - Merge models can be loaded directly for generation without saving
 
 # Recent Update
-2023.01.28.0100(JST)  
-MBWモードでSave current modelボタンが正常に動作しない問題を解決しました  
-ファイル名が長すぎて保存時にエラーが出る問題を解決しました  
-Problem solved where the "Save current model" button would not work properly in MBW mode  
-Problem solved where an error would occur when saving a file with too long a file name
+すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md)にあります。  
+All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md).
 
-2023.01.26.2100(JST)  
-XY plotにおいてタイプMBWが使用できない不具合を修正しました  
-Fixed a bug that type of MBW could work in XY plot
+### bug fix 2023.01.29.0000(JST)
+pinpoint blocksがX方向で使用できない問題を修正しました。  
+pinpoint blocks選択時Triple,Twiceを使用できない問題を解決しました  
+XY plot 使用時に一部軸タイプでMBWを使用できない問題を解決しました  
+Fixed a problem where pinpoint blocks could not be used in the X axis.  
+Fixed a problem in which Triple,Twice could not be used when selecting pinpoint blocks.  
+Problem solved where MBW could not be used with some axis types when using XY plot.
 
-2023.01.25.0000(JST)  
+### 2023.01.25.0000(JST)  
 added several features 
 - added new merge mode "Triple sum","sum Twice"  
 - added XY plot
