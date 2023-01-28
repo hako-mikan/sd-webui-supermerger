@@ -36,7 +36,7 @@ def freezetime():
     state_mergen = True
 
 hear = False
-hearm = False
+hearm = True
 def caster(news,hear):
     if hear: print(news)
 
@@ -182,9 +182,12 @@ def genxyplot(xmen:str,ymen:str,xtype,ytype,weights_a,weights_b,model_a,model_b,
         xcount = 0
         for x in xs:
             xydealer(x,xtype)
-            if "alpha" in xtype and pinpoint:weights_a_in = weightsdealer(x,xtype,y,weights_a)
-            if "beta" in xtype and pinpoint:weights_b_in = weightsdealer(x,xtype,y,weights_b)
-            castall(True)
+            if ("alpha" in xtype or "alpha" in ytype)and pinpoint:
+                weights_a_in = weightsdealer(x,xtype,y,weights_a)
+                weights_b_in = weights_b
+            if ("beta" in xtype or "beta" in ytype) and pinpoint:
+                weights_b_in = weightsdealer(x,xtype,y,weights_b)
+                weights_a_in =weights_a
             print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)} ({xcount+ycount*len(xs)+1}/{allcount})")
             #currentmodel = makemodelname("","",model_a, model_b,model_c, alpha,beta,blocks,mode)
             if xtype=="seed" and xcount > 0:
@@ -297,12 +300,12 @@ currentmodel=""):
         weights_b_t=weights_b.split(',',1)
         base_alpha  = float(weights_a_t[0])    
         weights_a = [float(w) for w in weights_a_t[1].split(',')]
-        caster(f"from {weights_a}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
+        caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
         if len(weights_a) != 25:return f"ERROR: weights alpha value must be {26}.",None,None,None,None,currentmodel
         if usebeta:
             base_beta = float(weights_b_t[0]) 
             weights_b = [float(w) for w in weights_b_t[1].split(',')]
-            caster(f"from {weights_b}, beta = {base_beta},weights_a ={weights_b}",hearm)
+            caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
             if len(weights_b) != 25: return f"ERROR: weights beta value must be {26}.",None,None,None,None,currentmodel
 
     device = device if device in ["cpu", "cuda"] else "cpu"
