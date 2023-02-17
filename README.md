@@ -6,6 +6,13 @@
 すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md)にあります。  
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md).
 
+### update to version 3 2023.02.17.2020(JST)
+- LoRA関係の機能を追加しました
+- Logを保存し、設定を呼び出せるようになりました
+- safetensors,fp16形式での保存に対応しました
+- weightのプリセットに対応しました
+- XYプロットの予約が可能になりました
+
 ### bug fix 2023.01.29.0000(JST)
 pinpoint blocksがX方向で使用できない問題を修正しました。  
 pinpoint blocks選択時Triple,Twiceを使用できない問題を解決しました  
