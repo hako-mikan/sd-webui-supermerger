@@ -12,6 +12,7 @@ All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerg
 - safetensors,fp16形式での保存に対応しました
 - weightのプリセットに対応しました
 - XYプロットの予約が可能になりました
+diffusersのインストールが必要になりました。windowsの場合はweb-uiのフォルダでコマンドプロンプトから"pip install diffusers"を打つことでインストールできる場合がありますが環境によります。
 # 
 
 日本語説明は[後半](#概要)後半にあります。
