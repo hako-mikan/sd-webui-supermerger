@@ -160,6 +160,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     count_target_of_basealpha = 0
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if "model" in key and key in theta_1:
+            if usebeta and not key in theta_2:
+                continue
+                
             current_alpha = alpha
             current_beta = beta
 
