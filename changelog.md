@@ -1,4 +1,21 @@
 # Changelog
+
+### bug fix 2023.01.29.0000(JST)
+pinpoint blocksがX方向で使用できない問題を修正しました。  
+pinpoint blocks選択時Triple,Twiceを使用できない問題を解決しました  
+XY plot 使用時に一部軸タイプでMBWを使用できない問題を解決しました  
+Fixed a problem where pinpoint blocks could not be used in the X axis.  
+Fixed a problem in which Triple,Twice could not be used when selecting pinpoint blocks.  
+Problem solved where MBW could not be used with some axis types when using XY plot.
+
+### 2023.01.25.0000(JST)  
+added several features 
+- added new merge mode "Triple sum","sum Twice"  
+- added XY plot
+ 
+- 新しいマージモードを追加しました "Triple sum","sum Twice"  
+- XY plot機能を追加しました
+
 ### bug fix 2023.01.29.0000(JST)
 pinpoint blocksがX方向で使用できない問題を修正しました。  
 pinpoint blocks選択時Triple,Twiceを使用できない問題を解決しました  
