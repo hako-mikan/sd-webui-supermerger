@@ -71,6 +71,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     caster("merge start",hearm)
     global hear
     global mergedmodel
+
     gc.collect()
 
     # for from file
@@ -162,7 +163,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         if "model" in key and key in theta_1:
             if usebeta and not key in theta_2:
                 continue
-                
+
             current_alpha = alpha
             current_beta = beta
 
@@ -390,10 +391,12 @@ def namefromhash(hash):
     return checkpoint_info.model_name
 
 def hashfromname(name):
+    from modules import sd_models
     if name == "" or name ==[]: return ""
-    name = filenamecutter(name)
     checkpoint_info = sd_models.get_closet_checkpoint_match(name)
-    return checkpoint_info.shorthash
+    if checkpoint_info.shorthash is not None:
+        return checkpoint_info.shorthash
+    return checkpoint_info.calculate_shorthash()
 
 def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
