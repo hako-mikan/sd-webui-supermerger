@@ -60,11 +60,12 @@ def on_ui_tabs():
             sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
             create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
             sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
-            create_refresh_button(sml_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+            create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
         with gr.Row().style(equal_height=False):
             sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
-       
+            alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
+            beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25)
         with gr.Row().style(equal_height=False):
           sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",*[2**(x+2) for x in range(9)]],value = "no",type = "value") 
           sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
@@ -84,7 +85,7 @@ def on_ui_tabs():
 
         sml_makelora.click(
             fn=makelora,
-            inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings],
+            inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings,alpha,beta],
             outputs=[sml_submit_result]
         )
 
@@ -152,7 +153,7 @@ def makeloraname(model_a,model_b):
     model_b=filenamecutter(model_b)
     return "lora_"+model_a+"-"+model_b
 
-def makelora(model_a,model_b,dim,saveto,settings):
+def makelora(model_a,model_b,dim,saveto,settings,alpha,beta):
     print("make LoRA start")
     if model_a == "" or model_b =="":
       return "ERROR: No model Selected"
@@ -167,7 +168,7 @@ def makelora(model_a,model_b,dim,saveto,settings):
         print(_err_msg)
         return _err_msg
 
-    svd(fullpathfromname(model_a),fullpathfromname(model_b),False,dim,"float",saveto)
+    svd(fullpathfromname(model_a),fullpathfromname(model_b),False,dim,"float",saveto,alpha,beta)
     return f"saved to {saveto}"
 
 def lmerge(loranames,loraratioss,settings,filename,dim):
@@ -360,7 +361,7 @@ def pluslora(lnames,loraratios,settings,output,model):
                                         ).unsqueeze(2).unsqueeze(3) * scale
           theta_0[keychanger[msd_key]] = torch.nn.Parameter(weight)
     #usemodelgen(theta_0,model)
-    result = savemodel(theta_0,dname,output,settings)
+    result = savemodel(theta_0,dname,output,settings,model)
     del theta_0
     gc.collect()
     return result
@@ -368,7 +369,7 @@ def pluslora(lnames,loraratios,settings,output,model):
 CLAMP_QUANTILE = 0.99
 MIN_DIFF = 1e-6
 
-def svd(model_a,model_b,v2,dim,save_precision,save_to):
+def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
   def str_to_dtype(p):
     if p == 'float':
       return torch.float
@@ -398,7 +399,7 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to):
     lora_name = lora_o.lora_name
     module_o = lora_o.org_module
     module_t = lora_t.org_module
-    diff = module_t.weight - module_o.weight
+    diff = alpha*module_t.weight - beta*module_o.weight
 
     # Text Encoder might be same
     if torch.max(torch.abs(diff)) > MIN_DIFF:
@@ -832,7 +833,6 @@ def merge_lora_models(models, ratios,sets):
         ratio, fugou = (ratio**0.5,1) if ratio > 0 else (abs(ratio)**0.5,-1)
 
       if "lora_down" in key:
-        print("down")
         ratio = ratio * fugou
 
       scale = math.sqrt(alpha / base_alpha) * ratio
