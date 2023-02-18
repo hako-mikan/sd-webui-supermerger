@@ -363,7 +363,6 @@ def searchhistory(words,searchmode):
                 if w not in m:hit = False
             else:
                 if w in m:hit = True
-        print(i,len(mlist))
         if hit :outs.append(mlist[i])
 
     if outs == []:return [["no result","",""],]
