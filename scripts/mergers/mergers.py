@@ -94,7 +94,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets].copy()
     
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
