@@ -714,6 +714,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a):
 
 def filenamecutter(name,model_a = False):
     from modules import sd_models
+    if name =="" or name ==[]: return
     checkpoint_info = sd_models.get_closet_checkpoint_match(name)
     name= checkpoint_info.filename
 
