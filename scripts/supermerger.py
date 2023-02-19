@@ -9,7 +9,7 @@ import os.path
 import argparse
 import modules.ui
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import simggen,savemerged,typesg,smergegen,rwmergelog
+from scripts.mergers.mergers import simggen,typesg,smergegen,rwmergelog
 from scripts.mergers.xyplot import freezetime,numaker,numanager,nulister
 import csv
 from modules import sd_models,script_callbacks,scripts, shared,sd_hijack,devices,sd_vae
@@ -27,7 +27,7 @@ def on_ui_train_tabs(params):
 path_root = scripts.basedir()
 
 def on_ui_tabs():
-    filepath = os.path.join(path_root, "scripts","mbwpresets.txt")
+    filepath = os.path.join(path_root, "scripts\\mbwpresets.txt")
     weights_presets=""
     try:
         with open(filepath) as f:
@@ -65,7 +65,6 @@ def on_ui_tabs():
                         merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
                         mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
                         gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
-                        savemodel = gr.Button(elem_id="model_merger_merge", value="Save Model",variant='primary')
                     with gr.Row():
                         with gr.Column(scale = 4):
                             save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16"], label="save settings")
@@ -244,12 +243,6 @@ def on_ui_tabs():
             outputs=[*imagegal],
         )
 
-        savemodel.click(
-            fn=savemerged,
-            inputs=[custom_name,save_sets],
-            outputs=[submit_result,dummy_t],
-        )
-
         gengrid.click(
             fn=numanager,
             inputs=[dtrue,x_type,xgrid,y_type,ygrid,*msettings,*gensets.txt2img_preview_params],
@@ -363,6 +356,7 @@ def searchhistory(words,searchmode):
                 if w not in m:hit = False
             else:
                 if w in m:hit = True
+        print(i,len(mlist))
         if hit :outs.append(mlist[i])
 
     if outs == []:return [["no result","",""],]
