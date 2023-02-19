@@ -27,7 +27,7 @@ def on_ui_train_tabs(params):
 path_root = scripts.basedir()
 
 def on_ui_tabs():
-    filepath = os.path.join(path_root, "scripts\\mbwpresets.txt")
+    filepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     weights_presets=""
     try:
         with open(filepath) as f:
