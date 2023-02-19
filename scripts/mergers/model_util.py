@@ -684,7 +684,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a):
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
     model_a_path= checkpoint_info.filename
-    modeldir = model_a_path.rsplit("\\",1)[0]
+    modeldir = os.path.split(model_a_path)[0]
 
     if not fname or fname == "":
         fname = currentmodel.replace(" ","").replace(",","_").replace("(","_").replace(")","_")+pre+ext
