@@ -1,7 +1,6 @@
 import os
 import torch
 from transformers import CLIPTextModel,  CLIPTextConfig
-from diffusers import AutoencoderKL,  UNet2DConditionModel
 from safetensors.torch import load_file
 import safetensors.torch
 
@@ -727,6 +726,7 @@ def filenamecutter(name,model_a = False):
 
 # TODO dtype指定の動作が怪しいので確認する text_encoderを指定形式で作れるか未確認
 def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
+  import diffusers
   _, state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
   if dtype is not None:
     for k, v in state_dict.items():
@@ -737,7 +737,7 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   unet_config = create_unet_diffusers_config(v2)
   converted_unet_checkpoint = convert_ldm_unet_checkpoint(v2, state_dict, unet_config)
 
-  unet = UNet2DConditionModel(**unet_config)
+  unet = diffusers.UNet2DConditionModel(**unet_config)
   info = unet.load_state_dict(converted_unet_checkpoint)
   print("loading u-net:", info)
 
@@ -745,7 +745,7 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   vae_config = create_vae_diffusers_config()
   converted_vae_checkpoint = convert_ldm_vae_checkpoint(state_dict, vae_config)
 
-  vae = AutoencoderKL(**vae_config)
+  vae = diffusers.AutoencoderKL(**vae_config)
   info = vae.load_state_dict(converted_vae_checkpoint)
   print("loading vae:", info)
 
