@@ -6,6 +6,9 @@
 すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md)にあります。  
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md).
 
+### update 2023.02.20.2000(JST)
+"diffusers"をインポートするタイミングを変更しました。このアップデートにより、環境によっては"diffusers"のインストールなしに起動できるようになります。
+
 ### bug fix 2023.02.19.2330(JST)
 いくつかのバグが修正されました
 - LOWRAMオプション有効時にエラーになる問題
