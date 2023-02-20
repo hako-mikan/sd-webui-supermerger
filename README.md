@@ -7,7 +7,7 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md)  
 
-### update 2023.02.2000(JST)
+### update 2023.02.20.2000(JST)
 The timing of importing "diffusers" has been changed. With this update, some environments can be started without installing "diffusers".
 
 ### bug fix 2023.02.19.2330(JST)
