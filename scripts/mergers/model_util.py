@@ -715,13 +715,10 @@ def filenamecutter(name,model_a = False):
     from modules import sd_models
     if name =="" or name ==[]: return
     checkpoint_info = sd_models.get_closet_checkpoint_match(name)
-    name= checkpoint_info.filename
+    name= os.path.splitext(checkpoint_info.filename)[0]
 
-    if "ckpt" in name:name =name[:name.find('.ckpt')]
-    if "safetensor" in name:name=name[:name.find('.safetensor')]
     if not model_a:
-        if "\\" in name:
-            name = name.split("\\")[-1]
+        name = os.path.basename(name)
     return name
 
 # TODO dtype指定の動作が怪しいので確認する text_encoderを指定形式で作れるか未確認
