@@ -108,6 +108,7 @@ LoRA can also be used alone. The ":block" part can be omitted. The ratio can be 
 ### Make LoRA
 Generates a LoRA from the difference of two models.
 If you specify a demension, it will be created with the specified dimension. If no demension is specified, LoRAs are created with dim 128.
+The blend ratio can be adjusted by alpha and beta. (alpha x Model_A - beta x Model B) alpha, beta = 1 is the normal LoRA creation.
 
 ### merge LoRAs
 Merges one or more LoRAs. kohya-ss's latest script is used, so LoRAs with different dimensions can be merged, but note that the generated images may differ significantly because LoRAs are recalculated when dimensions are converted. 
