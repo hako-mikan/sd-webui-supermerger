@@ -56,7 +56,7 @@ def on_ui_tabs():
         sml_submit_result = gr.Textbox(label="Message")
         with gr.Row().style(equal_height=False):
             sml_cpmerge = gr.Button(elem_id="model_merger_merge", value="Merge to Checkpoint",variant='primary')
-            sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (A-B)",variant='primary')
+            sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * A - beta * B)",variant='primary')
             sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
             create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
             sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
@@ -64,8 +64,8 @@ def on_ui_tabs():
         with gr.Row().style(equal_height=False):
             sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
-            alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
-            beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25)
+            alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
+            beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=1)
         with gr.Row().style(equal_height=False):
           sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",*[2**(x+2) for x in range(9)]],value = "no",type = "value") 
           sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
