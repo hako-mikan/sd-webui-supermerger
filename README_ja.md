@@ -108,6 +108,7 @@ LoRA名1:マージ比率1:階層,LoRA名2:階層,マージ比率2,LoRA名3:マ�
 ### Make LoRA
 ふたつのモデルの差分からLoRAを生成します。
 demensionを指定すると指定されたdimensionで作製されます。無指定の場合は128で作製します。
+alphaとbetaによって配合比率を調整することができます。(alpha x Model_A - beta x Model B)　alpha, beta = 1が通常のLoRA作成となります。
 
 ### merge LoRAs
 ひとつまたは複数のLoRA同士をマージします。kohya-ss氏の最新のスクリプトを使用しているので、dimensionの異なるLoRA同氏もマージ可能ですが、dimensionの変換の際はLoRAの再計算を行うため、生成される画像が大きく異なる可能性があることに注意してください。  
