@@ -381,10 +381,15 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
 
   save_dtype = str_to_dtype(save_precision)
 
-  print(f"loading SD model : {model_b}")
-  text_encoder_o, _, unet_o = load_models_from_stable_diffusion_checkpoint(v2, model_b)
-  print(f"loading SD model : {model_a}")
-  text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
+  if model_a == model_b:
+    print(f"loading SD model : {model_a}")
+    text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
+    text_encoder_o, _, unet_o = text_encoder_t, _, unet_t
+  else:
+    print(f"loading SD model : {model_b}")
+    text_encoder_o, _, unet_o = load_models_from_stable_diffusion_checkpoint(v2, model_b)
+    print(f"loading SD model : {model_a}")
+    text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
 
   # create LoRA network to extract weights: Use dim (rank) as alpha
   lora_network_o = create_network(1.0, dim, dim, None, text_encoder_o, unet_o)
