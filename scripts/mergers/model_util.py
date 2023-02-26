@@ -3,6 +3,7 @@ import torch
 from transformers import CLIPTextModel,  CLIPTextConfig
 from safetensors.torch import load_file
 import safetensors.torch
+from modules.sd_models import read_state_dict
 
 # DiffUsers版StableDiffusionのモデルパラメータ
 NUM_TRAIN_TIMESTEPS = 1000
@@ -643,16 +644,7 @@ def load_checkpoint_with_text_encoder_conversion(ckpt_path):
       ('cond_stage_model.transformer.final_layer_norm.', 'cond_stage_model.transformer.text_model.final_layer_norm.')
   ]
 
-  if is_safetensors(ckpt_path):
-    checkpoint = None
-    state_dict = load_file(ckpt_path, "cpu")
-  else:
-    checkpoint = torch.load(ckpt_path, map_location="cpu")
-    if "state_dict" in checkpoint:
-      state_dict = checkpoint["state_dict"]
-    else:
-      state_dict = checkpoint
-      checkpoint = None
+  state_dict = read_state_dict(ckpt_path)
 
   key_reps = []
   for rep_from, rep_to in TEXT_ENCODER_KEY_REPLACEMENTS:
@@ -665,7 +657,7 @@ def load_checkpoint_with_text_encoder_conversion(ckpt_path):
     state_dict[new_key] = state_dict[key]
     del state_dict[key]
 
-  return checkpoint, state_dict
+  return state_dict
 
 def to_half(sd):
     for key in sd.keys():
@@ -677,7 +669,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a):
     from modules import sd_models,shared
     if "fp16" in savesets: 
         state_dict = to_half(state_dict)
-        pre = "pf16"
+        pre = "fp16"
     else:pre = ""
     ext = ".safetensors" if "safetensors" in savesets else ".ckpt"
 
@@ -724,7 +716,7 @@ def filenamecutter(name,model_a = False):
 # TODO dtype指定の動作が怪しいので確認する text_encoderを指定形式で作れるか未確認
 def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   import diffusers
-  _, state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
+  state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
   if dtype is not None:
     for k, v in state_dict.items():
       if type(v) is torch.Tensor:
