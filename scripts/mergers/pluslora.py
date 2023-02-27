@@ -60,7 +60,7 @@ def on_ui_tabs():
             sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
             create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
             sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
-            create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+            create_refresh_button(sml_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
         with gr.Row().style(equal_height=False):
             sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
@@ -422,7 +422,7 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
     lora_name = lora_o.lora_name
     module_o = lora_o.org_module
     module_t = lora_t.org_module
-    diff = module_t.weight - module_o.weight
+    diff = alpha*module_t.weight - beta*module_o.weight
     diff = diff.float()
 
     diffs[lora_name] = diff
