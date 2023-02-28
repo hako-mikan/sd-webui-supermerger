@@ -167,7 +167,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
             if usebeta:
                 zs = [zs[i:i+2] for i in range(0,len(zs),2)]
                 caster(zs,hear)
-        elif "deep" in ztype:
+        elif "elemental" in ztype:
             zs = zmen.splitlines()
         else:
             zs = [z.strip() for z in zmen.split(',')]
@@ -255,7 +255,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if "model_A" in zt:model_a = z
         if "model_B" in zt:model_b = z
         if "model_C" in zt:model_c = z
-        if "deep" in zt:deep = z
+        if "elemental" in zt:deep = z
     
     # plot start
     for y in ys:
@@ -269,8 +269,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
             if ("beta" in xtype or "beta" in ytype) and pinpoint:
                 weights_b_in = weightsdealer(x,xtype,y,weights_b)
                 weights_a_in =weights_a
-            if "pd" in xtype or "pd" in ytype or "effective" in xtype or "effective" in ytype:
-                deep_in = deep +","+ str(x)+":"+ str(y) if "pd" in xtype else deep+"," + str(y)+":"+ str(x)
+            if "pe" in xtype or "pe" in ytype or "effective" in xtype or "effective" in ytype:
+                deep_in = deep +","+ str(x)+":"+ str(y) if "pe" in xtype else deep+"," + str(y)+":"+ str(x)
             else:
                 deep_in = deep
 
