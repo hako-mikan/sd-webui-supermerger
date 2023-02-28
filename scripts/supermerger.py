@@ -149,7 +149,7 @@ def on_ui_tabs():
                     s_reloadtags = gr.Button(value="Reload Tags",variant='primary')
                     s_savetext = gr.Button(value="Save Presets",variant='primary')
                     s_openeditor = gr.Button(value="Open TextEditor",variant='primary')
-                weightstags= gr.TextArea(label="available",lines=2,value=tagdicter(weights_presets),visible =True,interactive =True) 
+                weightstags= gr.TextBox(label="available",lines=2,value=tagdicter(weights_presets),visible =True,interactive =True) 
                 wpresets= gr.TextArea(label="",value=weights_presets,visible =True,interactive  = True)    
 
             with gr.Tab("Reservation"):
