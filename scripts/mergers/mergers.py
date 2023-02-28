@@ -20,8 +20,8 @@ from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 from inspect import currentframe
 
 mergedmodel=[]
-typesg = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)"]
-types = ["none","alpha","beta","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks"]
+typesg = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","deep","pinpoint deep","effective deep checker"]
+types = ["none","alpha","beta","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks","deep","pd","effective"]
 modes=["Weight" ,"Add" ,"Triple","Twice"]
 sevemodes=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
@@ -40,11 +40,13 @@ def casterr(*args,hear=hear):
         names = {id(v): k for k, v in currentframe().f_back.f_locals.items()}
         print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
     
-  #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets]  
-def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,
+  #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
+def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,esettings,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,currentmodel,imggen):
 
-    result,currentmodel,modelid,theta_0 = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets)
+    deepprint  = True if "print change" in esettings else False
+
+    result,currentmodel,modelid,theta_0 = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint=deepprint)
 
     if "ERROR" in result: return result, *non3
 
@@ -66,8 +68,9 @@ NUM_INPUT_BLOCKS = 12
 NUM_MID_BLOCK = 1
 NUM_OUTPUT_BLOCKS = 12
 NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
+blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
      
-def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets):
+def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint = False):
     caster("merge start",hearm)
     global hear
     global mergedmodel
@@ -94,13 +97,17 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep].copy()
     
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
 
     caster(mergedmodel,False)
+
+    if len(deep) > 0:
+        deep = deep.replace("\n",",")
+        deep = deep.split(",")
 
     #format check
     if model_a =="" or model_b =="" or ((not modes[0] in mode) and model_c=="") : 
@@ -157,13 +164,13 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
 
     chckpoint_dict_skip_on_merge = ["cond_stage_model.transformer.text_model.embeddings.position_ids"]
-
     count_target_of_basealpha = 0
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if "model" in key and key in theta_1:
             if usebeta and not key in theta_2:
                 continue
 
+            weight_index = -1
             current_alpha = alpha
             current_beta = beta
 
@@ -204,6 +211,28 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             else:
                 count_target_of_basealpha = count_target_of_basealpha + 1
 
+            if len(deep) > 0:
+                skey = key + blockid[weight_index+1]
+                for d in deep:
+                    if d.count(":") != 2 :continue
+                    dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
+                    dbs,dws = dbs.split(" "), dws.split(" ")
+                    dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
+                    dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
+                    flag = dbn
+                    for db in dbs:
+                        if db in skey:
+                            flag = not dbn
+                    if flag:flag = dwn
+                    else:continue
+                    for dw in dws:
+                        if dw in skey:
+                            flag = not dwn
+                    if flag:
+                        dr = float(dr)
+                        if deepprint :print(dbs,dws,key,dr)
+                        current_alpha = dr
+
             if modes[1] in mode:#Add
                 caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]",hear)
                 theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
@@ -236,21 +265,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     caster(mergedmodel,False)
 
     return "",currentmodel,modelid,theta_0
-
-def savemerged(custom_name,save_sets):
-    global mergedmodel
-    mergesets = mergedmodel.copy()
-    if len(mergesets)!=13:
-        return "ERROR:no info for merged model",None
-    if "save after merge" not in save_sets:save_sets.append("save after merge")
-    mergesets[2] = namefromhash(mergesets[2])
-    mergesets[3] = namefromhash(mergesets[3])
-    mergesets[4] = namefromhash(mergesets[4])   
-    #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
-    mergesets [9] = custom_name
-    mergesets [10] = save_sets
-
-    return smerge(*mergesets)
 
 def load_model_weights_m(model,model_a,model_b,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)

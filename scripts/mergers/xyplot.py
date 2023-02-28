@@ -1,7 +1,11 @@
 import random
+import cv2
+import numpy as np
+import os
 import copy
+import csv
 from PIL import Image
-from modules import images
+from modules import images,scripts
 from modules.shared import opts
 from scripts.mergers.mergers import types,smerge,simggen,filenamecutter,draw_origin,wpreseter
 from scripts.mergers.model_util import usemodelgen
@@ -17,14 +21,32 @@ def freezetime():
     global state_mergen
     state_mergen = True
 
-def numanager(normalstart,xtype,xmen,ytype,ymen,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,
+def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h):
     global numadepth
     grids = []
+    nn = "\n\n"
+
+    if nn in xmen:
+        xmens = xmen.split(nn)
+        xmen = xmens[0]
+        for men in xmens[1:]:
+            numaker(xtype,men,ytype,ymen,esettings,
+                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                        prompt,nprompt,steps,sampler,cfg,seed,w,h)
+
+    if nn in ymen:
+        ymens = ymen.split(nn)
+        ymen = ymens[0]
+        for men in ymens[1:]:
+            numaker(xtype,xmen,ytype,men,esettings,
+                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                        prompt,nprompt,steps,sampler,cfg,seed,w,h)
+
     if normalstart:
-        result,currentmodel,xyimage,a,b,c= sgenxyplot(xtype,xmen,ytype,ymen,
-                                                                             weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,
+        result,currentmodel,xyimage,a,b,c= sgenxyplot(xtype,xmen,ytype,ymen,esettings,
+                                                                             weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                                                                              prompt,nprompt,steps,sampler,cfg,seed,w,h)
         if xyimage is not None:grids =[xyimage[0]]
         else:print(result)
@@ -58,13 +80,13 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,
 
     return result,currentmodel,grids,a,b,c
 
-def numaker(xtype,xmen,ytype,ymen,
+def numaker(xtype,xmen,ytype,ymen,esettings,
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets]       
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h):
     global numadepth
-    numadepth.append([len(numadepth)+1,"waiting",xtype,xmen,ytype,ymen,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,
+    numadepth.append([len(numadepth)+1,"waiting",xtype,xmen,ytype,ymen,esettings,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h])
     return numalistmaker(copy.deepcopy(numadepth))
 
@@ -90,17 +112,21 @@ def numalistmaker(numa):
 def caster(news,hear):
     if hear: print(news)
 
-def sgenxyplot(xtype,xmen,ytype,ymen,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,
+def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h):
     global hear
-    #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint ]
+    esettings = " ".join(esettings)
+    #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
     xtype = types[xtype]
     ytype = types[ytype]
+    if ytype == "none": ymen = ""
 
     modes=["Weight" ,"Add" ,"Triple","Twice","Diff"]
     xs=ys=0
     weights_a_in=weights_b_in="0"
+
+    deepprint  = True if "print change" in esettings else False
 
     def castall(hear):
         if hear :print(f"xmen:{xmen}, ymen:{ymen}, xtype:{xtype}, ytype:{ytype}, weights_a:{weights_a_in}, weights_b:{weights_b_in}, model_A:{model_a},model_B :{model_b}, model_C:{model_c}, alpha:{alpha},\
@@ -141,6 +167,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,
             if usebeta:
                 zs = [zs[i:i+2] for i in range(0,len(zs),2)]
                 caster(zs,hear)
+        elif "deep" in ztype:
+            zs = zmen.splitlines()
         else:
             zs = [z.strip() for z in zmen.split(',')]
             caster(zs,hear)
@@ -209,8 +237,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,
         return z,z
 
     def xydealer(z,zt):
-        nonlocal alpha,beta,seed,weights_a_in,weights_b_in,model_a,model_b,model_c
-        if pinpoint:return
+        nonlocal alpha,beta,seed,weights_a_in,weights_b_in,model_a,model_b,model_c,deep
+        if pinpoint or "pd" in zt or "effective" in zt:return
         if "and" in zt:
             alpha,beta = abdealer(z)
             return
@@ -227,7 +255,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,
         if "model_A" in zt:model_a = z
         if "model_B" in zt:model_b = z
         if "model_C" in zt:model_c = z
-
+        if "deep" in zt:deep = z
+    
     # plot start
     for y in ys:
         xydealer(y,ytype)
@@ -240,9 +269,15 @@ def sgenxyplot(xtype,xmen,ytype,ymen,
             if ("beta" in xtype or "beta" in ytype) and pinpoint:
                 weights_b_in = weightsdealer(x,xtype,y,weights_b)
                 weights_a_in =weights_a
+            if "pd" in xtype or "pd" in ytype or "effective" in xtype or "effective" in ytype:
+                deep_in = deep +","+ str(x)+":"+ str(y) if "pd" in xtype else deep+"," + str(y)+":"+ str(x)
+            else:
+                deep_in = deep
+
+            print(deep_in)
             print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)} ({xcount+ycount*len(xs)+1}/{allcount})")
             if not (xtype=="seed" and xcount > 0):
-               _ , currentmodel,modelid,theta_0=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,useblocks,"","",id_sets,False) 
+               _ , currentmodel,modelid,theta_0=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,useblocks,"","",id_sets,False,deep_in,deepprint = deepprint) 
                usemodelgen(theta_0,model_a)
                              # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
             image_temp=simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,currentmodel,id_sets,modelid)
@@ -270,10 +305,13 @@ def sgenxyplot(xtype,xmen,ytype,ymen,
 
     if ys==[""]:ys = [" "]
 
-    gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
-    grid = smakegrid(xyimage,xs,ys,gridmodel,image_temp[4])
+    if "effective" in xtype or "effective" in ytype:
+        xyimage,xs,ys = effectivechecker(xyimage,xs,ys,model_a,model_b,esettings)
 
-    xyimage.insert(0,grid)
+    if not "grid" in esettings:
+        gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
+        grid = smakegrid(xyimage,xs,ys,gridmodel,image_temp[4])
+        xyimage.insert(0,grid)
 
     state_mergen = False
     return "Finished",currentmodel,xyimage,*image_temp[1:4]
@@ -361,3 +399,65 @@ def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha
 
     currentmodel = currentmodel+vals
     return currentmodel
+
+def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
+    diffs = []
+    outnum =[]
+    im1 = np.array(imgs[0])
+    for i in range(len(imgs)-1):
+        im2 = np.array(imgs[i+1])
+
+        abs_diff = cv2.absdiff(im2 ,  im1)
+
+        abs_diff_t = cv2.threshold(abs_diff, 5, 255, cv2.THRESH_BINARY)[1]        
+        res = abs_diff_t.astype(np.uint8)
+        percentage = (np.count_nonzero(res) * 100)/ res.size
+        abs_diff = cv2.bitwise_not(abs_diff)
+        outnum.append(percentage)
+
+        abs_diff = Image.fromarray(abs_diff)     
+        #imgs.insert(i//2*3,diff_img)
+        diffs.append(abs_diff)
+        diffs.append(imgs[i+1])
+        diffs.append(imgs[0])
+
+        model_a = filenamecutter(model_a)
+        model_b = filenamecutter(model_b)
+
+        dir = os.path.join(opts.outdir_txt2img_samples,f"{model_a+model_b}","difgif")
+        if "gif" in esettings:
+            try:
+                os.makedirs(dir)
+            except FileExistsError:
+                pass
+            gifpath = gifpath_t = os.path.join(dir,ys[i+1].replace(":","_")+".gif")
+            
+            is_file = os.path.isfile(gifpath)
+            j = 0
+            while is_file:
+                gifpath = gifpath_t.replace(".gif",f"_{j}.gif")
+                print(gifpath)
+                is_file = os.path.isfile(gifpath)
+                j = j + 1
+
+            imgs[0].save(gifpath, save_all=True, append_images=[imgs[i+1]], optimize=False, duration=1000, loop=0)
+
+    nums = []
+    ys = ys[1:]
+    for i in range(len(ys)):
+        nums.append([ys[i],outnum[i]])
+        ys[i] = ys[i] + "\n Diff : " + str(round(outnum[i],3)) + "%"
+
+    xs = ["diff",xs[0],"source"]
+
+    if "cvs" in esettings:
+        try:
+            os.makedirs(dir)
+        except FileExistsError:
+            pass
+        filepath = os.path.join(dir, f"{model_a+model_b}.csv")
+        with open(filepath, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerows(nums)
+
+    return diffs,xs,ys

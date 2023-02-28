@@ -5,6 +5,7 @@ import os
 import gc
 import gradio as gr
 import modules.shared as shared
+import gc
 from safetensors.torch import load_file, save_file
 from typing import List
 from tqdm import tqdm
@@ -157,6 +158,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta):
     print("make LoRA start")
     if model_a == "" or model_b =="":
       return "ERROR: No model Selected"
+    gc.collect()
 
     if saveto =="" : saveto = makeloraname(model_a,model_b)
     if not ".safetensors" in saveto :saveto  += ".safetensors"
@@ -368,7 +370,6 @@ def pluslora(lnames,loraratios,settings,output,model):
 
 CLAMP_QUANTILE = 0.99
 MIN_DIFF = 1e-6
-
 def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
   def str_to_dtype(p):
     if p == 'float':
@@ -382,12 +383,12 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
   save_dtype = str_to_dtype(save_precision)
 
   if model_a == model_b:
-    print(f"loading SD model : {model_a}")
     text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
     text_encoder_o, _, unet_o = text_encoder_t, _, unet_t
   else:
     print(f"loading SD model : {model_b}")
     text_encoder_o, _, unet_o = load_models_from_stable_diffusion_checkpoint(v2, model_b)
+    
     print(f"loading SD model : {model_a}")
     text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
 
@@ -396,7 +397,6 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
   lora_network_t = create_network(1.0, dim, dim, None, text_encoder_t, unet_t)
   assert len(lora_network_o.text_encoder_loras) == len(
       lora_network_t.text_encoder_loras), f"model version is different (SD1.x vs SD2.x) / それぞれのモデルのバージョンが違います（SD1.xベースとSD2.xベース） "
-
   # get diffs
   diffs = {}
   text_encoder_different = False
@@ -535,8 +535,7 @@ class LoRAModule(torch.nn.Module):
 def create_network(multiplier, network_dim, network_alpha, vae, text_encoder, unet, **kwargs):
   if network_dim is None:
     network_dim = 4                     # default
-  network = LoRANetwork(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim, alpha=network_alpha)
-  return network
+  return LoRANetwork(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim, alpha=network_alpha)
 
 class LoRANetwork(torch.nn.Module):
   UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
