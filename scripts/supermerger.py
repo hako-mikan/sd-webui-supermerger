@@ -197,7 +197,7 @@ def on_ui_tabs():
                         headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
                 )
 
-        with gr.Tab("ElementalMerge", elem_id="tab_deep"):
+        with gr.Tab("Elemental", elem_id="tab_deep"):
                 with gr.Row():
                     deep = gr.Textbox(label="ElementalMerge",lines=2,value="")
                 with gr.Row():
