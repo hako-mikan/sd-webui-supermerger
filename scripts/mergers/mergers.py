@@ -20,8 +20,8 @@ from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 from inspect import currentframe
 
 mergedmodel=[]
-typesg = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","deep","pinpoint deep","effective deep checker"]
-types = ["none","alpha","beta","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks","deep","pd","effective"]
+typesg = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","pinpoint element","effective elemental checker"]
+types = ["none","alpha","beta","alpha and beta","seed", "mbw weights", "model_A","model_B","model_C","pinpoint blocks","elemental","pe","effective"]
 modes=["Weight" ,"Add" ,"Triple","Twice"]
 sevemodes=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
