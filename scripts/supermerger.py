@@ -3,14 +3,17 @@ from logging import exception
 from pprint import pprint
 import gradio as gr
 import gc
-import torch
+import re
+import safetensors.torch
 import os
+import shutil
 import os.path
 import argparse
 import modules.ui
 import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import simggen,typesg,smergegen,rwmergelog
 from scripts.mergers.xyplot import freezetime,numaker,numanager,nulister
+from scripts.mergers.model_util import savemodel
 import csv
 from modules import sd_models,script_callbacks,scripts, shared,sd_hijack,devices,sd_vae
 from modules.ui import create_refresh_button, create_output_panel
@@ -27,13 +30,22 @@ def on_ui_train_tabs(params):
 path_root = scripts.basedir()
 
 def on_ui_tabs():
-    filepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     weights_presets=""
-    try:
-        with open(filepath) as f:
-            weights_presets = f.read()
-    except OSError as e:
-            pass
+    userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
+    if os.path.isfile(userfilepath):
+        try:
+            with open(userfilepath) as f:
+                weights_presets = f.read()
+        except OSError as e:
+                pass
+    else:
+        filepath = os.path.join(path_root, "scripts","mbwpresets_master.txt")
+        try:
+            with open(filepath) as f:
+                weights_presets = f.read()
+                shutil.copyfile(filepath, userfilepath)
+        except OSError as e:
+                pass
 
     with gr.Blocks(analytics_enabled=False) as ui:
         with gr.Tab("Merge", elem_id="tab_merge"):
@@ -104,6 +116,8 @@ def on_ui_tabs():
                 blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in modules.sd_models.checkpoints_list.values()],type="value",interactive=True)
+            with gr.Row(visible = False) as row_esets:
+                esettings = gr.CheckboxGroup(label = "effective chekcer settings",choices=["save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
     
             with gr.Tab("Weights Setting"):
                 with gr.Row():
@@ -149,7 +163,7 @@ def on_ui_tabs():
                     s_reloadtags = gr.Button(value="Reload Tags",variant='primary')
                     s_savetext = gr.Button(value="Save Presets",variant='primary')
                     s_openeditor = gr.Button(value="Open TextEditor",variant='primary')
-                weightstags= gr.Textbox(label="available",lines=2,value=tagdicter(weights_presets),visible =True,interactive =True) 
+                weightstags= gr.Textbox(label="available",lines = 2,value=tagdicter(weights_presets),visible =True,interactive =True) 
                 wpresets= gr.TextArea(label="",value=weights_presets,visible =True,interactive  = True)    
 
             with gr.Tab("Reservation"):
@@ -193,6 +207,24 @@ def on_ui_tabs():
                         headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
                 )
 
+        with gr.Tab("Elemental", elem_id="tab_deep"):
+                with gr.Row():
+                    deep = gr.Textbox(label="ElementalMerge",lines=2,value="")
+                with gr.Row():
+                    esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                with gr.Row():
+                    smd_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    create_refresh_button(smd_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
+                    smd_loadkeys = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    keys = gr.Dataframe(headers=["No.","block","key"],)
+
+        smd_loadkeys.click(
+            fn=loadkeys,
+            inputs=[smd_model_a],
+            outputs=[keys]
+        )
+
         def unload():
             if shared.sd_model == None: return "already unloaded"
             sd_hijack.model_hijack.undo_hijack(shared.sd_model)
@@ -205,35 +237,24 @@ def on_ui_tabs():
 
         load_history.click(fn=load_historyf,outputs=[history ])
 
-        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets]
+        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
+        xysettings=[x_type,xgrid,y_type,ygrid,esettings]
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [submit_result,*msettings[0:12]]
-        )
-
-        s_reserve.click(
-            fn=numaker,
-            inputs=[x_type,xgrid,y_type,ygrid,*msettings,*gensets.txt2img_preview_params],
-            outputs=[numaframe]
-        )
-
-        s_reserve1.click(
-            fn=numaker,
-            inputs=[x_type,xgrid,y_type,ygrid,*msettings,*gensets.txt2img_preview_params],
-            outputs=[numaframe]
+            outputs = [submit_result,*msettings[0:12],deep]
         )
 
         merge.click(
             fn=smergegen,
-            inputs=[*msettings,*gensets.txt2img_preview_params,currentmodel,dfalse],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,currentmodel,dfalse],
             outputs=[submit_result,currentmodel]
         )
 
         mergeandgen.click(
             fn=smergegen,
-            inputs=[*msettings,*gensets.txt2img_preview_params,currentmodel,dtrue],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,currentmodel,dtrue],
             outputs=[submit_result,currentmodel,*imagegal]
         )
 
@@ -243,15 +264,27 @@ def on_ui_tabs():
             outputs=[*imagegal],
         )
 
+        s_reserve.click(
+            fn=numaker,
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params],
+            outputs=[numaframe]
+        )
+
+        s_reserve1.click(
+            fn=numaker,
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params],
+            outputs=[numaframe]
+        )
+
         gengrid.click(
             fn=numanager,
-            inputs=[dtrue,x_type,xgrid,y_type,ygrid,*msettings,*gensets.txt2img_preview_params],
+            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[dfalse,x_type,xgrid,y_type,ygrid,*msettings,*gensets.txt2img_preview_params],
+            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
@@ -297,8 +330,8 @@ def on_ui_tabs():
         ou10.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
         editweights.change(fn=changesliders,inputs=[weights_a,weights_b,editweights],outputs=[x for x in menbers[3:]])
 
-        x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid])
-        y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid])
+        x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets])
+        y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets])
         x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
 
         import subprocess
@@ -389,7 +422,9 @@ def reversparams(id):
     mgs[10] = [x.strip() for x in mgs[10].split(",")]
     mgs[11] = mgs[11].replace("[","").replace("]","").replace("'", "") 
     mgs[11] = [x.strip() for x in mgs[11].split(",")]
-    return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:12]]]
+    while len(mgs) > 13:
+        mgs.append("")
+    return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:13]]]
 
 def add_to_seq(seq,maker):
     return gr.Textbox.update(value = maker if seq=="" else seq+"\r\n"+maker)
@@ -409,26 +444,14 @@ def makerand(num):
 
 #row_blockids,row_checkpoints,row_inputers,ygrid
 def showxy(x,y):
+    flags =[False]*5
     t = typesg
-    if t[y] == "none":
-        if "model" in t[x]: 
-            return [gr.update(visible = False),gr.update(visible = True),gr.update(visible = True),gr.update(visible = False)]
-        if "pinpoint" in t[x]:
-            return [gr.update(visible = True),gr.update(visible = False),gr.update(visible = True),gr.update(visible = False)]
-        else:
-            return [gr.update(visible = False) for x in range(4)]
-    else:
-        if "model" in t[y]:
-            if "pinpoint" in t[x]:
-                return [gr.update(visible = True) for x in range(4)]
-            else:
-                return [gr.update(visible = False),*[gr.update(visible = True) for x in range(3)]]
-        if "pinpoint" in t[y]:
-            if "model" in t[x]:
-                return [gr.update(visible = True) for x in range(4)]
-            else:
-                return [gr.update(visible = True),gr.update(visible = False),gr.update(visible = True),gr.update(visible = True)]
-        return [*[gr.update(visible = False) for x in range(3)],gr.update(visible = True)]
+    txy = t[x] + t[y]
+    if "model" in txy : flags[1] = flags[2] = True
+    if "pinpoint" in txy : flags[0] = flags[2] = True
+    if "effective" in txy : flags[4] = True
+    if not "none" in t[y] : flags[3] = True
+    return [gr.update(visible = x) for x in flags]
 
 def changesliders(texta,textb,target):
     text = texta if target =="alpha" else textb
@@ -460,6 +483,44 @@ def tagdicter(presets):
         if len([w for w in w.split(",")]) == 26:
             wdict[key.strip()]=w
     return ",".join(list(wdict.keys()))
+
+def loadkeys(model_a):
+    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+    sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+    keys = []
+    for i, key in enumerate(sd.keys()):
+        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
+        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
+        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
+
+        weight_index = -1
+        blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
+
+        NUM_INPUT_BLOCKS = 12
+        NUM_MID_BLOCK = 1
+        NUM_OUTPUT_BLOCKS = 12
+        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
+
+        if 'time_embed' in key:
+            weight_index = -2                # before input blocks
+        elif '.out.' in key:
+            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
+        else:
+            m = re_inp.search(key)
+            if m:
+                inp_idx = int(m.groups()[0])
+                weight_index = inp_idx
+            else:
+                m = re_mid.search(key)
+                if m:
+                    weight_index = NUM_INPUT_BLOCKS
+                else:
+                    m = re_out.search(key)
+                    if m:
+                        out_idx = int(m.groups()[0])
+                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
+        keys.append([i,blockid[weight_index+1],key])
+    return keys
 
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
 script_callbacks.on_ui_tabs(on_ui_tabs)
