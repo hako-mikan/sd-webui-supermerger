@@ -75,7 +75,7 @@ def on_ui_tabs():
           sml_calcdim = gr.Button(elem_id="calcloras", value="calculate dimension of LoRAs(It may take a few minutes if there are many LoRAs)",variant='primary')
           sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
         sml_loras = gr.CheckboxGroup(label = "Lora",choices=[x[0] for x in lora.available_loras.items()],type="value",interactive=True,visible = True)
-        sml_loraratios = gr.TextArea(label="",lines=10,value=sml_lbwpresets,visible =True,interactive  = True)  
+        sml_loraratios = gr.TextArea(label="",value=sml_lbwpresets,visible =True,interactive  = True)  
 
         sml_merge.click(
             fn=lmerge,
