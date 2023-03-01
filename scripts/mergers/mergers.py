@@ -235,7 +235,11 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
             if modes[1] in mode:#Add
                 caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]",hear)
-                theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
+
+                if theta_0[key].size != theta_1[key].size:
+                    print(theta_0[key].size)
+                else:
+                    theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
             elif modes[2] in mode:#Triple
                 caster(f"model A[{key}] +  {1-current_alpha-current_beta} +  model B[{key}]*{current_alpha} + model C[{key}]*{current_beta}",hear)
                 theta_0[key] = (1 - current_alpha-current_beta) * theta_0[key] + current_alpha * theta_1[key]+current_beta * theta_2[key]
