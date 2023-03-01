@@ -6,6 +6,7 @@ import gc
 import re
 import safetensors.torch
 import os
+import shutil
 import os.path
 import argparse
 import modules.ui
@@ -29,13 +30,22 @@ def on_ui_train_tabs(params):
 path_root = scripts.basedir()
 
 def on_ui_tabs():
-    filepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     weights_presets=""
-    try:
-        with open(filepath) as f:
-            weights_presets = f.read()
-    except OSError as e:
-            pass
+    userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
+    if os.path.isfile(userfilepath):
+        try:
+            with open(userfilepath) as f:
+                weights_presets = f.read()
+        except OSError as e:
+                pass
+    else:
+        filepath = os.path.join(path_root, "scripts","mbwpresets_master.txt")
+        try:
+            with open(filepath) as f:
+                weights_presets = f.read()
+                shutil.copyfile(filepath, userfilepath)
+        except OSError as e:
+                pass
 
     with gr.Blocks(analytics_enabled=False) as ui:
         with gr.Tab("Merge", elem_id="tab_merge"):
