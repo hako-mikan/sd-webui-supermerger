@@ -80,7 +80,7 @@ def on_ui_tabs():
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
                     with gr.Row():
-                        x_type = gr.Dropdown(label="X type", choices=[x for x in typesg[:-1]], value="alpha", type="index")
+                        x_type = gr.Dropdown(label="X type", choices=[x for x in typesg], value="alpha", type="index")
                         x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
                     xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
                     y_type = gr.Dropdown(label="Y type", choices=[y for y in typesg], value="none", type="index")    
