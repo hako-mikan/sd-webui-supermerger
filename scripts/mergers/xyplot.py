@@ -26,19 +26,20 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h):
     global numadepth
     grids = []
-    nn = "\n\n"
+    sep = "|"
 
-    if nn in xmen:
-        xmens = xmen.split(nn)
+    if sep  in xmen:
+        xmens = xmen.split(sep)
         xmen = xmens[0]
+        if seed =="-1": seed = str(random.randrange(4294967294))
         for men in xmens[1:]:
             numaker(xtype,men,ytype,ymen,esettings,
                         weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h)
-
-    if nn in ymen:
-        ymens = ymen.split(nn)
+    elif sep  in ymen:
+        ymens = ymen.split(sep)
         ymen = ymens[0]
+        if seed =="-1": seed = str(random.randrange(4294967294))
         for men in ymens[1:]:
             numaker(xtype,xmen,ytype,men,esettings,
                         weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
@@ -160,7 +161,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         print(f"the die was thrown : {zs}")
 
     #adjust parameters, alpha,beta,models,seed: list of single parameters, mbw(no beta):list of text,mbw(usebeta); list of pair text
-    def adjuster(zmen,ztype):
+    def adjuster(zmen,ztype,aztype):
         if "mbw" in ztype:#men separated by newline
             zs = zmen.splitlines()
             caster(zs,hear)
@@ -168,15 +169,22 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                 zs = [zs[i:i+2] for i in range(0,len(zs),2)]
                 caster(zs,hear)
         elif "elemental" in ztype:
-            zs = zmen.splitlines()
+            zs = zmen.split("\n\n")
         else:
+            if "pe" in ztype:
+                zmen = zmen.replace("\n",",")
+            if "effective" in ztype:
+                zmen = ","+zmen
+                zmen = zmen.replace("\n",",")
             zs = [z.strip() for z in zmen.split(',')]
             caster(zs,hear)
+        if "alpha" in ztype and "effective" in aztype:
+            zs = [zs[0]]
         if "seed" in ztype:dicedealer(zs)
         return zs
 
-    xs = adjuster(xmen,xtype)
-    ys = adjuster(ymen,ytype)
+    xs = adjuster(xmen,xtype,ytype)
+    ys = adjuster(ymen,ytype,xtype)
 
     #in case beta selected but mode is Weight sum or Add or Diff
     if ("beta" in xtype or "beta" in ytype) and not usebeta:
@@ -269,8 +277,10 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
             if ("beta" in xtype or "beta" in ytype) and pinpoint:
                 weights_b_in = weightsdealer(x,xtype,y,weights_b)
                 weights_a_in =weights_a
-            if "pe" in xtype or "pe" in ytype or "effective" in xtype or "effective" in ytype:
-                deep_in = deep +","+ str(x)+":"+ str(y) if "pe" in xtype else deep+"," + str(y)+":"+ str(x)
+            if "pe" in xtype or "effective" in xtype:
+                deep_in = deep +","+ str(x)+":"+ str(y) 
+            elif "pe" in ytype or "effective" in ytype:
+                deep_in = deep +","+ str(y)+":"+ str(x) 
             else:
                 deep_in = deep
 
@@ -404,6 +414,17 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
     diffs = []
     outnum =[]
     im1 = np.array(imgs[0])
+    
+    model_a = filenamecutter(model_a)
+    model_b = filenamecutter(model_b)
+    dir = os.path.join(opts.outdir_txt2img_samples,f"{model_a+model_b}","difgif")
+
+    if "gif" in esettings:
+        try:
+            os.makedirs(dir)
+        except FileExistsError:
+            pass
+
     for i in range(len(imgs)-1):
         im2 = np.array(imgs[i+1])
 
@@ -416,20 +437,10 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
         outnum.append(percentage)
 
         abs_diff = Image.fromarray(abs_diff)     
-        #imgs.insert(i//2*3,diff_img)
+
         diffs.append(abs_diff)
-        diffs.append(imgs[i+1])
-        diffs.append(imgs[0])
 
-        model_a = filenamecutter(model_a)
-        model_b = filenamecutter(model_b)
-
-        dir = os.path.join(opts.outdir_txt2img_samples,f"{model_a+model_b}","difgif")
         if "gif" in esettings:
-            try:
-                os.makedirs(dir)
-            except FileExistsError:
-                pass
             gifpath = gifpath_t = os.path.join(dir,ys[i+1].replace(":","_")+".gif")
             
             is_file = os.path.isfile(gifpath)
@@ -443,12 +454,15 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
             imgs[0].save(gifpath, save_all=True, append_images=[imgs[i+1]], optimize=False, duration=1000, loop=0)
 
     nums = []
-    ys = ys[1:]
-    for i in range(len(ys)):
-        nums.append([ys[i],outnum[i]])
-        ys[i] = ys[i] + "\n Diff : " + str(round(outnum[i],3)) + "%"
+    outs = []
 
-    xs = ["diff",xs[0],"source"]
+    ls,ss = (xs.copy(),ys.copy()) if len(xs) > len(ys) else (ys.copy(),xs.copy())
+
+    ls = ls[1:]
+    for i in range(len(ls)):
+        nums.append([ls[i],outnum[i]])
+        ls[i] = ls[i] + "\n Diff : " + str(round(outnum[i],3)) + "%"    
+
 
     if "cvs" in esettings:
         try:
@@ -460,4 +474,14 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
             writer = csv.writer(f)
             writer.writerows(nums)
 
-    return diffs,xs,ys
+    if len(ys) > len (xs):
+        for diff,img in zip(diffs,imgs[1:]):
+            outs.append(diff)
+            outs.append(img)
+            outs.append(imgs[0])
+            ss = ["diff",ss[0],"source"]
+        return outs,ss,ls
+    else:
+        outs = [imgs[0]]*len(diffs)  + imgs[1:]+ diffs
+        ss = ["source",ss[0],"diff"]
+        return outs,ls,ss
