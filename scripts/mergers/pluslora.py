@@ -327,7 +327,7 @@ def pluslora(lnames,loraratios,settings,output,model):
 
     for name,filename, lwei in zip(names,filenames, lweis):
       print(f"loading: {name}")
-      lora_sd = load_state_dict(filename, torch.float64)
+      lora_sd = load_state_dict(filename, torch.float)
 
       print(f"merging..." ,lwei)
       for key in lora_sd.keys():
