@@ -133,7 +133,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if hear :print(f"xmen:{xmen}, ymen:{ymen}, xtype:{xtype}, ytype:{ytype}, weights_a:{weights_a_in}, weights_b:{weights_b_in}, model_A:{model_a},model_B :{model_b}, model_C:{model_c}, alpha:{alpha},\
         beta :{beta}, mode:{mode}, blocks:{useblocks}")
 
-    pinpoint = "pinpoint" in xtype or "pinpoint" in ytype
+    pinpoint = "pinpoint blocks" in xtype or "pinpoint blocks" in ytype
     usebeta = modes[2] in mode or modes[3] in mode
 
     #check and adjust format
@@ -171,7 +171,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         elif "elemental" in ztype:
             zs = zmen.split("\n\n")
         else:
-            if "pe" in ztype:
+            if "pinpoint element" in ztype:
                 zmen = zmen.replace("\n",",")
             if "effective" in ztype:
                 zmen = ","+zmen
@@ -192,11 +192,11 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         print(f"{modes[3]} mode automatically selected)")
 
     #in case mbw or pinpoint selected but useblocks not chekced
-    if ("mbw" in xtype or "pinpoint" in xtype) and not useblocks:
+    if ("mbw" in xtype or "pinpoint blocks" in xtype) and not useblocks:
         useblocks = True
         print(f"MBW mode enabled")
 
-    if ("mbw" in ytype or "pinpoint" in ytype) and not useblocks:
+    if ("mbw" in ytype or "pinpoint blocks" in ytype) and not useblocks:
         useblocks = True
         print(f"MBW mode enabled")
 
@@ -214,8 +214,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
     #format ,IN00 IN03,IN04-IN09,OUT4,OUT05
     def weightsdealer(x,xtype,y,weights):
         caster(f"weights from : {weights}",hear)
-        zz = x if "pinpoint" in xtype else y
-        za = y if "pinpoint" in xtype else x
+        zz = x if "pinpoint blocks" in xtype else y
+        za = y if "pinpoint blocks" in xtype else x
         zz = [z.strip() for z in zz.split(' ')]
         weights_t = [w.strip() for w in weights.split(',')]
         if zz[0]!="NOT":
@@ -244,13 +244,13 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if " " in z:return z.split(" ")[0],z.split(" ")[1]
         return z,z
 
-    def xydealer(z,zt):
+    def xydealer(z,zt,azt):
         nonlocal alpha,beta,seed,weights_a_in,weights_b_in,model_a,model_b,model_c,deep
-        if pinpoint or "pd" in zt or "effective" in zt:return
+        if pinpoint or "pinpoint element" in zt or "effective" in zt:return
         if "and" in zt:
             alpha,beta = abdealer(z)
             return
-        if "alpha" in zt:alpha = z
+        if "alpha" in zt and not "pinpoint element" in azt:alpha = z
         if "beta" in zt: beta = z
         if "seed" in zt:seed = int(z)
         if "mbw" in zt:
@@ -267,19 +267,19 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
     
     # plot start
     for y in ys:
-        xydealer(y,ytype)
+        xydealer(y,ytype,xtype)
         xcount = 0
         for x in xs:
-            xydealer(x,xtype)
+            xydealer(x,xtype,ytype)
             if ("alpha" in xtype or "alpha" in ytype) and pinpoint:
                 weights_a_in = weightsdealer(x,xtype,y,weights_a)
                 weights_b_in = weights_b
             if ("beta" in xtype or "beta" in ytype) and pinpoint:
                 weights_b_in = weightsdealer(x,xtype,y,weights_b)
                 weights_a_in =weights_a
-            if "pe" in xtype or "effective" in xtype:
+            if "pinpoint element" in xtype or "effective" in xtype:
                 deep_in = deep +","+ str(x)+":"+ str(y) 
-            elif "pe" in ytype or "effective" in ytype:
+            elif "pinpoint element" in ytype or "effective" in ytype:
                 deep_in = deep +","+ str(y)+":"+ str(x) 
             else:
                 deep_in = deep
