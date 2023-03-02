@@ -89,6 +89,11 @@ def on_ui_tabs():
                                 mergeid = gr.Textbox(label="merge from ID", elem_id="model_converter_custom_name",value = "-1")
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
+                    with gr.Accordion("Elemental Merge",open = False):
+                        with gr.Row():
+                            esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                        with gr.Row():
+                            deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
                     with gr.Row():
                         x_type = gr.Dropdown(label="X type", choices=[x for x in typesg], value="alpha", type="index")
                         x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
@@ -207,11 +212,7 @@ def on_ui_tabs():
                         headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
                 )
 
-        with gr.Tab("Elemental", elem_id="tab_deep"):
-                with gr.Row():
-                    deep = gr.Textbox(label="ElementalMerge",lines=2,value="")
-                with gr.Row():
-                    esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+        with gr.Tab("Elements", elem_id="tab_deep"):
                 with gr.Row():
                     smd_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
                     create_refresh_button(smd_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
@@ -449,7 +450,7 @@ def showxy(x,y):
     txy = t[x] + t[y]
     if "model" in txy : flags[1] = flags[2] = True
     if "pinpoint" in txy : flags[0] = flags[2] = True
-    if "effective" in txy : flags[4] = True
+    if "effective" in txy or "element" in txy : flags[4] = True
     if not "none" in t[y] : flags[3] = True
     return [gr.update(visible = x) for x in flags]
 
