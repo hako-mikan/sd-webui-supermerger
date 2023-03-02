@@ -10,7 +10,7 @@ from modules.shared import opts
 from scripts.mergers.mergers import types,smerge,simggen,filenamecutter,draw_origin,wpreseter
 from scripts.mergers.model_util import usemodelgen
 
-hear = False
+hear = True
 hearm = False
 
 state_mergen = False
@@ -165,7 +165,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if "mbw" in ztype:#men separated by newline
             zs = zmen.splitlines()
             caster(zs,hear)
-            if usebeta or "mbw alpha and beta" in ztype:
+            if "mbw alpha and beta" in ztype:
                 zs = [zs[i:i+2] for i in range(0,len(zs),2)]
                 caster(zs,hear)
         elif "elemental" in ztype:
