@@ -49,7 +49,7 @@ elemental用のXY plotを複数用意しています。入力例はsample.txtに
 #### elemental
 複数の要素マージについてXY plotを作成します。要素同士は空行で区切ってください。
 トップ画像はsample.txtのsample1を実行した結果です。
-[!](https://github.com/hako-mikan/sd-webui-supermerger/blob/images/sample1.jpg)
+
 #### pinpoint element
 特定の要素について値を変えてXY plotを作成します。pinpoint Blocksと同じことを要素で行います。反対の軸にはalphaを指定してください。要素同士は改行またはカンマで区切ります。  
 以下の画像はsample.txtのsample3を実行した結果です。
