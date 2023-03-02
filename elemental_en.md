@@ -3,7 +3,7 @@
 
 In a block-by-block merge, the merge ratio can be changed for each of the 25 blocks, but a blocks also consists of multiple elements, and in principle it is possible to change the ratio for each element. It is possible, but the number of elements is more than 600, and it was doubtful whether it could be handled by human hands, but we tried to implement it. I do not recommend merging elements by element out of the blue. It is recommended to use it as a final adjustment when a problem that cannot be solved by block-by-block merging.  
 The following images show the result of changing the elements in the OUT05 layer. The leftmost one is without merging, the second one is all the OUT05 layers (i.e., normal block-by-block merging), and the rest are element merging. As shown in the table below, there are several more elements in attn2, etc.
-
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample1.jpg)
 ## Usage
 Note that elemental merging is effective for both normal and block-by-block merging, and is computed last, so it will overwrite values specified for block-by-block merging.
 
