@@ -3,7 +3,7 @@
 - Merge models can be loaded directly for generation without saving
 
 # Recent Update
-すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/vmain/changelog.md)にあります。  
+すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)にあります。  
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md).
 
 ### update 2023.03.02.1900(JST)
