@@ -425,6 +425,8 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
         except FileExistsError:
             pass
 
+    ls,ss = (xs.copy(),ys.copy()) if len(xs) > len(ys) else (ys.copy(),xs.copy())
+
     for i in range(len(imgs)-1):
         im2 = np.array(imgs[i+1])
 
@@ -441,7 +443,7 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
         diffs.append(abs_diff)
 
         if "gif" in esettings:
-            gifpath = gifpath_t = os.path.join(dir,ys[i+1].replace(":","_")+".gif")
+            gifpath = gifpath_t = os.path.join(dir,ls[i+1].replace(":","_")+".gif")
             
             is_file = os.path.isfile(gifpath)
             j = 0
@@ -456,15 +458,12 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
     nums = []
     outs = []
 
-    ls,ss = (xs.copy(),ys.copy()) if len(xs) > len(ys) else (ys.copy(),xs.copy())
-
     ls = ls[1:]
     for i in range(len(ls)):
         nums.append([ls[i],outnum[i]])
         ls[i] = ls[i] + "\n Diff : " + str(round(outnum[i],3)) + "%"    
 
-
-    if "cvs" in esettings:
+    if "csv" in esettings:
         try:
             os.makedirs(dir)
         except FileExistsError:
