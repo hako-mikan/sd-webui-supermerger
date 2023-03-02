@@ -7,7 +7,7 @@
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/changelog.md).
 
 ### update 2023.03.02.1900(JST)
-- Elementai Merge機能を実装しました。詳細は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/elemental_ja.md)
+- Elemental Merge機能を実装しました。詳細は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/ver2/elemental_ja.md)
 
 ### update 2023.02.20.2000(JST)
 "diffusers"をインポートするタイミングを変更しました。このアップデートにより、環境によっては"diffusers"のインストールなしに起動できるようになります。
