@@ -1,4 +1,32 @@
 # Changelog
+### bug fix 2023.02.19.2330(JST)
+いくつかのバグが修正されました
+- LOWRAMオプション有効時にエラーになる問題
+- Linuxでエラーになる問題
+- XY plotが正常に終了しない問題
+- 未ロードのモデルを設定時にエラーになる問題
+
+### update to version 3 2023.02.17.2020(JST)
+- LoRA関係の機能を追加しました
+- Logを保存し、設定を呼び出せるようになりました
+- safetensors,fp16形式での保存に対応しました
+- weightのプリセットに対応しました
+- XYプロットの予約が可能になりました
+
+### bug fix 2023.02.19.2330(JST)
+Several bugs have been fixed
+- Error when LOWRAM option is enabled
+- Error on Linux
+- XY plot did not finish properly
+- Error when setting unused models
+
+### update to version 3 2023.02.17.2020(JST)
+- Added LoRA related functions
+- Logs can now be saved and settings can be recalled.
+- Save in safetensors and fp16 format is now supported.
+- Weight presets are now supported.
+- Reservation of XY plots is now possible.
+
 ### bug fix 2023.01.29.0000(JST)
 pinpoint blocksがX方向で使用できない問題を修正しました。  
 pinpoint blocks選択時Triple,Twiceを使用できない問題を解決しました  
