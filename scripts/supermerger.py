@@ -423,7 +423,7 @@ def reversparams(id):
     mgs[10] = [x.strip() for x in mgs[10].split(",")]
     mgs[11] = mgs[11].replace("[","").replace("]","").replace("'", "") 
     mgs[11] = [x.strip() for x in mgs[11].split(",")]
-    while len(mgs) > 13:
+    while len(mgs)  13:
         mgs.append("")
     return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:13]]]
 
