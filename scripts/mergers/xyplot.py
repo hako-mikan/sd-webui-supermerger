@@ -123,7 +123,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
     ytype = types[ytype]
     if ytype == "none": ymen = ""
 
-    modes=["Weight" ,"Add" ,"Triple","Twice","Diff"]
+    modes=["Weight" ,"Add" ,"Triple","Twice"]
     xs=ys=0
     weights_a_in=weights_b_in="0"
 
@@ -165,7 +165,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if "mbw" in ztype:#men separated by newline
             zs = zmen.splitlines()
             caster(zs,hear)
-            if usebeta:
+            if usebeta or "mbw alpha and beta" in ztype:
                 zs = [zs[i:i+2] for i in range(0,len(zs),2)]
                 caster(zs,hear)
         elif "elemental" in ztype:
@@ -247,19 +247,24 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
     def xydealer(z,zt,azt):
         nonlocal alpha,beta,seed,weights_a_in,weights_b_in,model_a,model_b,model_c,deep
         if pinpoint or "pinpoint element" in zt or "effective" in zt:return
+        if "mbw" in zt:
+            def weightser(z):return z, z.split(',',1)[0]
+            if "mbw alpha and beta" in zt:
+                weights_a_in,alpha = weightser(wpreseter(z[0],wpresets))
+                weights_b_in,beta = weightser(wpreseter(z[1],wpresets))
+                return
+            elif "alpha" in zt:
+                weights_a_in,alpha = weightser(wpreseter(z,wpresets))
+                return
+            else:
+                weights_b_in,beta = weightser(wpreseter(z,wpresets))
+                return
         if "and" in zt:
             alpha,beta = abdealer(z)
             return
         if "alpha" in zt and not "pinpoint element" in azt:alpha = z
         if "beta" in zt: beta = z
         if "seed" in zt:seed = int(z)
-        if "mbw" in zt:
-            def weightser(z):return z, z.split(',',1)[0]
-            if usebeta:
-                weights_a_in,alpha = weightser(wpreseter(z[0],wpresets))
-                weights_b_in,beta = weightser(wpreseter(z[1],wpresets))
-            else:
-                weights_a_in,alpha = weightser(wpreseter(z,wpresets))
         if "model_A" in zt:model_a = z
         if "model_B" in zt:model_b = z
         if "model_C" in zt:model_c = z
@@ -284,7 +289,6 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
             else:
                 deep_in = deep
 
-            print(deep_in)
             print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)} ({xcount+ycount*len(xs)+1}/{allcount})")
             if not (xtype=="seed" and xcount > 0):
                _ , currentmodel,modelid,theta_0=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,useblocks,"","",id_sets,False,deep_in,deepprint = deepprint) 
@@ -307,8 +311,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         ys=ys[:ycount]
         print(f"stopped at x={xcount},y={ycount}")
 
-    if "mbw" in xtype and usebeta: xs = [f"alpha:({x[0]}),beta({x[1]})" for x in xs ]
-    if "mbw" in ytype and usebeta: ys = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
+    if "mbw alpha and beta" in xtype: xs = [f"alpha:({x[0]}),beta({x[1]})" for x in xs ]
+    if "mbw alpha and beta" in ytype: ys = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
 
     xs[0]=xtype+" = "+xs[0] #draw X label
     if ytype!=types[0] or "model" in ytype:ys[0]=ytype+" = "+ys[0]  #draw Y label
@@ -353,12 +357,12 @@ def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha
     modes=["Weight" ,"Add" ,"Triple","Twice"]
 
     if "mbw" in xtype:
-        wa = "X"
-        if usebeta:wb = "X"
+        if "alpha" in xtype:wa = "X"
+        if usebeta or " beta" in xtype:wb = "X"
 
     if "mbw" in ytype:
-        wa = "Y"
-        if usebeta:wb = "Y"
+        if "alpha" in ytype:wa = "Y"
+        if usebeta or " beta" in ytype:wb = "Y"
 
     wa = "alpha = " + wa
     wb = "beta = " + wb
@@ -398,12 +402,12 @@ def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha
     if "beta" in ytype:beta = "Y"
 
     if "mbw" in xtype:
-        alpha = "X"
-        if usebeta:beta = "X"
+        if "alpha" in xtype: alpha = "X"
+        if "beta" in xtype or usebeta: beta = "X"
 
     if "mbw" in ytype:
-        alpha = "Y"
-        if usebeta:beta = "Y"
+        if "alpha" in ytype: alpha = "Y"
+        if "beta" in ytype or usebeta: beta = "Y"
 
     vals = f"\nalpha = {alpha},beta = {beta}" if not useblocks else f"\n{wa}\n{wb}"
 
