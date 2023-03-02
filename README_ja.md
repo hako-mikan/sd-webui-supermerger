@@ -6,6 +6,9 @@
 すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)にあります。  
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md).
 
+### update 2023.03.03.0145(JST)
+- XYプロットに新たな軸「mbw alpha」「mbw beta」「mbw alpha and beta」を追加しました。
+
 ### update 2023.03.02.1900(JST)
 - Elemental Merge機能を実装しました。詳細は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_ja.md)
 
