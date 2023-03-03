@@ -482,7 +482,7 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
             outs.append(diff)
             outs.append(img)
             outs.append(imgs[0])
-            ss = ["diff",ss[0],"source"]
+        ss = ["diff",ss[0],"source"]
         return outs,ss,ls
     else:
         outs = [imgs[0]]*len(diffs)  + imgs[1:]+ diffs
