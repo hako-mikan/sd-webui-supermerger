@@ -7,6 +7,10 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
+### bug fix 2023.03.06.0145
+- fixed : Add difference function was broken
+- Add differenceが正常に動作しない問題を解決しました
+
 ### update 2023.03.03.0145(JST)
 - Add new XY type "mbw alpha","mbw beta","mbw alpha and beta"
 
