@@ -7,7 +7,7 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
-### update 2023.03.16.0100(JST)
+### update 2023.03.18.0200(JST)
 - support LyCORIS partially
 - support hiresfix(Gen/XY plot)
 - 一部LyCORISに対応しました
