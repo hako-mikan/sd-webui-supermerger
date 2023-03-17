@@ -7,16 +7,11 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
-### bug fix 2023.03.06.0145
-- fixed : Add difference function was broken
-- Add differenceが正常に動作しない問題を解決しました
-
-### update 2023.03.03.0145(JST)
-- Add new XY type "mbw alpha","mbw beta","mbw alpha and beta"
-
-### update 2023.03.02.1900(JST)
-- Elemental Merge feature added. Details [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_en.md).
-
+### update 2023.03.16.0100(JST)
+- support LyCORIS partially
+- support hiresfix(Gen/XY plot)
+- 一部LyCORISに対応しました
+- hiresfixに対応しました(Gen/XY plot)
 
 ### update 2023.02.20.2000(JST)
 The timing of importing "diffusers" has been changed. With this update, some environments can be started without installing "diffusers".
@@ -104,6 +99,10 @@ Deletes the currently loaded model. This is used to free up GPU memory when usin
 
 ## LoRA
 LoRA related functions. It is basically the same as kohya-ss scripts, but it supports block-by-block merging. Currently, it does not support V2.X series merging.
+
+Note: LyCORIS supports only single merge due to its special structure. Only ratios of 1,0 can be used for single merges. If any other value is used, the result will not match the Block weight LoRA result, even if the value is "SAME TO STRENGTH".
+LoCon will match reasonably well even with non-integers.
+
 ### merge to checkpoint
 Merge LoRAs into a model. Multiple LoRAs can be merged at the same time.  
 Enter LoRA name1:ratio1:block1,LoRA name2:ratio2:block2,... 

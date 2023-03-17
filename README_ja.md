@@ -6,6 +6,10 @@
 すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)にあります。  
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md).
 
+### update 2023.03.18.0200(JST)
+- hiresfixに対応しました
+- 一部LyCORIS,LoConに対応しました
+
 ### update 2023.03.03.0145(JST)
 - XYプロットに新たな軸「mbw alpha」「mbw beta」「mbw alpha and beta」を追加しました。
 
@@ -98,6 +102,10 @@ Reserve XY plotボタンはすぐさまプロットを実行せず、ボタン�
 
 ## LoRA
 LoRA関連の機能です。基本的にはkohya-ssのスクリプトと同じですが、階層マージに対応します。現時点ではV2.X系のマージには対応していません。
+
+注意：LyCORISは構造が特殊なため単独マージのみに対応しています。単独マージの比率は1,0のみ使用可能です。他の値を用いるとsame to Strengthでも階層LoRAの結果と一致しません。
+LoConは整数以外でもそれなりに一致します。
+
 ### merge to checkpoint
 モデルにLoRAをマージします。複数のLoRAを同時にマージできます。  
 LoRA名1:マージ比率1:階層,LoRA名2:階層,マージ比率2,LoRA名3:マージ比率3･･･  
