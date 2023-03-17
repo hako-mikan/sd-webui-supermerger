@@ -1,4 +1,5 @@
 import re
+from sklearn.linear_model import PassiveAggressiveClassifier
 import torch
 import math
 import os
@@ -13,24 +14,6 @@ from tqdm import tqdm
 from modules import  sd_models,scripts
 from scripts.mergers.model_util import load_models_from_stable_diffusion_checkpoint,filenamecutter,savemodel
 from modules.ui import create_refresh_button
-
-LORABLOCKS=["encoder",
-"down_blocks_0_attentions_0",
-"down_blocks_0_attentions_1",
-"down_blocks_1_attentions_0",
-"down_blocks_1_attentions_1",
-"down_blocks_2_attentions_0",
-"down_blocks_2_attentions_1",
-"mid_block_attentions_0",
-"up_blocks_1_attentions_0",
-"up_blocks_1_attentions_1",
-"up_blocks_1_attentions_2",
-"up_blocks_2_attentions_0",
-"up_blocks_2_attentions_1",
-"up_blocks_2_attentions_2",
-"up_blocks_3_attentions_0",
-"up_blocks_3_attentions_1",
-"up_blocks_3_attentions_2"]
 
 def on_ui_tabs():
     import lora
@@ -116,7 +99,8 @@ def on_ui_tabs():
               if n[0] in llist:
                 if llist[n[0]] !="": continue
               c_lora = lora.available_loras.get(n[0], None) 
-              d = dimgetter(c_lora.filename)
+              d,t = dimgetter(c_lora.filename)
+              if t == "LoCon" : d = f"{d}:{t}"
               if d not in dlist:
                 if type(d) == int :dlist.append(d)
                 elif d not in dn: dn.append(d)
@@ -188,6 +172,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     ln = []
     lr = []
     ld = []
+    lt = []
     dmax = 1
 
     for i,n in enumerate(lnames):
@@ -199,9 +184,11 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         c_lora = lora.available_loras.get(n[0], None) 
         ln.append(c_lora.filename)
         lr.append(ratio)
-        d = dimgetter(c_lora.filename)
+        d,t = dimgetter(c_lora.filename)
+        lt.append(t)
         ld.append(d)
-        if d > dmax : dmax = d
+        if d != "LyCORIS":
+          if d > dmax : dmax = d
 
     if filename =="":filename =loranames.replace(",","+").replace(":","_")
     if not ".safetensors" in filename:filename += ".safetensors"
@@ -209,7 +196,11 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
   
     dim = int(dim) if dim != "no" and dim != "auto" else 0
 
-    if dim > 0:
+    if "LyCORIS" in ld or "LoCon" in lt:
+      if len(ld) !=1:
+        return "multiple merge of LyCORIS is not supported"
+      sd = lycomerge(ln[0],lr[0])
+    elif dim > 0:
       print("change demension to ", dim)
       sd = merge_lora_models_dim(ln, lr, dim,settings)
     elif "auto" in settings and ld.count(ld[0]) != len(ld):
@@ -247,6 +238,7 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
 
     names=[]
     filenames=[]
+    loratypes=[]
     lweis=[]
 
     for n in lnames:
@@ -258,6 +250,8 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
         c_lora = lora.available_loras.get(n[0], None) 
         names.append(n[0])
         filenames.append(c_lora.filename)
+        _,t = dimgetter(c_lora.filename)
+        if "LyCORIS" in t: return "LyCORIS merge is not supported"
         lweis.append(ratio)
 
     modeln=filenamecutter(model,True)   
@@ -282,11 +276,13 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
       print(f"merging..." ,lwei)
       for key in lora_sd.keys():
         ratio = 1
-        for i,block in enumerate(LORABLOCKS):
-            if block in key:
-                ratio = lwei[i]
 
         fullkey = convert_diffusers_name_to_compvis(key)
+
+        for i,block in enumerate(LORABLOCKS):
+            if block in fullkey:
+                ratio = lwei[i]
+
         msd_key, lora_key = fullkey.split(".", 1)
 
         if "lora_down" in key:
@@ -331,10 +327,20 @@ def save_to_file(file_name, model, state_dict, dtype):
         torch.save(model, file_name)
 
 re_digits = re.compile(r"\d+")
+
 re_unet_down_blocks = re.compile(r"lora_unet_down_blocks_(\d+)_attentions_(\d+)_(.+)")
 re_unet_mid_blocks = re.compile(r"lora_unet_mid_block_attentions_(\d+)_(.+)")
 re_unet_up_blocks = re.compile(r"lora_unet_up_blocks_(\d+)_attentions_(\d+)_(.+)")
+
+re_unet_down_blocks_res = re.compile(r"lora_unet_down_blocks_(\d+)_resnets_(\d+)_(.+)")
+re_unet_mid_blocks_res = re.compile(r"lora_unet_mid_block_resnets_(\d+)_(.+)")
+re_unet_up_blocks_res = re.compile(r"lora_unet_up_blocks_(\d+)_resnets_(\d+)_(.+)")
+
+re_unet_downsample = re.compile(r"lora_unet_down_blocks_(\d+)_downsamplers_0_conv(.+)")
+re_unet_upsample = re.compile(r"lora_unet_up_blocks_(\d+)_upsamplers_0_conv(.+)")
+
 re_text_block = re.compile(r"lora_te_text_model_encoder_layers_(\d+)_(.+)")
+
 
 def convert_diffusers_name_to_compvis(key):
     def match(match_list, regex):
@@ -356,6 +362,45 @@ def convert_diffusers_name_to_compvis(key):
 
     if match(m, re_unet_up_blocks):
         return f"diffusion_model_output_blocks_{m[0] * 3 + m[1]}_1_{m[2]}"
+
+    if match(m, re_unet_down_blocks_res):
+        block = f"diffusion_model_input_blocks_{1 + m[0] * 3 + m[1]}_0_"
+        if m[2].startswith('conv1'):
+            return f"{block}in_layers_2{m[2][len('conv1'):]}"
+        elif m[2].startswith('conv2'):
+            return f"{block}out_layers_3{m[2][len('conv2'):]}"
+        elif m[2].startswith('time_emb_proj'):
+            return f"{block}emb_layers_1{m[2][len('time_emb_proj'):]}"
+        elif m[2].startswith('conv_shortcut'):
+            return f"{block}skip_connection{m[2][len('conv_shortcut'):]}"
+
+    if match(m, re_unet_mid_blocks_res):
+        block = f"diffusion_model_middle_block_{m[0]*2}_"
+        if m[1].startswith('conv1'):
+            return f"{block}in_layers_2{m[1][len('conv1'):]}"
+        elif m[1].startswith('conv2'):
+            return f"{block}out_layers_3{m[1][len('conv2'):]}"
+        elif m[1].startswith('time_emb_proj'):
+            return f"{block}emb_layers_1{m[1][len('time_emb_proj'):]}"
+        elif m[1].startswith('conv_shortcut'):
+            return f"{block}skip_connection{m[1][len('conv_shortcut'):]}"
+
+    if match(m, re_unet_up_blocks_res):
+        block = f"diffusion_model_output_blocks_{m[0] * 3 + m[1]}_0_"
+        if m[2].startswith('conv1'):
+            return f"{block}in_layers_2{m[2][len('conv1'):]}"
+        elif m[2].startswith('conv2'):
+            return f"{block}out_layers_3{m[2][len('conv2'):]}"
+        elif m[2].startswith('time_emb_proj'):
+            return f"{block}emb_layers_1{m[2][len('time_emb_proj'):]}"
+        elif m[2].startswith('conv_shortcut'):
+            return f"{block}skip_connection{m[2][len('conv_shortcut'):]}"
+
+    if match(m, re_unet_downsample):
+        return f"diffusion_model_input_blocks_{m[0]*3+3}_0_op{m[1]}"
+
+    if match(m, re_unet_upsample):
+        return f"diffusion_model_output_blocks_{m[0]*3 + 2}_{1+(m[0]!=0)}_conv{m[1]}"
 
     if match(m, re_text_block):
         return f"transformer_text_model_encoder_layers_{m[0]}_{m[1]}"
@@ -687,15 +732,34 @@ def load_state_dict(file_name, dtype):
 
 def dimgetter(filename):
     lora_sd = load_state_dict(filename, torch.float)
-    for key in lora_sd.keys():
-          if "lora_down" in key:
-            dim = lora_sd[key].size()[0]
-            return dim
-    return "unknown"
+    alpha = None
+    dim = None
+    type = None
+
+    if "lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight" in lora_sd.keys():
+      type = "LoCon"
+
+    for key, value in lora_sd.items():
+        if alpha is None and 'alpha' in key:
+            alpha = value
+        if dim is None and 'lora_down' in key and len(value.size()) == 2:
+            dim = value.size()[0]
+        if "hada_t1" in key:
+            dim,type = "LyCORIS","LyCORIS"
+        if alpha is not None and dim is not None:
+            break
+    if alpha is None:
+        alpha = dim
+    if type == None:type = "LoRA"
+    if dim :
+      return dim,type
+    else:
+      return "unknown","unknown"
 
 def blockfromkey(key):
+    fullkey = convert_diffusers_name_to_compvis(key)
     for i,n in enumerate(LORABLOCKS):
-      if n in  key: return i
+      if n in  fullkey: return i
     return 0
 
 def merge_lora_models_dim(models, ratios, new_rank,sets):
@@ -862,3 +926,84 @@ def makeloraname(model_a,model_b):
     model_a=filenamecutter(model_a)
     model_b=filenamecutter(model_b)
     return "lora_"+model_a+"-"+model_b
+
+def lycomerge(filename,ratios):
+    sd = load_state_dict(filename, torch.float)
+
+    if len(ratios) == 17:
+      r0 = 1
+      ratios = [ratios[0]] + [r0] + ratios[1:3]+ [r0] + ratios[3:5]+[r0] + ratios[5:7]+[r0,r0,r0] + [ratios[7]] + [r0,r0,r0] + ratios[8:]
+
+    print("LyCORIS: " , ratios)
+
+    keys_failed_to_match = []
+
+    for lkey, weight in sd.items():
+        ratio = 1
+        picked = False
+        if 'alpha' in lkey:
+          continue
+        
+        fullkey = convert_diffusers_name_to_compvis(lkey)
+        key, lora_key = fullkey.split(".", 1)
+
+        for i,block in enumerate(LYCOBLOCKS):
+            if block in key:
+                ratio = ratios[i]
+                picked = True
+        if not picked: keys_failed_to_match.append(key)
+
+        sd[lkey] = weight * math.sqrt(abs(float(ratio)))
+
+        if "down" in lkey and ratio < 0:
+          sd[key] = sd[key] * -1
+        
+    if len(keys_failed_to_match) > 0:
+      print(keys_failed_to_match)
+  
+    return sd 
+
+LORABLOCKS=["encoder",
+"diffusion_model_input_blocks_1_",
+"diffusion_model_input_blocks_2_",
+"diffusion_model_input_blocks_4_",
+"diffusion_model_input_blocks_5_",
+"diffusion_model_input_blocks_7_",
+"diffusion_model_input_blocks_8_",
+"diffusion_model_middle_block_",
+"diffusion_model_output_blocks_3_",
+"diffusion_model_output_blocks_4_",
+"diffusion_model_output_blocks_5_",
+"diffusion_model_output_blocks_6_",
+"diffusion_model_output_blocks_7_",
+"diffusion_model_output_blocks_8_",
+"diffusion_model_output_blocks_9_",
+"diffusion_model_output_blocks_10_",
+"diffusion_model_output_blocks_11_"]
+
+LYCOBLOCKS=["encoder",
+"diffusion_model_input_blocks_0_",
+"diffusion_model_input_blocks_1_",
+"diffusion_model_input_blocks_2_",
+"diffusion_model_input_blocks_3_",
+"diffusion_model_input_blocks_4_",
+"diffusion_model_input_blocks_5_",
+"diffusion_model_input_blocks_6_",
+"diffusion_model_input_blocks_7_",
+"diffusion_model_input_blocks_8_",
+"diffusion_model_input_blocks_9_",
+"diffusion_model_input_blocks_10_",
+"diffusion_model_input_blocks_11_",
+"diffusion_model_middle_block_",
+"diffusion_model_output_blocks_0_",
+"diffusion_model_output_blocks_1_",
+"diffusion_model_output_blocks_2_",
+"diffusion_model_output_blocks_3_",
+"diffusion_model_output_blocks_4_",
+"diffusion_model_output_blocks_5_",
+"diffusion_model_output_blocks_6_",
+"diffusion_model_output_blocks_7_",
+"diffusion_model_output_blocks_8_",
+"diffusion_model_output_blocks_9_",
+"diffusion_model_output_blocks_10_",
+"diffusion_model_output_blocks_11_"]

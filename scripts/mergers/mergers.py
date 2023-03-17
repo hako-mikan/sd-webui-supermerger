@@ -42,7 +42,9 @@ def casterr(*args,hear=hear):
     
   #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,esettings,
-                    prompt,nprompt,steps,sampler,cfg,seed,w,h,currentmodel,imggen):
+                    prompt,nprompt,steps,sampler,cfg,seed,w,h,
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                    currentmodel,imggen):
 
     deepprint  = True if "print change" in esettings else False
 
@@ -59,7 +61,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     gc.collect()
 
     if imggen :
-        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,currentmodel,id_sets,modelid)
+        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,currentmodel,id_sets,modelid)
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -412,7 +414,7 @@ def hashfromname(name):
         return checkpoint_info.shorthash
     return checkpoint_info.calculate_shorthash()
 
-def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
+def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
     p = processing.StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
@@ -432,6 +434,12 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_set
     p.seed_resize_from_w=0
     p.seed_resize_from_h=0
     p.denoising_strength=None
+    if hireson:
+        p.enable_hr = hireson
+        p.denoising_strength = denoise_str
+        p.hr_upscaler = hrupscaler
+        p.hr_second_pass_steps = hr2ndsteps
+        p.hr_scale = hr_scale
 
     if type(p.prompt) == list:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
