@@ -89,6 +89,17 @@ def on_ui_tabs():
                                 mergeid = gr.Textbox(label="merge from ID", elem_id="model_converter_custom_name",value = "-1")
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
+
+                    with gr.Accordion("hiresfix",open = False):
+                        hireson = gr.Checkbox(label = "hiresfix",value = False, visible = True,interactive=True)    
+                        with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
+                            hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
+                            hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
+                            denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
+                            hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
+                            
+                    hiresfix = [hireson,hrupscaler,hr2ndsteps,denois_str,hr_scale]
+
                     with gr.Accordion("Elemental Merge",open = False):
                         with gr.Row():
                             esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
@@ -249,43 +260,43 @@ def on_ui_tabs():
 
         merge.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,currentmodel,dfalse],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,currentmodel,dfalse],
             outputs=[submit_result,currentmodel]
         )
 
         mergeandgen.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,currentmodel,dtrue],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,currentmodel,dtrue],
             outputs=[submit_result,currentmodel,*imagegal]
         )
 
         gen.click(
             fn=simggen,
-            inputs=[*gensets.txt2img_preview_params,currentmodel,id_sets],
+            inputs=[*gensets.txt2img_preview_params,*hiresfix,currentmodel,id_sets],
             outputs=[*imagegal],
         )
 
         s_reserve.click(
             fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params],
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
             outputs=[numaframe]
         )
 
         s_reserve1.click(
             fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params],
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
             outputs=[numaframe]
         )
 
         gengrid.click(
             fn=numanager,
-            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params],
+            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params],
+            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
