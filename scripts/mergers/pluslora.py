@@ -167,6 +167,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     ldict ={}
 
     for i,l in enumerate(loraratios):
+        if ":" not in l or not (l.count(",") == 16 or l.count(",") == 25) : continue
         ldict[l.split(":")[0]]=l.split(":")[1]
 
     ln = []
@@ -234,6 +235,7 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
     ldict ={}
 
     for i,l in enumerate(loraratios):
+        if ":" not in l or not (l.count(",") == 16 or l.count(",") == 25) : continue
         ldict[l.split(":")[0].strip()]=l.split(":")[1]
 
     names=[]
