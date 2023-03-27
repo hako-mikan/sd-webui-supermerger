@@ -32,7 +32,7 @@ def on_ui_tabs():
     sml_filepath = os.path.join(sml_path_root,"scripts", "lbwpresets.txt")
     sml_lbwpresets=""
     try:
-        with open(sml_filepath) as f:
+        with open(sml_filepath,encoding="utf-8") as f:
             sml_lbwpresets = f.read()
     except OSError as e:
         sml_lbwpresets=LWEIGHTSPRESETS 
