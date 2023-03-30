@@ -36,6 +36,7 @@ def on_ui_tabs():
         try:
             with open(userfilepath) as f:
                 weights_presets = f.read()
+                filepath = userfilepath
         except OSError as e:
                 pass
     else:
