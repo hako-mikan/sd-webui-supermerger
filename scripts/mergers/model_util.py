@@ -772,7 +772,7 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
 
   return text_model, vae, unet
 
-def usemodelgen(theta_0,model_a):
+def usemodelgen(theta_0,model_a,model_name):
   from modules import lowvram, devices, sd_hijack,shared, sd_vae
   sd_hijack.model_hijack.undo_hijack(shared.sd_model)
 
@@ -811,6 +811,7 @@ def usemodelgen(theta_0,model_a):
 
   shared.sd_model = model
   sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=True)
+  shared.sd_model.sd_checkpoint_info.model_name = model_name
   
   def _setvae():
       sd_vae.delete_base_vae()
