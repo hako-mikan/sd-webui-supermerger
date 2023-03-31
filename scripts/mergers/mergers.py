@@ -52,7 +52,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     if "ERROR" in result: return result, *non3
 
-    usemodelgen(theta_0,model_a)
+    usemodelgen(theta_0,model_a,currentmodel)
 
     save = True if sevemodes[0] in save_sets else False
 
