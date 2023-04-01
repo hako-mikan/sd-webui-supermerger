@@ -811,7 +811,7 @@ def usemodelgen(theta_0,model_a,model_name):
 
   shared.sd_model = model
   sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=True)
-  shared.sd_model.sd_checkpoint_info.model_name = model_name
+  #shared.sd_model.sd_checkpoint_info.model_name = model_name
   
   def _setvae():
       sd_vae.delete_base_vae()
