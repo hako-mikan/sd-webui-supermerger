@@ -742,7 +742,7 @@ def dimgetter(filename):
       type = "LoCon"
 
     for key, value in lora_sd.items():
-        print(key)
+  
         if alpha is None and 'alpha' in key:
             alpha = value
         if dim is None and 'lora_down' in key and len(value.size()) == 2:
