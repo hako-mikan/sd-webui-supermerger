@@ -742,11 +742,12 @@ def dimgetter(filename):
       type = "LoCon"
 
     for key, value in lora_sd.items():
+        print(key)
         if alpha is None and 'alpha' in key:
             alpha = value
         if dim is None and 'lora_down' in key and len(value.size()) == 2:
             dim = value.size()[0]
-        if "hada_t1" in key:
+        if "hada_" in key:
             dim,type = "LyCORIS","LyCORIS"
         if alpha is not None and dim is not None:
             break
