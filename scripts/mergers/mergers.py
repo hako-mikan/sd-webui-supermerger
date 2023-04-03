@@ -7,6 +7,7 @@ import torch
 import tqdm
 import datetime
 import csv
+import json
 from PIL import Image, ImageFont, ImageDraw
 from fonts.ttf import Roboto
 from tqdm import tqdm
@@ -30,7 +31,7 @@ sevemodes=["save model", "overwrite"]
 
 hear = False
 hearm = False
-non3 = [None]*3
+non4 = [None]*4
 
 def caster(news,hear):
     if hear: print(news)
@@ -48,15 +49,15 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     deepprint  = True if "print change" in esettings else False
 
-    result,currentmodel,modelid,theta_0 = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint=deepprint)
+    result,currentmodel,modelid,theta_0,metadata = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint=deepprint)
 
-    if "ERROR" in result: return result, *non3
+    if "ERROR" in result: return result, *non4
 
     usemodelgen(theta_0,model_a,currentmodel)
 
     save = True if sevemodes[0] in save_sets else False
 
-    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a) if save else "Merged model loaded:"+currentmodel
+    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
 
     gc.collect()
 
@@ -85,6 +86,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if type(base_alpha) == str:base_alpha = float(base_alpha)
     if type(base_beta) == str:base_beta  = float(base_beta)
 
+    weights_a_orig = weights_a
+    weights_b_orig = weights_b
+
     # preset to weights
     if wpresets != False and useblocks:
         weights_a = wpreseter(weights_a,wpresets)
@@ -93,6 +97,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     # mode select booleans
     save = True if sevemodes[0] in save_sets else False
     usebeta = modes[2] in mode or modes[3] in mode
+    save_metadata = "safetensors" in save_sets
+    metadata = {"format": "pt", "models": {}, "merge_recipe": None}
     
     if not useblocks:
         weights_a = weights_b = ""
@@ -113,7 +119,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     #format check
     if model_a =="" or model_b =="" or ((not modes[0] in mode) and model_c=="") : 
-        return "ERROR: Necessary model is not selected",*non3
+        return "ERROR: Necessary model is not selected",*non4
     
     #for MBW text to list
     if useblocks:
@@ -122,12 +128,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         base_alpha  = float(weights_a_t[0])    
         weights_a = [float(w) for w in weights_a_t[1].split(',')]
         caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
-        if len(weights_a) != 25:return f"ERROR: weights alpha value must be {26}.",*non3
+        if len(weights_a) != 25:return f"ERROR: weights alpha value must be {26}.",*non4
         if usebeta:
             base_beta = float(weights_b_t[0]) 
             weights_b = [float(w) for w in weights_b_t[1].split(',')]
             caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
-            if len(weights_b) != 25: return f"ERROR: weights beta value must be {26}.",*non3
+            if len(weights_b) != 25: return f"ERROR: weights beta value must be {26}.",*non4
 
     caster("model load start",hearm)
 
@@ -205,7 +211,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
                 if weight_index >= NUM_TOTAL_BLOCKS:
                     print(f"ERROR: illegal block index: {key}")
-                    return f"ERROR: illegal block index: {key}",None,None
+                    return f"ERROR: illegal block index: {key}",*non4
                 
                 if weight_index >= 0 and useblocks:
                     current_alpha = weights_a[weight_index]
@@ -266,7 +272,48 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
-    return "",currentmodel,modelid,theta_0
+    if save_metadata:
+        merge_recipe = {
+            "type": "sd-webui-supermerger",
+            "weights_alpha": weights_a,
+            "weights_beta": weights_b,
+            "weights_alpha_orig": weights_a_orig,
+            "weights_beta_orig": weights_b_orig,
+            "model_a": longhashfromname(model_a),
+            "model_b": longhashfromname(model_b),
+            "model_c": longhashfromname(model_c),
+            "base_alpha": base_alpha,
+            "base_beta": base_beta,
+            "mode": mode,
+            "useblocks": useblocks,
+            "custom_name": custom_name,
+            "save_sets": save_sets,
+            "id_sets": id_sets,
+            "elemental_merge": deep
+        }
+        metadata["merge_recipe"] = json.dumps(merge_recipe)
+
+        def add_model_metadata(checkpoint_name):
+            checkpoint_info = sd_models.get_closet_checkpoint_match(checkpoint_name)
+            checkpoint_info.calculate_shorthash()
+            metadata["models"][checkpoint_info.sha256] = {
+                "name": checkpoint_info.name,
+                "legacy_hash": checkpoint_info.hash,
+                "merge_recipe": checkpoint_info.metadata.get("merge_recipe", None)
+            }
+
+            metadata["models"].update(checkpoint_info.metadata.get("models", {}))
+
+        if model_a:
+            add_model_metadata(model_a)
+        if model_b:
+            add_model_metadata(model_b)
+        if model_c:
+            add_model_metadata(model_c)
+
+        metadata["models"] = json.dumps(metadata["models"])
+
+    return "",currentmodel,modelid,theta_0,metadata
 
 def load_model_weights_m(model,model_a,model_b,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
@@ -413,6 +460,15 @@ def hashfromname(name):
     if checkpoint_info.shorthash is not None:
         return checkpoint_info.shorthash
     return checkpoint_info.calculate_shorthash()
+
+def longhashfromname(name):
+    from modules import sd_models
+    if name == "" or name ==[]: return ""
+    checkpoint_info = sd_models.get_closet_checkpoint_match(name)
+    if checkpoint_info.sha256 is not None:
+        return checkpoint_info.sha256
+    checkpoint_info.calculate_shorthash()
+    return checkpoint_info.sha256
 
 def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
