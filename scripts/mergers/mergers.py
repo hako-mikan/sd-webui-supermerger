@@ -98,7 +98,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     save = True if sevemodes[0] in save_sets else False
     usebeta = modes[2] in mode or modes[3] in mode
     save_metadata = "safetensors" in save_sets
-    metadata = {"format": "pt", "models": {}, "merge_recipe": None}
+    metadata = {"format": "pt", "sd_merge_models": {}, "sd_merge_recipe": None}
     
     if not useblocks:
         weights_a = weights_b = ""
@@ -291,18 +291,18 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             "id_sets": id_sets,
             "elemental_merge": deep
         }
-        metadata["merge_recipe"] = json.dumps(merge_recipe)
+        metadata["sd_merge_recipe"] = json.dumps(merge_recipe)
 
         def add_model_metadata(checkpoint_name):
             checkpoint_info = sd_models.get_closet_checkpoint_match(checkpoint_name)
             checkpoint_info.calculate_shorthash()
-            metadata["models"][checkpoint_info.sha256] = {
+            metadata["sd_merge_models"][checkpoint_info.sha256] = {
                 "name": checkpoint_info.name,
                 "legacy_hash": checkpoint_info.hash,
-                "merge_recipe": checkpoint_info.metadata.get("merge_recipe", None)
+                "merge_recipe": checkpoint_info.metadata.get("sd_merge_recipe", None)
             }
 
-            metadata["models"].update(checkpoint_info.metadata.get("models", {}))
+            metadata["sd_merge_models"].update(checkpoint_info.metadata.get("sd_merge_models", {}))
 
         if model_a:
             add_model_metadata(model_a)
@@ -311,7 +311,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         if model_c:
             add_model_metadata(model_c)
 
-        metadata["models"] = json.dumps(metadata["models"])
+        metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
 
     return "",currentmodel,modelid,theta_0,metadata
 
