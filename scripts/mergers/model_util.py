@@ -665,7 +665,7 @@ def to_half(sd):
             sd[key] = sd[key].half()
     return sd
 
-def savemodel(state_dict,currentmodel,fname,savesets,model_a):
+def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
     from modules import sd_models,shared
     if "fp16" in savesets: 
         state_dict = to_half(state_dict)
@@ -697,7 +697,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a):
 
     print("Saving...")
     if ext == ".safetensors":
-        safetensors.torch.save_file(state_dict, fname, metadata={"format": "pt"})
+        safetensors.torch.save_file(state_dict, fname, metadata=metadata)
     else:
         torch.save(state_dict, fname)
     print("Done!")
