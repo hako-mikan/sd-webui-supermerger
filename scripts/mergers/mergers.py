@@ -97,7 +97,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     # mode select booleans
     save = True if sevemodes[0] in save_sets else False
     usebeta = modes[2] in mode or modes[3] in mode
-    save_metadata = "safetensors" in save_sets
+    save_metadata = "no metadata" not in save_sets
     metadata = {"format": "pt", "sd_merge_models": {}, "sd_merge_recipe": None}
     
     if not useblocks:
