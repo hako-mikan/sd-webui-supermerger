@@ -80,7 +80,7 @@ def on_ui_tabs():
                         gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
                     with gr.Row():
                         with gr.Column(scale = 4):
-                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16"], value=["safetensors"], label="save settings")
+                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
                         with gr.Column(scale = 2):
                             id_sets = gr.CheckboxGroup(["image", "PNG info"], label="write merged model ID to")
                     with gr.Row():      
