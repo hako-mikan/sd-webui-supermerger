@@ -7,6 +7,10 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
+### update 2023.04.06.1945(JST)
+- metadata can be saved in safetensors
+- safetensors形式のファイルにマージ条件を保存できるようになりました
+
 ### update 2023.03.18.0200(JST)
 - support LyCORIS partially
 - support hiresfix(Gen/XY plot)
