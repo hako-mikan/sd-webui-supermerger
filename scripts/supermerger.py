@@ -11,9 +11,9 @@ import os.path
 import argparse
 import modules.ui
 import scripts.mergers.pluslora as pluslora
+import scripts.mergers.pluslora_old as pluslora_old
 from scripts.mergers.mergers import simggen,typesg,smergegen,rwmergelog
 from scripts.mergers.xyplot import freezetime,numaker,numanager,nulister
-from scripts.mergers.model_util import savemodel
 import csv
 from modules import sd_models,script_callbacks,scripts, shared,sd_hijack,devices,sd_vae
 from modules.ui import create_refresh_button, create_output_panel
@@ -231,6 +231,10 @@ def on_ui_tabs():
                     smd_loadkeys = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
+
+        with gr.Tab("LoRA-old", elem_id="tab_lora"):
+            pluslora_old.on_ui_tabs()
+
 
         smd_loadkeys.click(
             fn=loadkeys,
