@@ -2,25 +2,18 @@
 - Model merge extention for [AUTOMATIC1111's stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 
 - Merge models can be loaded directly for generation without saving
 
-日本語は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
+### English / 日本語
+日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
-### update 2023.04.06.1945(JST)
-- metadata can be saved in safetensors
-- safetensors形式のファイルにマージ条件を保存できるようになりました
+- New feature, optimization using cosine similarity
+- Now you can stop merge
+- batch size can be set
 
-### update 2023.03.18.0200(JST)
-- support LyCORIS partially
-- support hiresfix(Gen/XY plot)
-- 一部LyCORISに対応しました
-- hiresfixに対応しました(Gen/XY plot)
-
-### update 2023.02.20.2000(JST)
-The timing of importing "diffusers" has been changed. With this update, some environments can be started without installing "diffusers".
-
-diffusers must now be installed. on windows, this can be done by typing "pip install diffusers" at the command prompt in the web-ui folder, but it depends on your environment.
+#### requirement
+diffusers(0.10.2 or later),sklearn is required to use some LoRA-related features
 
 # overview
 This extension allows merged models to be loaded as models for image generation without saving them.
@@ -38,8 +31,17 @@ Merge 3 models at the same time. alpha and beta are used. I added this function 
 #### sum Twice
 Weight sum twice, alpha and beta are used. 
 
-### use MBW
+#### use MBW
 If checked, block-by-block merging is enabled. Use the slider at the bottom of the screen to set the ratio of each block.
+
+#### calcmode
+If you select "cosine", the comparison is performed using cosine similarity, centered on the set ratio, and the ratio is calculated to eliminate loss due to merging. See below for more details.   
+Thanks to [recoilme](https://github.com/recoilme) for devising the idea and to [SwiftIllusion](https://github.com/SwiftIllusion) for introducing this technique.   
+https://github.com/hako-mikan/sd-webui-supermerger/issues/33
+https://github.com/recoilme/losslessmix
+
+### save metadate
+Enable "save metadate" to embed merge conditions as metadata, only in safetensor format. Embedded conditions can be viewed in the Metadata tab.
 
 ## Each button
 ### Merge
@@ -116,6 +118,10 @@ LoRA can also be used alone. The ":block" part can be omitted. The ratio can be 
 Generates a LoRA from the difference of two models.
 If you specify a demension, it will be created with the specified dimension. If no demension is specified, LoRAs are created with dim 128.
 The blend ratio can be adjusted by alpha and beta. (alpha x Model_A - beta x Model B) alpha, beta = 1 is the normal LoRA creation.
+
+#### caution in using google colab
+It has been reported that many errors occur when using with colab. This seems to be caused by multiple reasons.
+First is a memory problem. It is recommended that the fp16 model be used. If the full model is used, at least 8 GB of memory is required. This is the amount used by this script. Also, it seems that the error occurs if different versions of diffusers are installed. version 0.10.2 has been tested.
 
 ### merge LoRAs
 Merges one or more LoRAs. kohya-ss's latest script is used, so LoRAs with different dimensions can be merged, but note that the generated images may differ significantly because LoRAs are recalculated when dimensions are converted. 

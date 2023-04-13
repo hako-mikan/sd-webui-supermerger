@@ -6,20 +6,15 @@
 すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)にあります。  
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md).
 
-### update 2023.03.18.0200(JST)
-- hiresfixに対応しました
-- 一部LyCORIS,LoConに対応しました
+### English / 日本語
+日本語: [![jp](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
 
-### update 2023.03.03.0145(JST)
-- XYプロットに新たな軸「mbw alpha」「mbw beta」「mbw alpha and beta」を追加しました。
+## Updates
+- 新機能, コサイン類似度を用いた比率の最適化
+- マージを途中で止められるようになりました
+- 複数のバッチサイズに対応しました
 
-### update 2023.03.02.1900(JST)
-- Elemental Merge機能を実装しました。詳細は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_ja.md)
-
-### update 2023.02.20.2000(JST)
-"diffusers"をインポートするタイミングを変更しました。このアップデートにより、環境によっては"diffusers"のインストールなしに起動できるようになります。
-
-diffusersのインストールが必要になりました。windowsの場合はweb-uiのフォルダでコマンドプロンプトから"pip install diffusers"を打つことでインストールできる場合がありますが環境によります。
+一部LoRA関係の機能を使用する場合diffusers(0.10.2以降),sklearnが必要です。
 # 
 
 # 概要
@@ -38,8 +33,18 @@ diffusersのインストールが必要になりました。windowsの場合はw
 #### sum Twice
 Weight sumを2回行います。alpha,betaが使用されます。MBWモードでも使えます。それぞれMBWのalpha,betaを入力してください。
 
-### use MBW
+#### use MBW
 チェックするとブロックごとのマージが有効になります。各ブロックごとの比率は下部のスライダーなどで設定してください。
+
+#### 計算手法
+cosineを選択すると、設定されたマージ比率を中心として、コサイン類似度を用いた比較を行い、マージによるロスをなくすような比率を計算し、その比率を用いてマージを行います。
+詳しくは下記を参照して下さい(英語です)
+考案された[recoilme](https://github.com/recoilme)氏とこの手法を紹介してくれた[SwiftIllusion](https://github.com/SwiftIllusion)氏に感謝します。  
+https://github.com/hako-mikan/sd-webui-supermerger/issues/33
+https://github.com/recoilme/losslessmix
+
+### 保存
+save metadateを有効にするとマージ条件をメタデータとして埋め込めます。safetensor形式のみ有効です。埋め込まれた条件はMetadataタブで確認できます。
 
 ## 各ボタン
 ### Merge
@@ -115,6 +120,10 @@ LoRA名1:マージ比率1:階層,LoRA名2:階層,マージ比率2,LoRA名3:マ�
 ふたつのモデルの差分からLoRAを生成します。
 demensionを指定すると指定されたdimensionで作製されます。無指定の場合は128で作製します。
 alphaとbetaによって配合比率を調整することができます。(alpha x Model_A - beta x Model B)　alpha, beta = 1が通常のLoRA作成となります。
+
+#### google colab使用時の問題
+colabで使用する場合に多くのエラーが発生することが報告されています。これは複数の原因によって発生しているようです。  
+まずはメモリの問題です。モデルはfp16モデルを使用することを推奨します。フルモデルを使用した場合8GB以上のメモリが必要になります。これはこのスクリプトが使用する量です。また、インストールされているdiffusersのバージョンが異なるとエラーが発生するようです。version 0.10.2で動作確認されています。
 
 ### merge LoRAs
 ひとつまたは複数のLoRA同士をマージします。kohya-ss氏の最新のスクリプトを使用しているので、dimensionの異なるLoRA同氏もマージ可能ですが、dimensionの変換の際はLoRAの再計算を行うため、生成される画像が大きく異なる可能性があることに注意してください。  
