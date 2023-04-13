@@ -301,7 +301,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                _ , currentmodel,modelid,theta_0,_=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,useblocks,"","",id_sets,False,deep_in,deepprint = deepprint) 
                usemodelgen(theta_0,model_a,currentmodel)
                              # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
-            image_temp=simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,currentmodel,id_sets,modelid)
+            image_temp=simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,1,currentmodel,id_sets,modelid)
             xyimage.append(*image_temp[0])
             xcount+=1
             if state_mergen:
