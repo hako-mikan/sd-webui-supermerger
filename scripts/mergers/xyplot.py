@@ -5,9 +5,9 @@ import os
 import copy
 import csv
 from PIL import Image
-from modules import images,scripts
+from modules import images
 from modules.shared import opts
-from scripts.mergers.mergers import types,smerge,simggen,filenamecutter,draw_origin,wpreseter
+from scripts.mergers.mergers import TYPES,smerge,simggen,filenamecutter,draw_origin,wpreseter
 from scripts.mergers.model_util import usemodelgen
 
 hear = True
@@ -22,7 +22,7 @@ def freezetime():
     state_mergen = True
 
 def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale):
     global numadepth
@@ -35,7 +35,7 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
         if seed =="-1": seed = str(random.randrange(4294967294))
         for men in xmens[1:]:
             numaker(xtype,men,ytype,ymen,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h,
                         hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale)
     elif sep  in ymen:
@@ -44,13 +44,13 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
         if seed =="-1": seed = str(random.randrange(4294967294))
         for men in ymens[1:]:
             numaker(xtype,xmen,ytype,men,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h,
                         hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale)
 
     if normalstart:
         result,currentmodel,xyimage,a,b,c= sgenxyplot(xtype,xmen,ytype,ymen,esettings,
-                                                                             weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                                                                             weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                                                                              prompt,nprompt,steps,sampler,cfg,seed,w,h,
                                                                              hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale)
         if xyimage is not None:grids =[xyimage[0]]
@@ -86,13 +86,13 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
     return result,currentmodel,grids,a,b,c
 
 def numaker(xtype,xmen,ytype,ymen,esettings,
-#msettings=[weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets]       
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+#msettings=[weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets]       
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale):
     global numadepth
     numadepth.append([len(numadepth)+1,"waiting",xtype,xmen,ytype,ymen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale])
     return numalistmaker(copy.deepcopy(numadepth))
@@ -111,8 +111,8 @@ def nulister(redel):
 def numalistmaker(numa):
     if numa ==[]: return [["no data","",""],]
     for i,r in enumerate(numa):
-        r[2] =  types[int(r[2])]
-        r[4] =  types[int(r[4])]
+        r[2] =  TYPES[int(r[2])]
+        r[4] =  TYPES[int(r[4])]
         numa[i] = r[0:6]+r[8:11]+r[12:16]+r[6:8]
     return numa
 
@@ -120,14 +120,14 @@ def caster(news,hear):
     if hear: print(news)
 
 def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale):
     global hear
     esettings = " ".join(esettings)
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
-    xtype = types[xtype]
-    ytype = types[ytype]
+    xtype = TYPES[xtype]
+    ytype = TYPES[ytype]
     if ytype == "none": ymen = ""
 
     modes=["Weight" ,"Add" ,"Triple","Twice"]
@@ -298,7 +298,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
 
             print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)} ({xcount+ycount*len(xs)+1}/{allcount})")
             if not (xtype=="seed" and xcount > 0):
-               _ , currentmodel,modelid,theta_0=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,useblocks,"","",id_sets,False,deep_in,deepprint = deepprint) 
+               _ , currentmodel,modelid,theta_0=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,useblocks,"","",id_sets,False,deep_in,deepprint = deepprint) 
                usemodelgen(theta_0,model_a,currentmodel)
                              # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
             image_temp=simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,currentmodel,id_sets,modelid)
@@ -322,7 +322,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
     if "mbw alpha and beta" in ytype: ys = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
 
     xs[0]=xtype+" = "+xs[0] #draw X label
-    if ytype!=types[0] or "model" in ytype:ys[0]=ytype+" = "+ys[0]  #draw Y label
+    if ytype!=TYPES[0] or "model" in ytype:ys[0]=ytype+" = "+ys[0]  #draw Y label
 
     if ys==[""]:ys = [" "]
 

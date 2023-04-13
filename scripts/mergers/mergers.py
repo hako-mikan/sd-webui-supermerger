@@ -1,12 +1,14 @@
 from linecache import clearcache
 import os
 import gc
+import numpy as np
 import os.path
 import re
 import torch
 import tqdm
 import datetime
 import csv
+import json
 from PIL import Image, ImageFont, ImageDraw
 from fonts.ttf import Roboto
 from tqdm import tqdm
@@ -19,18 +21,24 @@ from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 
 from inspect import currentframe
 
+stopmerge = False
+
+def freezemtime():
+    global stopmerge
+    stopmerge = True
+
 mergedmodel=[]
-typesg = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","pinpoint element","effective elemental checker"]
-types = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","pinpoint element","effective"]
-modes=["Weight" ,"Add" ,"Triple","Twice"]
-sevemodes=["save model", "overwrite"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","pinpoint element","effective elemental checker"]
+TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","pinpoint element","effective"]
+MODES=["Weight" ,"Add" ,"Triple","Twice"]
+SAVEMODES=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
 #id sets "image", "PNG info","XY grid"
 
 hear = False
 hearm = False
-non3 = [None]*3
+non4 = [None]*4
 
 def caster(news,hear):
     if hear: print(news)
@@ -41,27 +49,29 @@ def casterr(*args,hear=hear):
         print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
     
   #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
-def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,esettings,
+def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
+                    esettings,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,
                     currentmodel,imggen):
 
     deepprint  = True if "print change" in esettings else False
 
-    result,currentmodel,modelid,theta_0 = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint=deepprint)
+    result,currentmodel,modelid,theta_0,metadata = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint=deepprint)
 
-    if "ERROR" in result: return result, *non3
+    if "ERROR" in result or "STOPPED" in result: 
+        return result,"not loaded",*non4
 
     usemodelgen(theta_0,model_a,currentmodel)
 
-    save = True if sevemodes[0] in save_sets else False
+    save = True if SAVEMODES[0] in save_sets else False
 
-    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a) if save else "Merged model loaded:"+currentmodel
+    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
 
     gc.collect()
 
     if imggen :
-        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,currentmodel,id_sets,modelid)
+        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,currentmodel,id_sets,modelid)
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -72,10 +82,10 @@ NUM_OUTPUT_BLOCKS = 12
 NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
      
-def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint = False):
+def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint = False):
     caster("merge start",hearm)
-    global hear
-    global mergedmodel
+    global hear,mergedmodel,stopmerge
+    stopmerge = False
 
     gc.collect()
 
@@ -85,14 +95,19 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if type(base_alpha) == str:base_alpha = float(base_alpha)
     if type(base_beta) == str:base_beta  = float(base_beta)
 
+    weights_a_orig = weights_a
+    weights_b_orig = weights_b
+
     # preset to weights
     if wpresets != False and useblocks:
         weights_a = wpreseter(weights_a,wpresets)
         weights_b = wpreseter(weights_b,wpresets)
 
     # mode select booleans
-    save = True if sevemodes[0] in save_sets else False
-    usebeta = modes[2] in mode or modes[3] in mode
+    save = True if SAVEMODES[0] in save_sets else False
+    usebeta = MODES[2] in mode or MODES[3] in mode
+    save_metadata = "save metadata" in save_sets
+    metadata = {"format": "pt", "sd_merge_models": {}, "sd_merge_recipe": None}
     
     if not useblocks:
         weights_a = weights_b = ""
@@ -112,8 +127,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         deep = deep.split(",")
 
     #format check
-    if model_a =="" or model_b =="" or ((not modes[0] in mode) and model_c=="") : 
-        return "ERROR: Necessary model is not selected",*non3
+    if model_a =="" or model_b =="" or ((not MODES[0] in mode) and model_c=="") : 
+        return "ERROR: Necessary model is not selected",*non4
     
     #for MBW text to list
     if useblocks:
@@ -122,13 +137,13 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         base_alpha  = float(weights_a_t[0])    
         weights_a = [float(w) for w in weights_a_t[1].split(',')]
         caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
-        if len(weights_a) != 25:return f"ERROR: weights alpha value must be {26}.",*non3
+        if len(weights_a) != 25:return f"ERROR: weights alpha value must be {26}.",*non4
         if usebeta:
             base_beta = float(weights_b_t[0]) 
             weights_b = [float(w) for w in weights_b_t[1].split(',')]
             caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
-            if len(weights_b) != 25: return f"ERROR: weights beta value must be {26}.",*non3
-
+            if len(weights_b) != 25: return f"ERROR: weights beta value must be {26}.",*non4
+        
     caster("model load start",hearm)
 
     print(f"  model A  \t: {model_a}")
@@ -139,10 +154,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  weights_beta\t: {weights_b}")
     print(f"  mode\t\t: {mode}")
     print(f"  MBW \t\t: {useblocks}")
+    print(f"  CalcMode \t: {calcmode}")
 
     theta_1=load_model_weights_m(model_b,False,True,save).copy()
 
-    if modes[1] in mode:#Add
+    if MODES[1] in mode:#Add
+        if stopmerge: return "STOPPED", *non4
         theta_2 = load_model_weights_m(model_c,False,False,save).copy()
         for key in tqdm(theta_1.keys()):
             if 'model' in key:
@@ -153,9 +170,11 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     theta_1[key] = torch.zeros_like(theta_1[key])
         del theta_2
 
+    if stopmerge: return "STOPPED", *non4
+    
     theta_0=load_model_weights_m(model_a,True,False,save).copy()
 
-    if modes[2] in mode or modes[3] in mode:#Tripe or Twice
+    if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
         theta_2 = load_model_weights_m(model_c,False,False,save).copy()
 
     alpha = base_alpha
@@ -167,7 +186,27 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     chckpoint_dict_skip_on_merge = ["cond_stage_model.transformer.text_model.embeddings.position_ids"]
     count_target_of_basealpha = 0
+
+    if calcmode =="cosine":
+        if stopmerge: return "STOPPED", *non4
+        sim = torch.nn.CosineSimilarity(dim=0)
+        sims = np.array([], dtype=np.float64)
+        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
+            # skip VAE model parameters to get better results
+            if "first_stage_model" in key: continue
+            if "model" in key and key in theta_1:
+                simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
+                dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
+                magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
+                combined_similarity = (simab + magnitude_similarity) / 2.0
+                sims = np.append(sims, combined_similarity.numpy())
+        sims = sims[~np.isnan(sims)]
+        sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
+        sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
+
+
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
+        if stopmerge: return "STOPPED", *non4
         if "model" in key and key in theta_1:
             if usebeta and not key in theta_2:
                 continue
@@ -205,7 +244,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
                 if weight_index >= NUM_TOTAL_BLOCKS:
                     print(f"ERROR: illegal block index: {key}")
-                    return f"ERROR: illegal block index: {key}",None,None
+                    return f"ERROR: illegal block index: {key}",*non4
                 
                 if weight_index >= 0 and useblocks:
                     current_alpha = weights_a[weight_index]
@@ -235,24 +274,39 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         if deepprint :print(dbs,dws,key,dr)
                         current_alpha = dr
 
-            if modes[1] in mode:#Add
-                caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]",hear)
-                theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
-            elif modes[2] in mode:#Triple
-                caster(f"model A[{key}] +  {1-current_alpha-current_beta} +  model B[{key}]*{current_alpha} + model C[{key}]*{current_beta}",hear)
-                theta_0[key] = (1 - current_alpha-current_beta) * theta_0[key] + current_alpha * theta_1[key]+current_beta * theta_2[key]
-            elif modes[3] in mode:#Twice
-                caster(f"model A[{key}] +  {1-current_alpha} + * model B[{key}]*{alpha}",hear)
-                caster(f"model A+B[{key}] +  {1-current_beta} + * model C[{key}]*{beta}",hear)
-                theta_0[key] = (1 - current_alpha) * theta_0[key] + current_alpha * theta_1[key]
-                theta_0[key] = (1 - current_beta) * theta_0[key] + current_beta * theta_2[key]
-            else:#Weight
-                if current_alpha == 1:
-                    caster(f"alpha = 0,model A[{key}=model B[{key}",hear)
-                    theta_0[key] = theta_1[key]
-                elif current_alpha !=0:
-                    caster(f"model A[{key}] +  {1-current_alpha} + * (model B)[{key}]*{alpha}",hear)
+            if calcmode == "normal":
+                if MODES[1] in mode:#Add
+                    caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]",hear)
+                    theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
+                elif MODES[2] in mode:#Triple
+                    caster(f"model A[{key}] +  {1-current_alpha-current_beta} +  model B[{key}]*{current_alpha} + model C[{key}]*{current_beta}",hear)
+                    theta_0[key] = (1 - current_alpha-current_beta) * theta_0[key] + current_alpha * theta_1[key]+current_beta * theta_2[key]
+                elif MODES[3] in mode:#Twice
+                    caster(f"model A[{key}] +  {1-current_alpha} + * model B[{key}]*{alpha}",hear)
+                    caster(f"model A+B[{key}] +  {1-current_beta} + * model C[{key}]*{beta}",hear)
                     theta_0[key] = (1 - current_alpha) * theta_0[key] + current_alpha * theta_1[key]
+                    theta_0[key] = (1 - current_beta) * theta_0[key] + current_beta * theta_2[key]
+                else:#Weight
+                    if current_alpha == 1:
+                        caster(f"alpha = 0,model A[{key}=model B[{key}",hear)
+                        theta_0[key] = theta_1[key]
+                    elif current_alpha !=0:
+                        caster(f"model A[{key}] +  {1-current_alpha} + * (model B)[{key}]*{alpha}",hear)
+                        theta_0[key] = (1 - current_alpha) * theta_0[key] + current_alpha * theta_1[key]
+
+            elif calcmode == "cosine":
+                # skip VAE model parameters to get better results
+                if "first_stage_model" in key: continue
+                if "model" in key and key in theta_0:
+                    simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
+                    dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
+                    magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
+                    combined_similarity = (simab + magnitude_similarity) / 2.0
+                    k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
+                    k = k - current_alpha
+                    k = k.clip(min=.0,max=1.)
+                    caster(f"model A[{key}] +  {1-k} + * (model B)[{key}]*{k}",hear)
+                    theta_0[key] = theta_0[key] * (1 - k) + theta_1[key] * k
 
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode)
 
@@ -266,7 +320,45 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
-    return "",currentmodel,modelid,theta_0
+    if save_metadata:
+        merge_recipe = {
+            "type": "sd-webui-supermerger",
+            "weights_alpha": weights_a if useblocks else None,
+            "weights_beta": weights_b if useblocks else None,
+            "weights_alpha_orig": weights_a_orig if useblocks else None,
+            "weights_beta_orig": weights_b_orig if useblocks else None,
+            "model_a": longhashfromname(model_a),
+            "model_b": longhashfromname(model_b),
+            "model_c": longhashfromname(model_c),
+            "base_alpha": base_alpha,
+            "base_beta": base_beta,
+            "mode": mode,
+            "mbw": useblocks,
+            "elemental_merge": deep,
+            "calcmode" : calcmode
+        }
+        metadata["sd_merge_recipe"] = json.dumps(merge_recipe)
+
+        def add_model_metadata(checkpoint_name):
+            checkpoint_info = sd_models.get_closet_checkpoint_match(checkpoint_name)
+            checkpoint_info.calculate_shorthash()
+            metadata["sd_merge_models"][checkpoint_info.sha256] = {
+                "name": checkpoint_name,
+                "legacy_hash": checkpoint_info.hash
+            }
+
+            #metadata["sd_merge_models"].update(checkpoint_info.metadata.get("sd_merge_models", {}))
+
+        if model_a:
+            add_model_metadata(model_a)
+        if model_b:
+            add_model_metadata(model_b)
+        if model_c:
+            add_model_metadata(model_c)
+
+        metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
+
+    return "",currentmodel,modelid,theta_0,metadata
 
 def load_model_weights_m(model,model_a,model_b,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
@@ -306,26 +398,24 @@ def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,usebl
     model_b=filenamecutter(model_b)
     model_c=filenamecutter(model_c)
 
-    modes=["Weight" ,"Add" ,"Triple","Twice","Diff"]
-
     if type(alpha) == str:alpha = float(alpha)
     if type(beta)== str:beta  = float(beta)
 
     if useblocks:
-        if modes[1] in mode:#add
+        if MODES[1] in mode:#add
             currentmodel =f"{model_a} + ({model_b} - {model_c}) x alpha ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)}"
-        elif modes[2] in mode:#triple
+        elif MODES[2] in mode:#triple
             currentmodel =f"{model_a} x (1-alpha-beta) + {model_b} x alpha + {model_c} x beta (alpha = {str(round(alpha,3))},{','.join(str(s) for s in weights_a)},beta = {beta},{','.join(str(s) for s in weights_b)})"
-        elif modes[3] in mode:#twice
+        elif MODES[3] in mode:#twice
             currentmodel =f"({model_a} x (1-alpha) + {model_b} x alpha)x(1-beta)+  {model_c} x beta ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)})_({str(round(beta,3))},{','.join(str(s) for s in weights_b)})"
         else:
             currentmodel =f"{model_a} x (1-alpha) + {model_b} x alpha ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)})"
     else:
-        if modes[1] in mode:#add
+        if MODES[1] in mode:#add
             currentmodel =f"{model_a} + ({model_b} -  {model_c}) x {str(round(alpha,3))}"
-        elif modes[2] in mode:#triple
+        elif MODES[2] in mode:#triple
             currentmodel =f"{model_a} x {str(round(1-alpha-beta,3))} + {model_b} x {str(round(alpha,3))} + {model_c} x {str(round(beta,3))}"
-        elif modes[3] in mode:#twice
+        elif MODES[3] in mode:#twice
             currentmodel =f"({model_a} x {str(round(1-alpha,3))} +{model_b} x {str(round(alpha,3))}) x {str(round(1-beta,3))} + {model_c} x {str(round(beta,3))}"
         else:
             currentmodel =f"{model_a} x {str(round(1-alpha,3))} + {model_b} x {str(round(alpha,3))}"
@@ -414,7 +504,16 @@ def hashfromname(name):
         return checkpoint_info.shorthash
     return checkpoint_info.calculate_shorthash()
 
-def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,mergeinfo="",id_sets=[],modelid = "no id"):
+def longhashfromname(name):
+    from modules import sd_models
+    if name == "" or name ==[]: return ""
+    checkpoint_info = sd_models.get_closet_checkpoint_match(name)
+    if checkpoint_info.sha256 is not None:
+        return checkpoint_info.sha256
+    checkpoint_info.calculate_shorthash()
+    return checkpoint_info.sha256
+
+def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
     p = processing.StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
@@ -422,7 +521,7 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,
         do_not_save_samples=True,
         do_not_reload_embeddings=True,
     )
-    p.batch_size = 1
+    p.batch_size = int(batch_size)
     p.prompt = prompt
     p.negative_prompt = nprompt
     p.steps = steps
@@ -452,8 +551,10 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,
         p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(p.negative_prompt, p.styles)]
 
     processed:Processed = processing.process_images(p)
-    if "image" in id_sets: processed.images[0] =  draw_origin(processed.images[0], str(modelid),w,h,w)
-    image = processed.images[0]
+    if "image" in id_sets:
+        for i, image in enumerate(processed.images):
+            processed.images[i] = draw_origin(image, str(modelid),w,h,w)
+
     if "PNG info" in id_sets:mergeinfo = mergeinfo + " ID " + str(modelid)
 
     infotext = create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds)
@@ -465,6 +566,13 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,
         if "Model:"in x:
             infotexts[i] = " Model: "+mergeinfo.replace(","," ")
     infotext= ",".join(infotexts)
-    images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, p=p,info=infotext)
+
+    for i, image in enumerate(processed.images):
+        images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, p=p,info=infotext)
+
+    if batch_size > 1:
+        grid = images.image_grid(processed.images, p.batch_size)
+        processed.images.insert(0, grid)
+        images.save_image(grid, opts.outdir_txt2img_grids, "grid", p.seed, p.prompt, opts.grid_format, info=infotext, short_filename=not opts.grid_extended_filename, p=p, grid=True)
     shared.state.end()
     return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),p
