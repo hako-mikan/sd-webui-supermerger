@@ -114,7 +114,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode].copy()
     
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
@@ -429,7 +429,7 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
     is_file = os.path.isfile(filepath)
     if not is_file:
         with open(filepath, 'a') as f:
-                                       #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
+                                       #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets, 12 deep 13 calcmode]
             f.writelines('"ID","time","name","weights alpha","weights beta","model A","model B","model C","alpha","beta","mode","use MBW","plus lora","custum name","save setting","use ID"\n')
     with  open(filepath, 'r+') as f:
         reader = csv.reader(f)
