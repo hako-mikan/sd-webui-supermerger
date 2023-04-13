@@ -141,12 +141,15 @@ def on_ui_tabs():
     
             with gr.Tab("Weights Setting"):
                 with gr.Row():
-                        addtoseq = gr.Button(elem_id="copytogen", value="Add weights to Sequence X",variant='primary')
+                    setalpha = gr.Button(elem_id="copytogen", value="set to alpha",variant='primary')
+                    readalpha = gr.Button(elem_id="copytogen", value="read from alpha",variant='primary')
+                    setbeta = gr.Button(elem_id="copytogen", value="set to beta",variant='primary')
+                    readbeta = gr.Button(elem_id="copytogen", value="read from beta",variant='primary')
+                    setx = gr.Button(elem_id="copytogen", value="set to X",variant='primary')
                 with gr.Row():
                     weights_a = gr.Textbox(label="weights for alpha, base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
                     weights_b = gr.Textbox(label="weights,for beta, base beta,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2")
                 with gr.Row():
-                    editweights = gr.Radio(label = "edit",choices = ["alpha","beta"], value = "alpha") 
                     base= gr.Slider(label="Base", minimum=0, maximum=1, step =0.01, value=0.5)
                     in00 = gr.Slider(label="IN00", minimum=0, maximum=1, step=0.01, value=0.5)
                     in01 = gr.Slider(label="IN01", minimum=0, maximum=1, step=0.01, value=0.5)
@@ -324,41 +327,21 @@ def on_ui_tabs():
         loadcachelist.click(fn=load_cachelist,inputs=[],outputs=[currentcache])
         addtox.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[xgrid])
         addtoy.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[ygrid])
-        addtoseq.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])
+
         stopgrid.click(fn=freezetime)
         stopmerge.click(fn=freezemtime)
 
         checkpoints.change(fn=lambda x:",".join(x),inputs=[checkpoints],outputs=[inputer])
         blockids.change(fn=lambda x:" ".join(x),inputs=[blockids],outputs=[inputer])
 
-        menbers = [weights_a,weights_b,editweights,base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
-        base.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in00.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in01.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in02.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in03.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in04.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in05.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in06.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in07.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in08.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in09.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in10.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        in11.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        mi00.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou00.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou01.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou02.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou03.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou04.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou05.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou06.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou07.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou08.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou09.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou11.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        ou10.change(fn=reload_mbmaker,inputs=[x for x in menbers],outputs=[weights_a,weights_b])
-        editweights.change(fn=changesliders,inputs=[weights_a,weights_b,editweights],outputs=[x for x in menbers[3:]])
+        menbers = [base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
+
+        setalpha.click(fn=slider2text,inputs=menbers,outputs=[weights_a])
+        setbeta.click(fn=slider2text,inputs=menbers,outputs=[weights_b])
+        setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
+
+        readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
+        readbeta.click(fn=text2slider,inputs=weights_b,outputs=menbers)
 
         x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets])
         y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets])
@@ -491,21 +474,14 @@ def showxy(x,y):
     if not "none" in t[y] : flags[3] = True
     return [gr.update(visible = x) for x in flags]
 
-def changesliders(texta,textb,target):
-    text = texta if target =="alpha" else textb
+def text2slider(text):
     vals = [t.strip() for t in text.split(",")]
     return [gr.update(value = float(v)) for v in vals]
 
-def reload_mbmaker(weights_a,weights_b,editweights,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z):
+def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z):
     numbers = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z]
-    up = gr.Textbox.update() 
-    text=",".join(str(s) for s in numbers)
-    if editweights == "alpha" :
-        if text ==weights_a:return up,up
-        return gr.Textbox.update(value = text),up
-    else:
-        if text ==weights_b:return up,up
-        return up,gr.Textbox.update(value = text)
+    numbers = [str(x) for x in numbers]
+    return gr.update(value = ",".join(numbers) )
 
 def tagdicter(presets):
     presets=presets.splitlines()
