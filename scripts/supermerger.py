@@ -11,9 +11,9 @@ import os.path
 import argparse
 import modules.ui
 import scripts.mergers.pluslora as pluslora
-import scripts.mergers.pluslora_old as pluslora_old
-from scripts.mergers.mergers import simggen,typesg,smergegen,rwmergelog
+from scripts.mergers.mergers import simggen,TYPESEG,smergegen,rwmergelog,freezemtime
 from scripts.mergers.xyplot import freezetime,numaker,numanager,nulister
+from scripts.mergers.model_util import savemodel
 import csv
 from modules import sd_models,script_callbacks,scripts, shared,sd_hijack,devices,sd_vae
 from modules.ui import create_refresh_button, create_output_panel
@@ -68,6 +68,7 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
+                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosine"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -78,9 +79,10 @@ def on_ui_tabs():
                         merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
                         mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
                         gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
+                        stopmerge = gr.Button(elem_id="stopmerge", value="Stop",variant='primary')
                     with gr.Row():
                         with gr.Column(scale = 4):
-                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16"], label="save settings")
+                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
                         with gr.Column(scale = 2):
                             id_sets = gr.CheckboxGroup(["image", "PNG info"], label="write merged model ID to")
                     with gr.Row():      
@@ -91,7 +93,8 @@ def on_ui_tabs():
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
 
-                    with gr.Accordion("hiresfix",open = False):
+                    with gr.Accordion("Hires Fix , Batch size",open = False):
+                        batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
                         hireson = gr.Checkbox(label = "hiresfix",value = False, visible = True,interactive=True)    
                         with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
                             hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
@@ -107,10 +110,10 @@ def on_ui_tabs():
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
                     with gr.Row():
-                        x_type = gr.Dropdown(label="X type", choices=[x for x in typesg], value="alpha", type="index")
+                        x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
                         x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
                     xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
-                    y_type = gr.Dropdown(label="Y type", choices=[y for y in typesg], value="none", type="index")    
+                    y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
                     ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
                     with gr.Row():
                         gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
@@ -193,8 +196,7 @@ def on_ui_tabs():
                 with gr.Row():
                     numaframe = gr.Dataframe(
                         headers=["No.","status","xtype","xmenber", "ytype","ymenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
-                        row_count=5,
-                )
+                        row_count=5,)
             # with gr.Tab("manual"):
             #     with gr.Row():
             #         gr.HTML(value="<p> exampls: Change base alpha from 0.1 to 0.9 <br>0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9<br>If you want to display the original model as well for comparison<br>0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1</p>")
@@ -232,9 +234,19 @@ def on_ui_tabs():
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
 
-        with gr.Tab("LoRA-old", elem_id="tab_lora"):
-            pluslora_old.on_ui_tabs()
+        with gr.Tab("Metadeta", elem_id="tab_metadata"):
+                with gr.Row():
+                    meta_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="read metadata",interactive=True)
+                    create_refresh_button(meta_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
+                    smd_loadmetadata = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    metadata = gr.TextArea()
 
+        smd_loadmetadata.click(
+            fn=loadmetadata,
+            inputs=[meta_model_a],
+            outputs=[metadata]
+        )                 
 
         smd_loadkeys.click(
             fn=loadkeys,
@@ -254,7 +266,7 @@ def on_ui_tabs():
 
         load_history.click(fn=load_historyf,outputs=[history ])
 
-        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,wpresets,deep]
+        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         xysettings=[x_type,xgrid,y_type,ygrid,esettings]
 
@@ -265,19 +277,19 @@ def on_ui_tabs():
 
         merge.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,currentmodel,dfalse],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dfalse],
             outputs=[submit_result,currentmodel]
         )
 
         mergeandgen.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,currentmodel,dtrue],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dtrue],
             outputs=[submit_result,currentmodel,*imagegal]
         )
 
         gen.click(
             fn=simggen,
-            inputs=[*gensets.txt2img_preview_params,*hiresfix,currentmodel,id_sets],
+            inputs=[*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,id_sets],
             outputs=[*imagegal],
         )
 
@@ -314,6 +326,7 @@ def on_ui_tabs():
         addtoy.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[ygrid])
         addtoseq.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])
         stopgrid.click(fn=freezetime)
+        stopmerge.click(fn=freezemtime)
 
         checkpoints.change(fn=lambda x:",".join(x),inputs=[checkpoints],outputs=[inputer])
         blockids.change(fn=lambda x:" ".join(x),inputs=[blockids],outputs=[inputer])
@@ -375,6 +388,14 @@ def on_ui_tabs():
 
 msearch = []
 mlist=[]
+
+def loadmetadata(model):
+    import json
+    checkpoint_info = sd_models.get_closet_checkpoint_match(model)
+    if ".safetensors" not in checkpoint_info.filename: return "no metadata(not safetensors)"
+    sdict = sd_models.read_metadata_from_safetensors(checkpoint_info.filename)
+    if sdict == {}: return "no metadata"
+    return json.dumps(sdict,indent=4)
 
 def load_historyf():
     filepath = os.path.join(path_root,"mergehistory.csv")
@@ -462,7 +483,7 @@ def makerand(num):
 #row_blockids,row_checkpoints,row_inputers,ygrid
 def showxy(x,y):
     flags =[False]*5
-    t = typesg
+    t = TYPESEG
     txy = t[x] + t[y]
     if "model" in txy : flags[1] = flags[2] = True
     if "pinpoint" in txy : flags[0] = flags[2] = True
