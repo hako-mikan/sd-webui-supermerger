@@ -275,7 +275,7 @@ def on_ui_tabs():
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [submit_result,*msettings[0:12],deep]
+            outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode]
         )
 
         merge.click(
@@ -443,9 +443,10 @@ def reversparams(id):
     mgs[10] = [x.strip() for x in mgs[10].split(",")]
     mgs[11] = mgs[11].replace("[","").replace("]","").replace("'", "") 
     mgs[11] = [x.strip() for x in mgs[11].split(",")]
-    while len(mgs) < 13:
+    while len(mgs) < 14:
         mgs.append("")
-    return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:13]]]
+    mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
+    return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:14]]]
 
 def add_to_seq(seq,maker):
     return gr.Textbox.update(value = maker if seq=="" else seq+"\r\n"+maker)
