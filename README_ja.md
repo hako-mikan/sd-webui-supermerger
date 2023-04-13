@@ -40,7 +40,7 @@ Weight sumを2回行います。alpha,betaが使用されます。MBWモード�
 cosineを選択すると、設定されたマージ比率を中心として、コサイン類似度を用いた比較を行い、マージによるロスをなくすような比率を計算し、その比率を用いてマージを行います。
 詳しくは下記を参照して下さい(英語です)
 考案された[recoilme](https://github.com/recoilme)氏とこの手法を紹介してくれた[SwiftIllusion](https://github.com/SwiftIllusion)氏に感謝します。  
-https://github.com/hako-mikan/sd-webui-supermerger/issues/33
+https://github.com/hako-mikan/sd-webui-supermerger/issues/33  
 https://github.com/recoilme/losslessmix
 
 ### 保存
