@@ -665,7 +665,7 @@ def to_half(sd):
             sd[key] = sd[key].half()
     return sd
 
-def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata):
+def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
     from modules import sd_models,shared
     if "fp16" in savesets: 
         state_dict = to_half(state_dict)
