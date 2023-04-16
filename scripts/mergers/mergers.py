@@ -107,7 +107,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     save = True if SAVEMODES[0] in save_sets else False
     usebeta = MODES[2] in mode or MODES[3] in mode
     save_metadata = "save metadata" in save_sets
-    metadata = {"format": "pt", "sd_merge_models": {}, "sd_merge_recipe": None}
+    metadata = {"format": "pt"}
     
     if not useblocks:
         weights_a = weights_b = ""
@@ -338,6 +338,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             "calcmode" : calcmode
         }
         metadata["sd_merge_recipe"] = json.dumps(merge_recipe)
+        metadata["sd_merge_models"] = {}
 
         def add_model_metadata(checkpoint_name):
             checkpoint_info = sd_models.get_closet_checkpoint_match(checkpoint_name)
