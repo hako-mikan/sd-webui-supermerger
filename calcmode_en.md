@@ -1,25 +1,84 @@
 ## Calculation method
 
-### normal
-#### Available modes : All
+- [normal](#normal)
+- [cosineA/cosineB](#cosine)
+- [smoothAdd](#smooth)
+- [tensor](#tensor)
+
+## normal
+### _Available modes :_ All
 Normal calculation method. Can be used in all modes.
 
-### cosineA
-#### Available modes : weight sum, Add difference
+## <a id="cosine">cosineA/cosineB</a>
+### _Available modes :_ weight sum
+The comparison of two models is performed using cosine similarity, centered on the set ratio, and is calculated to eliminate loss due to merging. See below for further details.
+https://github.com/hako-mikan/sd-webui-supermerger/issues/33 https://github.com/recoilme/losslessmix
 
-The comparison of two models is performed using cosine similarity, centered on the set ratio, and new ratio is calculated to eliminate loss due to merging. See below for more details.
+The original simple weight mode is the most basic method and works by linearly interpolating between the two models based on a given weight alpha. At alpha = 0, the output is the first model (model A), and at alpha = 1, the output is the second model (model B). Any other value of alpha results in a weighted average of the two models.
+- Original merge results between AnythingV3 and FeverDream model  
+`charming girl mid-shot. scenery-beautiful majestic`
+![MergeStandard](https://user-images.githubusercontent.com/6239068/232734670-958a6db3-1022-49ed-af73-f777223e71e6.png)
 
-https://github.com/hako-mikan/sd-webui-supermerger/issues/33
-https://github.com/recoilme/losslessmix
+One key advantage of the cosine methods over the original simple weight mode is that they take into account the structural similarity between the two models, which can lead to better results when the two models are similar but not identical. Another advantage of the cosine methods is that they can help prevent overfitting and improve generalization by limiting the amount of detail from one model that is incorporated into the other.
 
-### cosineB
-#### Available modes : weight sum, Add difference
+**In the case of CosineA**, we normalize the vectors of the first model (model A) before merging, so the resulting merged model will favor the structure of the first model while incorporating details from the second model. This is because we are essentially aligning the direction of the first model's vectors with the direction of the corresponding vectors in the second model.
+- CosineA merge results between AnythingV3 and FeverDream model
+_Note structure-wise the pose direction/flow and face area_
+![MergeCosineA](https://user-images.githubusercontent.com/6239068/232741979-f40450ab-6006-47e5-ae00-cf5e89b7ac09.png)
 
-### smoothAdd
-#### Add difference
 
-### tensor
-#### Available modes : weight sum only
+_Detail-wise for example note how above and below, in all cases there's more blur preserved for the background compared to foreground, instead of the linear difference in the original merge._
+
+**On the other hand, in CosineB**, we normalize the vectors of the second model (model B) before merging, so the resulting merged model will favor the structure of the second model while incorporating details from the first model. This is because we are aligning the direction of the second model's vectors with the direction of the corresponding vectors in the first model.
+- CosineB merge results between AnythingV3 and FeverDream model
+_Note structure-wise the pose direction/flow and face area, and how in the background it tried to keep the form more from the right too_
+![MergeCosineB](https://user-images.githubusercontent.com/6239068/232744751-20786eff-a654-468c-93e7-c19db5829c69.png)
+
+**In summary, the choice between CosineA and CosineB depends on which model's structure you want to prioritize in the resulting merged model. If you want to prioritize the structure of the first model, use CosineA. If you want to prioritize the structure of the second model, use CosineB.**
+
+Note also how the second model is more the 'reference point' for the merging looking at Alpha 1 compared to the changes at 0, so the order of models can also change the end result to look for your desired output.
+- CosineA merge results between FeverDream and AnythingV3 model
+![MergeOppositeCosineA](https://user-images.githubusercontent.com/6239068/232741034-ce3c9739-7f5a-4a7d-b979-fec4ac7d9b71.png)
+
+
+## <a id="smooth">smoothAdd</a>
+### _Available modes :_ Add difference
+A method of add difference that mixes the benefits of Median and Gaussian filters, to add model differences in a smoother way trying to avoid the negative 'burning' effect that can be seen when adding too many models this way. This also achieves more than just simply adding the difference at a lower value.
+
+- The starting point for reference
+![Untitled-1](https://user-images.githubusercontent.com/6239068/232780130-19caa53a-a767-4ee1-80a7-dc37ad948322.png)
+- Adding a collection of models on top of it, each with a value of 1
+`The burn here is very obvious`
+![Untitled-2](https://user-images.githubusercontent.com/6239068/232781113-3e2de251-711d-463a-82c9-a080be47e180.png)
+- Adding a collection of models on top of it, each with a value of 0.5
+`Still not an outcome I would accept, especially you can see with the bird`
+![Untitled-3](https://user-images.githubusercontent.com/6239068/232785787-cfde6967-fc86-47e8-b208-3aa8f5f46c40.png)
+<details>
+  <summary> The functionality and result of just the Median filter</summary>
+  
+- Reduces noise in the difference by replacing each value with the median of the neighboring values.
+- Preserves edges and structures in the difference, which is helpful when you want to transfer the learning related to object shapes and boundaries.
+- Non-linear filtering, which means it can better preserve the important features in the difference while reducing noise.
+![Untitled-5](https://user-images.githubusercontent.com/6239068/232785599-1e40ee9f-43de-4721-bb5f-0c21485fd8d3.png)
+</details>
+<details>
+  <summary> The functionality and result of just the Gaussian filter</summary>
+  
+- Smooths the difference by applying a Gaussian kernel, which reduces high-frequency noise and retains the low-frequency components.
+- The level of smoothing can be controlled by the sigma parameter, allowing you to experiment with different levels of smoothing.
+- Linear filtering, which means it can better preserve the global structure in the difference while reducing noise.
+![Untitled-4](https://user-images.githubusercontent.com/6239068/232785723-aecce7bb-1bc6-4731-a879-f8a7e4dc5a0c.png)
+</details>
+
+- The final result when instead using the combination of Median and Gaussian filters
+_Note also compared with either the Median/Guassin filters individually how you can see the top left of the mans hair in the top right image doesn't get 'stuck' when combining them here, achieving the best result overall_
+![Untitled-6](https://user-images.githubusercontent.com/6239068/232786207-f7f41c55-939e-46a1-ab24-2e6d885f65f9.png)
+>**TIP**
+>Sometimes you may want to use this smooth Add difference as an alternative to the regular, even without the risk of burning.
+>In these cases you could increase the Alpha up to 2, as smooth Add at 1 is a lower impact change individually than regular Add, but this of course depends on your desired outcome.
+
+## tensor
+### Available modes : weight sum only
 - This is an Elemental merge that goes beyond Elemental merging.
 As you know, each elemental tensor determines the features of an image in U-NET, and in normal merging, the values of each tensor are multiplied by a ratio and added together as shown below (normal). In the tensor method, the tensors are combined by dividing them by the ratio as shown in the figure below (tensor).
 
