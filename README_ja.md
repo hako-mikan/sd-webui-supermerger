@@ -21,8 +21,6 @@ English: [![jp](https://img.shields.io/badge/lang-English-green.svg)](https://gi
 このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
 これまでマージしたモデルはいったん保存して気に入らなければ削除するということが必要でしたが、このextentionを使うことでHDDやSSDの消耗を防ぐことができます。
 
-# 使い方
-
 # 各種設定
 ## マージモード
 ### Weight sum
