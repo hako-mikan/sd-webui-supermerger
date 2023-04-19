@@ -68,7 +68,7 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosine"], value = "normal") 
+                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB", "smoothAdd","tensor"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -109,6 +109,10 @@ def on_ui_tabs():
                             esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
+                    
+                    with gr.Accordion("Tensor Merge",open = False,visible=False):
+                        tensor = gr.Textbox(label="Blocks:Tensors",lines=2,value="")
+                    
                     with gr.Row():
                         x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
                         x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
@@ -134,6 +138,8 @@ def on_ui_tabs():
                 addtoy = gr.Button(value="Add to Sequence Y")
             with gr.Row(visible = False) as row_blockids:
                 blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
+            with gr.Row(visible = False) as row_calcmode:
+                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB", "smoothAdd","tensor"],type="value",interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in modules.sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
@@ -269,7 +275,7 @@ def on_ui_tabs():
 
         load_history.click(fn=load_historyf,outputs=[history ])
 
-        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep]
+        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         xysettings=[x_type,xgrid,y_type,ygrid,esettings]
 
@@ -333,6 +339,7 @@ def on_ui_tabs():
 
         checkpoints.change(fn=lambda x:",".join(x),inputs=[checkpoints],outputs=[inputer])
         blockids.change(fn=lambda x:" ".join(x),inputs=[blockids],outputs=[inputer])
+        calcmodes.change(fn=lambda x:",".join(x),inputs=[calcmodes],outputs=[inputer])
 
         menbers = [base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
 
@@ -343,8 +350,8 @@ def on_ui_tabs():
         readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
         readbeta.click(fn=text2slider,inputs=weights_b,outputs=menbers)
 
-        x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets])
-        y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets])
+        x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
+        y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
         x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
 
         import subprocess
@@ -466,13 +473,14 @@ def makerand(num):
 
 #row_blockids,row_checkpoints,row_inputers,ygrid
 def showxy(x,y):
-    flags =[False]*5
+    flags =[False]*6
     t = TYPESEG
     txy = t[x] + t[y]
     if "model" in txy : flags[1] = flags[2] = True
     if "pinpoint" in txy : flags[0] = flags[2] = True
     if "effective" in txy or "element" in txy : flags[4] = True
-    if not "none" in t[y] : flags[3] = True
+    if "calcmode" in txy : flags[5] = True
+    if not "none" in t[y] : flags[3] = flags[2] = True
     return [gr.update(visible = x) for x in flags]
 
 def text2slider(text):
