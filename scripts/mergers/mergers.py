@@ -1,4 +1,5 @@
 from linecache import clearcache
+
 import os
 import gc
 import numpy as np
@@ -9,6 +10,9 @@ import tqdm
 import datetime
 import csv
 import json
+import torch.nn as nn
+import scipy.ndimage
+from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
 from fonts.ttf import Roboto
 from tqdm import tqdm
@@ -28,8 +32,8 @@ def freezemtime():
     stopmerge = True
 
 mergedmodel=[]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","pinpoint element","effective elemental checker"]
-TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","pinpoint element","effective"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","pinpoint element","effective elemental checker","tensors","calcmode","prompt"]
+TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","pinpoint element","effective","tensor","calcmode","prompt"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
@@ -49,15 +53,19 @@ def casterr(*args,hear=hear):
         print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
     
   #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
-def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,
-                    esettings,
-                    prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,
-                    currentmodel,imggen):
+def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
+                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                       esettings,
+                       prompt,nprompt,steps,sampler,cfg,seed,w,h,
+                       hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,
+                       currentmodel,imggen):
 
     deepprint  = True if "print change" in esettings else False
 
-    result,currentmodel,modelid,theta_0,metadata = smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint=deepprint)
+    result,currentmodel,modelid,theta_0,metadata = smerge(
+                        weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
+                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,deepprint=deepprint
+                        )
 
     if "ERROR" in result or "STOPPED" in result: 
         return result,"not loaded",*non4
@@ -67,7 +75,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     save = True if SAVEMODES[0] in save_sets else False
 
     result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
-
+    del theta_0
     gc.collect()
 
     if imggen :
@@ -82,7 +90,8 @@ NUM_OUTPUT_BLOCKS = 12
 NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
      
-def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,deepprint = False):
+def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,deepprint = False):
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge
     stopmerge = False
@@ -108,13 +117,13 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     usebeta = MODES[2] in mode or MODES[3] in mode
     save_metadata = "save metadata" in save_sets
     metadata = {"format": "pt"}
-    
+
     if not useblocks:
         weights_a = weights_b = ""
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,tensor].copy()
     
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
@@ -155,6 +164,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  mode\t\t: {mode}")
     print(f"  MBW \t\t: {useblocks}")
     print(f"  CalcMode \t: {calcmode}")
+    print(f"  Elemental \t: {deep}")
+    print(f"  Tensors \t: {tensor}")
 
     theta_1=load_model_weights_m(model_b,False,True,save).copy()
 
@@ -172,7 +183,15 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if stopmerge: return "STOPPED", *non4
     
-    theta_0=load_model_weights_m(model_a,True,False,save).copy()
+    if calcmode == "tensor":
+        theta_t = load_model_weights_m(model_a,True,False,save).copy()
+        theta_0 ={}
+        for key in theta_t:
+            theta_0[key] = theta_t[key].clone()
+        del theta_t
+    else:
+        theta_0=load_model_weights_m(model_a,True,False,save).copy()
+
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
         theta_2 = load_model_weights_m(model_c,False,False,save).copy()
@@ -187,7 +206,23 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     chckpoint_dict_skip_on_merge = ["cond_stage_model.transformer.text_model.embeddings.position_ids"]
     count_target_of_basealpha = 0
 
-    if calcmode =="cosine":
+    if calcmode =="cosineA": #favors modelA's structure with details from B
+        if stopmerge: return "STOPPED", *non4
+        sim = torch.nn.CosineSimilarity(dim=0)
+        sims = np.array([], dtype=np.float64)
+        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
+            # skip VAE model parameters to get better results
+            if "first_stage_model" in key: continue
+            if "model" in key and key in theta_1:
+                theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
+                theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
+                simab = sim(theta_0_norm, theta_1_norm)
+                sims = np.append(sims,simab.numpy())
+        sims = sims[~np.isnan(sims)]
+        sims = np.delete(sims, np.where(sims<np.percentile(sims, 1 ,method = 'midpoint')))
+        sims = np.delete(sims, np.where(sims>np.percentile(sims, 99 ,method = 'midpoint')))
+
+    if calcmode =="cosineB": #favors modelB's structure with details from A
         if stopmerge: return "STOPPED", *non4
         sim = torch.nn.CosineSimilarity(dim=0)
         sims = np.array([], dtype=np.float64)
@@ -203,7 +238,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         sims = sims[~np.isnan(sims)]
         sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
-
 
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
@@ -294,7 +328,24 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         caster(f"model A[{key}] +  {1-current_alpha} + * (model B)[{key}]*{alpha}",hear)
                         theta_0[key] = (1 - current_alpha) * theta_0[key] + current_alpha * theta_1[key]
 
-            elif calcmode == "cosine":
+            elif calcmode == "cosineA": #favors modelA's structure with details from B
+                # skip VAE model parameters to get better results
+                if "first_stage_model" in key: continue
+                if "model" in key and key in theta_0:
+                    # Normalize the vectors before merging
+                    theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
+                    theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
+                    simab = sim(theta_0_norm, theta_1_norm)
+                    dot_product = torch.dot(theta_0_norm.view(-1), theta_1_norm.view(-1))
+                    magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
+                    combined_similarity = (simab + magnitude_similarity) / 2.0
+                    k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
+                    k = k - current_alpha
+                    k = k.clip(min=.0,max=1.)
+                    caster(f"model A[{key}] +  {1-k} + * (model B)[{key}]*{k}",hear)
+                    theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+
+            elif calcmode == "cosineB": #favors modelB's structure with details from A
                 # skip VAE model parameters to get better results
                 if "first_stage_model" in key: continue
                 if "model" in key and key in theta_0:
@@ -306,7 +357,51 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     k = k - current_alpha
                     k = k.clip(min=.0,max=1.)
                     caster(f"model A[{key}] +  {1-k} + * (model B)[{key}]*{k}",hear)
-                    theta_0[key] = theta_0[key] * (1 - k) + theta_1[key] * k
+                    theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+
+            elif calcmode == "smoothAdd":
+                caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
+                # Apply median filter to the weight differences
+                filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
+                # Apply Gaussian filter to the filtered differences
+                filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
+                theta_1[key] = torch.tensor(filtered_diff)
+                # Add the filtered differences to the original weights
+                theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
+
+            elif calcmode == "tensor":
+                dim = theta_0[key].dim()
+                if current_alpha+current_beta <= 1 :
+                    talphas = int(theta_0[key].shape[0]*(current_beta))
+                    talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
+                    if dim == 1:
+                        theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+
+                    elif dim == 2:
+                        theta_0[key][talphas:talphae,:] = theta_1[key][talphas:talphae,:].clone()
+
+                    elif dim == 3:
+                        theta_0[key][talphas:talphae,:,:] = theta_1[key][talphas:talphae,:,:].clone()
+
+                    elif dim == 4:
+                        theta_0[key][talphas:talphae,:,:,:] = theta_1[key][talphas:talphae,:,:,:].clone()
+
+                else:
+                    talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
+                    talphae = int(theta_0[key].shape[0]*(current_beta))
+                    theta_t = theta_1[key].clone()
+                    if dim == 1:
+                        theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+
+                    elif dim == 2:
+                        theta_t[talphas:talphae,:] = theta_0[key][talphas:talphae,:].clone()
+
+                    elif dim == 3:
+                        theta_t[talphas:talphae,:,:] = theta_0[key][talphas:talphae,:,:].clone()
+
+                    elif dim == 4:
+                        theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
+                    theta_0[key] = theta_t
 
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode)
 
@@ -315,6 +410,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             continue
         if "model" in key and key not in theta_0:
             theta_0.update({key:theta_1[key]})
+
+    del theta_1
 
     modelid = rwmergelog(currentmodel,mergedmodel)
 
