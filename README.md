@@ -8,9 +8,10 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
-- New feature, optimization using cosine similarity
-- Now you can stop merge
-- batch size can be set
+update 2023.04.19.2030(JST)
+- New feature, optimization using cosine similarity method updated [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
+- New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
+- New XY plot type : calcmode,prompt
 
 #### requirement
 diffusers(0.10.2 or later),sklearn is required to use some LoRA-related features
@@ -85,6 +86,13 @@ Please be careful not to forget to input "0".
 
 Block ID (only upper case letters are valid)
 BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09, OUT10,OUT11
+
+#### calcmode
+change calclation mode.  
+Note the correspondence between calculation mode and merge mode.
+
+#### prompt
+You can change the prompt. The negative prompt does not change. Separate with a new line.
 
 ### Reserve XY plot
 The Reserve XY plot button reserves the execution of an XY plot for the setting at the time the button is pressed, instead of immediately executing the plot. The reserved XY plot will be executed after the normal XY plot is completed or by pressing the Start XY plot button on the Reservation tab. Reservations can be made at any time during the execution or non-execution of an XY plot. The reservation list is not automatically updated, so use the Reload button. If an error occurs, the plot is discarded and the next reservation is executed. Images will not be displayed until all reservations are finished, but those that have been marked "Finished" have finished generating the grid and can be viewed in the Image Browser or other applications.
