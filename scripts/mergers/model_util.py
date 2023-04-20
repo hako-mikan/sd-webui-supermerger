@@ -795,7 +795,11 @@ def usemodelgen(theta_0,model_a,model_name):
   devices.dtype = torch.float32 if shared.cmd_opts.no_half else torch.float16
   devices.dtype_vae = torch.float32 if shared.cmd_opts.no_half or shared.cmd_opts.no_half_vae else torch.float16
   devices.dtype_unet = model.model.diffusion_model.dtype
-  devices.unet_needs_upcast = shared.cmd_opts.upcast_sampling and devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
+  
+  if hasattr(shared.cmd_opts,"upcast_sampling"):
+      devices.unet_needs_upcast = shared.cmd_opts.upcast_sampling and devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
+  else:
+      devices.unet_needs_upcast = devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
 
   model.first_stage_model.to(devices.dtype_vae)
   sd_hijack.model_hijack.hijack(model)
