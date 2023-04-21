@@ -457,6 +457,11 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
 
     return "",currentmodel,modelid,theta_0,metadata
+def forkforker(filename):
+    try:
+        return sd_models.read_state_dict(filename.filename,"cuda")
+    except:
+        return sd_models.read_state_dict(filename.filename)
 
 def load_model_weights_m(model,model_a,model_b,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
@@ -468,7 +473,7 @@ def load_model_weights_m(model,model_a,model_b,save):
         if model_a:
             load_model(checkpoint_info)
         print(f"Loading weights [{sd_model_name}] from file")
-        return sd_models.read_state_dict(checkpoint_info.filename,"cuda")
+        return forkforker(checkpoint_info.filename)
 
     if checkpoint_info in checkpoints_loaded:
         print(f"Loading weights [{sd_model_name}] from cache")
@@ -489,7 +494,7 @@ def load_model_weights_m(model,model_a,model_b,save):
         if model_a:
             load_model(checkpoint_info)
         print(f"Loading weights [{sd_model_name}] from file")
-        return sd_models.read_state_dict(checkpoint_info.filename,"cuda")
+        return forkforker(checkpoint_info.filename)
 
 def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,useblocks,mode):
     model_a=filenamecutter(model_a)
