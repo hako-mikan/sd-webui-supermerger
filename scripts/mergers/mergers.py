@@ -459,9 +459,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     return "",currentmodel,modelid,theta_0,metadata
 def forkforker(filename):
     try:
-        return sd_models.read_state_dict(filename.filename,"cuda")
+        return sd_models.read_state_dict(filename,"cuda")
     except:
-        return sd_models.read_state_dict(filename.filename)
+        return sd_models.read_state_dict(filename)
 
 def load_model_weights_m(model,model_a,model_b,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
