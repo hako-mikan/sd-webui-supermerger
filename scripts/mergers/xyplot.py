@@ -24,7 +24,7 @@ def freezetime():
 def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale):
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global numadepth
     grids = []
     sep = "|"
@@ -37,7 +37,7 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
             numaker(xtype,men,ytype,ymen,esettings,
                         weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale)
+                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
     elif sep  in ymen:
         ymens = ymen.split(sep)
         ymen = ymens[0]
@@ -46,14 +46,14 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
             numaker(xtype,xmen,ytype,men,esettings,
                         weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale)
+                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
 
     if normalstart:
         result,currentmodel,xyimage,a,b,c= sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                                                                              weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                                                                              useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                                                                              prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                                                                             hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale)
+                                                                             hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
         if xyimage is not None:grids =[xyimage[0]]
         else:print(result)
     else:
@@ -91,13 +91,13 @@ def numaker(xtype,xmen,ytype,ymen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                     useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale):
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global numadepth
     numadepth.append([len(numadepth)+1,"waiting",xtype,xmen,ytype,ymen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                     useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale])
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size])
     return numalistmaker(copy.deepcopy(numadepth))
 
 def nulister(redel):
@@ -126,7 +126,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                     useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale):
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global hear
     esettings = " ".join(esettings)
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
@@ -308,8 +308,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                                                                                 useblocks,"","",id_sets,False,deep_in,tensor,deepprint = deepprint) 
                usemodelgen(theta_0,model_a,currentmodel)
                              # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
-            image_temp=simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,1,currentmodel,id_sets,modelid)
-            xyimage.append(*image_temp[0])
+            image_temp = simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,currentmodel,id_sets,modelid)
+            xyimage.append(image_temp[0][0])
             xcount+=1
             if state_mergen:
                 flag = True
