@@ -1,24 +1,27 @@
-from heapq import merge
-from logging import exception
+import argparse
+import gc
+import os
+import os.path
+import re
+import shutil
+from importlib import reload
 from pprint import pprint
 import gradio as gr
-import gc
-import re
-import safetensors.torch
-import os
-import shutil
-import os.path
-import argparse
-import modules.ui
-import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import simggen,TYPESEG,smergegen,rwmergelog,freezemtime
-from scripts.mergers.xyplot import freezetime,numaker,numanager,nulister
-from scripts.mergers.model_util import savemodel
-import csv
-from modules import sd_models,script_callbacks,scripts, shared,sd_hijack,devices,sd_vae
-from modules.ui import create_refresh_button, create_output_panel
-from modules.shared import opts
+from modules import (devices, script_callbacks, scripts, sd_hijack, sd_models,sd_vae, shared)
+from modules.scripts import basedir
 from modules.sd_models import checkpoints_loaded
+from modules.shared import opts
+from modules.ui import create_output_panel, create_refresh_button
+import scripts.mergers.mergers
+import scripts.mergers.pluslora
+import scripts.mergers.xyplot
+reload(scripts.mergers.mergers) # update without restarting web-ui.bat
+reload(scripts.mergers.xyplot)
+reload(scripts.mergers.pluslora)
+import csv
+import scripts.mergers.pluslora as pluslora
+from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen)
+from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
 
 gensets=argparse.Namespace()
 
@@ -27,9 +30,9 @@ def on_ui_train_tabs(params):
     gensets.txt2img_preview_params=txt2img_preview_params
     return None
 
-path_root = scripts.basedir()
+path_root = basedir()
 
-def on_ui_tabs():
+def onon_ui_tabs():
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     if os.path.isfile(userfilepath):
@@ -48,7 +51,7 @@ def on_ui_tabs():
         except OSError as e:
                 pass
 
-    with gr.Blocks(analytics_enabled=False) as ui:
+    with gr.Blocks(analytics_enabled=False) as supermergerui:
         with gr.Tab("Merge", elem_id="tab_merge"):
             with gr.Row().style(equal_height=False):
                 with gr.Column(scale = 3):
@@ -141,7 +144,7 @@ def on_ui_tabs():
             with gr.Row(visible = False) as row_calcmode:
                 calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB", "smoothAdd","tensor"],type="value",interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
-                checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in modules.sd_models.checkpoints_list.values()],type="value",interactive=True)
+                checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
                 esettings = gr.CheckboxGroup(label = "effective chekcer settings",choices=["save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
     
@@ -304,25 +307,25 @@ def on_ui_tabs():
 
         s_reserve.click(
             fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
             outputs=[numaframe]
         )
 
         s_reserve1.click(
             fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
             outputs=[numaframe]
         )
 
         gengrid.click(
             fn=numanager,
-            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
+            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix],
+            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
@@ -374,7 +377,7 @@ def on_ui_tabs():
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
 
-    return [(ui, "SuperMerger", "SuperMerger")]
+    return (supermergerui, "SuperMergers", "SuperMerger"),
 
 msearch = []
 mlist=[]
@@ -545,5 +548,5 @@ def loadkeys(model_a):
         keys.append([i,blockid[weight_index+1],key])
     return keys
 
+script_callbacks.on_ui_tabs(onon_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
-script_callbacks.on_ui_tabs(on_ui_tabs)
