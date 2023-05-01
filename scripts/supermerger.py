@@ -32,7 +32,7 @@ def on_ui_train_tabs(params):
 
 path_root = basedir()
 
-def onon_ui_tabs():
+def on_ui_tabs():
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     if os.path.isfile(userfilepath):
@@ -377,7 +377,7 @@ def onon_ui_tabs():
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
 
-    return (supermergerui, "SuperMergers", "SuperMerger"),
+    return (supermergerui, "SuperMerger", "supermerger"),
 
 msearch = []
 mlist=[]
@@ -548,5 +548,5 @@ def loadkeys(model_a):
         keys.append([i,blockid[weight_index+1],key])
     return keys
 
-script_callbacks.on_ui_tabs(onon_ui_tabs)
+script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
