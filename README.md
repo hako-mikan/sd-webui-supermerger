@@ -8,6 +8,10 @@
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
+update 2023.05.02.1900(JST)
+- bug fix : Resolved conflict with wildcard in dynamic prompt
+- new feature : restore face and tile option added
+
 update 2023.04.19.2030(JST)
 - New feature, optimization using cosine similarity method updated [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
 - New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
