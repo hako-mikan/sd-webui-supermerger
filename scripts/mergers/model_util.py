@@ -716,6 +716,7 @@ def filenamecutter(name,model_a = False):
 # TODO dtype指定の動作が怪しいので確認する text_encoderを指定形式で作れるか未確認
 def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   import diffusers
+  print("diffusers version : ",diffusers.__version__)
   state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
   if dtype is not None:
     for k, v in state_dict.items():

@@ -192,6 +192,15 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if "alpha" in ztype and "effective" in aztype:
             zs = [zs[0]]
         if "seed" in ztype:dicedealer(zs)
+        if "alpha" == ztype or "beta" == ztype:
+            oz = []
+            for z in zs:
+                try:
+                    float(z)
+                    oz.append(z)
+                except:
+                    pass
+            zs = oz
         return zs
 
     xs = adjuster(xmen,xtype,ytype)

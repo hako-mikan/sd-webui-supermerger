@@ -616,7 +616,7 @@ def longhashfromname(name):
     checkpoint_info.calculate_shorthash()
     return checkpoint_info.sha256
 
-def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
+def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
     p = processing.StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
@@ -636,12 +636,21 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,
     p.seed_resize_from_w=0
     p.seed_resize_from_h=0
     p.denoising_strength=None
-    if hireson:
-        p.enable_hr = hireson
+
+    #"Restore faces", "Tiling", "Hires. fix"
+
+    if "Hires. fix" in genoptions:
+        p.enable_hr = True
         p.denoising_strength = denoise_str
         p.hr_upscaler = hrupscaler
         p.hr_second_pass_steps = hr2ndsteps
         p.hr_scale = hr_scale
+    
+    if "Tiling" in genoptions:
+        p.tiling = True
+
+    if "Restore faces" in genoptions:
+        p.restore_faces = True
 
     if type(p.prompt) == list:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
