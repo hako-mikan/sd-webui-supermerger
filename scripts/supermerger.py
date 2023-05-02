@@ -51,7 +51,7 @@ def on_ui_tabs():
         except OSError as e:
                 pass
 
-    with gr.Blocks(analytics_enabled=False) as supermergerui:
+    with gr.Blocks() as supermergerui:
         with gr.Tab("Merge"):
             with gr.Row().style(equal_height=False):
                 with gr.Column(scale = 3):
@@ -96,16 +96,16 @@ def on_ui_tabs():
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
 
-                    with gr.Accordion("Hires Fix , Batch size",open = False):
+                    with gr.Accordion("Restore faces, Tiling, Hires. fix, Batch size",open = False):
                         batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
-                        hireson = gr.Checkbox(label = "hiresfix",value = False, visible = True,interactive=True)    
+                        genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value")    
                         with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
                             hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
                             hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
                             denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
                             hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
                             
-                    hiresfix = [hireson,hrupscaler,hr2ndsteps,denois_str,hr_scale]
+                    hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
 
                     with gr.Accordion("Elemental Merge",open = False):
                         with gr.Row():
