@@ -13,8 +13,8 @@ update 2023.04.19.2030(JST)
 - New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
 - New XY plot type : calcmode,prompt
 
-#### requirement
-diffusers(0.10.2 or later),sklearn is required to use some LoRA-related features
+## requirement
+diffusers(0.10.2 to 0.14.0),sklearn is required to use some LoRA-related features
 
 # overview
 This extension allows merged models to be loaded as models for image generation without saving them.
