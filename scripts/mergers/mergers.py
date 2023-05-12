@@ -371,6 +371,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
             elif calcmode == "tensor":
                 dim = theta_0[key].dim()
+                if dim == 0 : continue
                 if current_alpha+current_beta <= 1 :
                     talphas = int(theta_0[key].shape[0]*(current_beta))
                     talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
