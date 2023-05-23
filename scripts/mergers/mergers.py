@@ -114,7 +114,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     # mode select booleans
     save = True if SAVEMODES[0] in save_sets else False
-    usebeta = MODES[2] in mode or MODES[3] in mode
+    usebeta = MODES[2] in mode or MODES[3] in mode or calcmode == "tensor"
     save_metadata = "save metadata" in save_sets
     metadata = {"format": "pt"}
 
@@ -128,6 +128,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
+    theta_2 = {}
 
     caster(mergedmodel,False)
 
@@ -242,7 +243,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
         if "model" in key and key in theta_1:
-            if usebeta and not key in theta_2:
+            if usebeta and (not key in theta_2) and (not theta_2 == {}) :
                 continue
 
             weight_index = -1
