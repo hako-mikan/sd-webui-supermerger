@@ -64,6 +64,7 @@ elemental用のXY plotを複数用意しています。入力例はsample.txtに
 ### 要素一覧
 基本的にはattnが顔や服装の情報を担っているようです。特にIN07,OUT03,OUT04,OUT05層の影響度が強いようです。階層によって影響度が異なることが多いので複数の層の同じ要素を同時に変化させることは意味が無いように思えます。
 nullと書かれた場所には要素が存在しません。
+
 ||IN00|IN01|IN02|IN03|IN04|IN05|IN06|IN07|IN08|IN09|IN10|IN11|M00|M00|OUT00|OUT01|OUT02|OUT03|OUT04|OUT05|OUT06|OUT07|OUT08|OUT09|OUT10|OUT11
 |-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|
 op.bias|null|null|null||null|null||null|null||null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null
@@ -78,8 +79,8 @@ out_layers.0.bias|null|||null|||null|||null|null|||||||||||||||
 out_layers.0.weight|null|||null|||null|||null|null|||||||||||||||
 out_layers.3.bias|null|||null|||null|||null|null|||||||||||||||
 out_layers.3.weight|null|||null|||null|||null|null|||||||||||||||
-skip_connection.bias|null|||null||null|null|||null|null|null|null|null||||||||||||
-skip_connection.weight|null|||null||null|null|||null|null|null|null|null||||||||||||
+skip_connection.bias|null|null|null|null||null|null||null|null|null|null|null|null||||||||||||
+skip_connection.weight|null|null|null|null||null|null||null|null|null|null|null|null||||||||||||
 norm.bias|null|||null|||null|||null|null|null||null|null|null|null|||||||||
 norm.weight|null|||null|||null|||null|null|null||null|null|null|null|||||||||
 proj_in.bias|null|||null|||null|||null|null|null||null|null|null|null|||||||||
