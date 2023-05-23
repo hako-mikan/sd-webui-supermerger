@@ -14,7 +14,6 @@ import torch.nn as nn
 import scipy.ndimage
 from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
-from fonts.ttf import Roboto
 from tqdm import tqdm
 from modules import shared, processing, sd_models, images, sd_samplers,scripts
 from modules.ui import  plaintext_to_html
@@ -559,9 +558,17 @@ def draw_origin(grid, text,width,height,width_one):
     grid_d.paste(grid,(0,0))
     def get_font(fontsize):
         try:
-            return ImageFont.truetype(opts.font or Roboto, fontsize)
+            from fonts.ttf import Roboto
+            try:
+                return ImageFont.truetype(opts.font or Roboto, fontsize)
+            except Exception:
+                return ImageFont.truetype(Roboto, fontsize)
         except Exception:
-            return ImageFont.truetype(Roboto, fontsize)
+            try:
+                return ImageFont.truetype(shared.opts.font or 'javascript/roboto.ttf', fontsize)
+            except Exception:
+                return ImageFont.truetype('javascript/roboto.ttf', fontsize)
+
     d= ImageDraw.Draw(grid_d)
     color_active = (0, 0, 0)
     fontsize = (width+height)//25
