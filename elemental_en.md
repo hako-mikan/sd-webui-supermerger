@@ -78,8 +78,8 @@ out_layers.0.bias|null|||null|||null|||null|null|||||||||||||||
 out_layers.0.weight|null|||null|||null|||null|null|||||||||||||||
 out_layers.3.bias|null|||null|||null|||null|null|||||||||||||||
 out_layers.3.weight|null|||null|||null|||null|null|||||||||||||||
-skip_connection.bias|null|||null||null|null|||null|null|null|null|null||||||||||||
-skip_connection.weight|null|||null||null|null|||null|null|null|null|null||||||||||||
+skip_connection.bias|null|null|null|null||null|null||null|null|null|null|null|null||||||||||||
+skip_connection.weight|null|null|null|null||null|null||null|null|null|null|null|null||||||||||||
 norm.bias|null|||null|||null|||null|null|null||null|null|null|null|||||||||
 norm.weight|null|||null|||null|||null|null|null||null|null|null|null|||||||||
 proj_in.bias|null|||null|||null|||null|null|null||null|null|null|null|||||||||
