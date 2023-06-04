@@ -29,13 +29,18 @@ def on_ui_tabs():
     OUTS:1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1\n\
     OUTALL:1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1\n\
     ALL0.5:0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
-    sml_filepath = os.path.join(sml_path_root,"scripts", "lbwpresets.txt")
+    lbwpath = os.path.join(sml_path_root,"scripts", "lbwpresets.txt")
+    lbwpathn = os.path.join(sml_path_root,"extensions","sd-webui-lora-block-weight","scripts", "lbwpresets.txt")
     sml_lbwpresets=""
-    try:
-        with open(sml_filepath,encoding="utf-8") as f:
+
+    if os.path.isfile(lbwpath):
+        with open(lbwpath,encoding="utf-8") as f:
             sml_lbwpresets = f.read()
-    except OSError as e:
-        sml_lbwpresets=LWEIGHTSPRESETS 
+    elif os.path.isfile(lbwpathn):
+        with open(lbwpathn,encoding="utf-8") as f:
+            sml_lbwpresets = f.read()
+    else:
+        sml_lbwpresets=LWEIGHTSPRESETS
 
     with gr.Blocks(analytics_enabled=False) :
         sml_submit_result = gr.Textbox(label="Message")
@@ -48,8 +53,8 @@ def on_ui_tabs():
             create_refresh_button(sml_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
         with gr.Row().style(equal_height=False):
             sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
-            alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
-            beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=1)
+            alpha = gr.Slider(label=" alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
+            beta = gr.Slider(label=" beta", minimum=-1.0, maximum=2, step=0.001, value=1)
         with gr.Row().style(equal_height=False):
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
             precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
