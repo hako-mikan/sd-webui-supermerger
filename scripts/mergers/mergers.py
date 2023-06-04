@@ -127,7 +127,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
-    theta_2 = {}
 
     caster(mergedmodel,False)
 
@@ -192,9 +191,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     else:
         theta_0=load_model_weights_m(model_a,True,False,save).copy()
 
-
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
         theta_2 = load_model_weights_m(model_c,False,False,save).copy()
+    else:
+        theta_2 = {}
 
     alpha = base_alpha
     beta = base_beta
