@@ -404,7 +404,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
                     theta_0[key] = theta_t
 
-    currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode)
+    currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
 
     for key in tqdm(theta_1.keys(), desc="Stage 2/2"):
         if key in chckpoint_dict_skip_on_merge:
@@ -497,7 +497,7 @@ def load_model_weights_m(model,model_a,model_b,save):
         print(f"Loading weights [{sd_model_name}] from file")
         return forkforker(checkpoint_info.filename)
 
-def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,useblocks,mode):
+def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,useblocks,mode,calc):
     model_a=filenamecutter(model_a)
     model_b=filenamecutter(model_b)
     model_c=filenamecutter(model_c)
@@ -523,6 +523,10 @@ def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,usebl
             currentmodel =f"({model_a} x {str(round(1-alpha,3))} +{model_b} x {str(round(alpha,3))}) x {str(round(1-beta,3))} + {model_c} x {str(round(beta,3))}"
         else:
             currentmodel =f"{model_a} x {str(round(1-alpha,3))} + {model_b} x {str(round(alpha,3))}"
+    if calc != "normal":
+        currentmodel = currentmodel + "_" + calc
+        if calc == "tensor":
+            currentmodel = currentmodel + f"_beta_{beta}"
     return currentmodel
 
 path_root = scripts.basedir()
