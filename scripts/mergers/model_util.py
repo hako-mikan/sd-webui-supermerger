@@ -669,7 +669,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
     from modules import sd_models,shared
     if "fp16" in savesets: 
         state_dict = to_half(state_dict)
-        pre = "fp16"
+        pre = ".fp16"
     else:pre = ""
     ext = ".safetensors" if "safetensors" in savesets else ".ckpt"
 
