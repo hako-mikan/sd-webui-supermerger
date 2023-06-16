@@ -45,8 +45,8 @@ Thanks to [recoilme](https://github.com/recoilme) for devising the idea and to [
 https://github.com/hako-mikan/sd-webui-supermerger/issues/33
 https://github.com/recoilme/losslessmix
 
-### save metadate
-Enable "save metadate" to embed merge conditions as metadata, only in safetensor format. Embedded conditions can be viewed in the Metadata tab.
+### save metadata
+Enable "save metadata" to embed merge conditions as metadata, only in safetensor format. Embedded conditions can be viewed in the Metadata tab.
 
 ## Each button
 ### Merge
