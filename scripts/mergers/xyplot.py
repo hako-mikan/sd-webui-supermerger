@@ -282,7 +282,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if "and" in zt:
             alpha,beta = abdealer(z)
             return
-        if "alpha" in zt and not "pinpoint element" in azt:alpha = z
+        if "alpha" in zt and not ("pinpoint element" in azt or "effective" in azt):alpha = z
         if "beta" in zt: beta = z
         if "seed" in zt:seed = int(z)
         if "model_A" in zt:model_a = z
