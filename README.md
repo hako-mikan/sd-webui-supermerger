@@ -17,10 +17,11 @@ update 2023.04.19.2030(JST)
 - New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
 - New XY plot type : calcmode,prompt
 
-## requirement
-diffusers(0.10.2 to 0.14.0),sklearn is required to use some LoRA-related features
+## Requirements
+- diffusers(0.10.2 to 0.14.0)
+- sklearn is required to use some LoRA-related features
 
-# overview
+# Overview
 This extension allows merged models to be loaded as models for image generation without saving them.
 This extension can prevent the use of HDD and SSD.
 
@@ -28,7 +29,7 @@ This extension can prevent the use of HDD and SSD.
 
 ### Merge mode
 #### Weight sum
-Normal merge. alpha is used. if MBW is enabled, MBW base is used as alpha.
+Normal merge. Alpha is used. If MBW is enabled, MBW base is used as alpha.
 #### Add difference
 Add difference, if MBW is enabled, MBW base is used as alpha
 #### Triple sum
