@@ -79,7 +79,8 @@ Changes the model. The model selected in the model selection window is ignored.
 Changes only specific blocks in MBW. Choose alpha or beta for the opposite axis. If you enter a block ID, the alpha (beta) will change only for that block. As with the other types, use commas to separate them. Multiple blocks can be changed at the same time by separating them with a space or hyphen. NOT must be entered first to have any effect.
 ##### Input example
 IN01,OUT10 OUT11, OUT03-OUT06,OUT07-OUT11,NOT M00 OUT03-OUT06
-In this case
+
+In this case:
 - 1:Only IN01 changes
 - 2:OUT10 and OUT11 change
 - 3:OUT03 to OUT06 change
