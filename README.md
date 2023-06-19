@@ -17,10 +17,11 @@ update 2023.04.19.2030(JST)
 - New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
 - New XY plot type : calcmode,prompt
 
-## requirement
-diffusers(0.10.2 to 0.14.0),sklearn is required to use some LoRA-related features
+## Requirements
+- diffusers(0.10.2 to 0.14.0)
+- sklearn is required to use some LoRA-related features
 
-# overview
+# Overview
 This extension allows merged models to be loaded as models for image generation without saving them.
 This extension can prevent the use of HDD and SSD.
 
@@ -28,7 +29,7 @@ This extension can prevent the use of HDD and SSD.
 
 ### Merge mode
 #### Weight sum
-Normal merge. alpha is used. if MBW is enabled, MBW base is used as alpha.
+Normal merge. Alpha is used. If MBW is enabled, MBW base is used as alpha.
 #### Add difference
 Add difference, if MBW is enabled, MBW base is used as alpha
 #### Triple sum
@@ -63,22 +64,23 @@ Read settings from merge log. The log is updated each time a merge is performed,
 
 ### Sequential XY Merge and Generation
 Performs sequential merge image generation. Effective in all merge modes.
-#### alpha,beta
+#### alpha, beta
 Change alpha and beta.
 #### alpha and beta
 Change alpha and beta at the same time. Separate alpha and beta with a single space, and separate each element with a comma. If only one number is entered, the same value is entered for both alpha and beta.  
-Example: 0,0.5 0.1,0.3 0.4,0.5
+Example: 0, 0.5 0.1, 0.3 0.4, 0.5
 #### MBW
 Performs a block-byblock merge. Enter ratios separated by newlines. Presets can be used, but be careful to **separate on a new line**.For Triple and Twice, enter two lines as a set. An odd number of lines will result in an error. 
 #### seed
 Changes the seed. Entering -1 will result in a fixed seed in the opposite axis direction.
-#### model_A,B,C
+#### model_A, B, C
 Changes the model. The model selected in the model selection window is ignored.
 #### pinpoint blocks
 Changes only specific blocks in MBW. Choose alpha or beta for the opposite axis. If you enter a block ID, the alpha (beta) will change only for that block. As with the other types, use commas to separate them. Multiple blocks can be changed at the same time by separating them with a space or hyphen. NOT must be entered first to have any effect.
 ##### Input example
-IN01,OUT10 OUT11, OUT03-OUT06,OUT07-OUT11,NOT M00 OUT03-OUT06
-In this case
+IN01, OUT10 OUT11, OUT03-OUT06, OUT07-OUT11, NOT M00 OUT03-OUT06
+
+In this case:
 - 1:Only IN01 changes
 - 2:OUT10 and OUT11 change
 - 3:OUT03 to OUT06 change
@@ -89,7 +91,7 @@ Please be careful not to forget to input "0".
 ![xy_grid-0006-2934360860 0](https://user-images.githubusercontent.com/122196982/214343111-e82bb20a-799b-4026-8e3c-dd36e26841e3.jpg)
 
 Block ID (only upper case letters are valid)
-BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09, OUT10,OUT11
+BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11
 
 #### calcmode
 change calclation mode.  
