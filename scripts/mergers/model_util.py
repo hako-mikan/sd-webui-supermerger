@@ -717,6 +717,7 @@ def filenamecutter(name,model_a = False):
 def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   import diffusers
   print("diffusers version : ",diffusers.__version__)
+  print("version of diffusers must be 0.10.2 to 0.14.0")
   state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
   if dtype is not None:
     for k, v in state_dict.items():

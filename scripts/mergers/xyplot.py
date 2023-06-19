@@ -8,7 +8,7 @@ from PIL import Image
 from modules import images
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,smerge,simggen,filenamecutter,draw_origin,wpreseter
-from scripts.mergers.model_util import usemodelgen
+from scripts.mergers.model_util import usemodelgen, savemodel
 
 hear = True
 hearm = False
@@ -313,9 +313,11 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
 
             print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)} ({xcount+ycount*len(xs)+1}/{allcount})")
             if not (xtype=="seed" and xcount > 0):
-               _ , currentmodel,modelid,theta_0,_=smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
+               _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                 useblocks,"","",id_sets,False,deep_in,tensor,deepprint = deepprint) 
                usemodelgen(theta_0,model_a,currentmodel)
+               if "save model" in esettings:
+                   savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
                              # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
             image_temp = simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,currentmodel,id_sets,modelid)
             xyimage.append(image_temp[0][0])
@@ -346,6 +348,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         xyimage,xs,ys = effectivechecker(xyimage,xs,ys,model_a,model_b,esettings)
 
     if not "grid" in esettings:
+        if "swap XY" in esettings:
+            xyimage, xs, ys = swapxy(xyimage, xs, ys)
         gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
         grid = smakegrid(xyimage,xs,ys,gridmodel,image_temp[4])
         xyimage.insert(0,grid)
@@ -369,6 +373,13 @@ def smakegrid(imgs,xs,ys,currentmodel,p):
         images.save_image(grid, opts.outdir_txt2img_grids, "xy_grid", extension=opts.grid_format, prompt=p.prompt, seed=p.seed, grid=True, p=p)
 
     return grid
+
+def swapxy(imgs,xs,ys):
+    nimgs = []
+    for x in range(len(xs)):
+        for y in range(len(ys)):
+            nimgs.append(imgs[y * len(xs) + x])
+    return nimgs, ys, xs
 
 def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,wa,wb,usebeta):
     model_a=filenamecutter(model_a)
