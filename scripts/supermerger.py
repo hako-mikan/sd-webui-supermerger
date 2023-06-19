@@ -122,6 +122,7 @@ def on_ui_tabs():
                     xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
                     y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
                     ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
+                    esettings = gr.CheckboxGroup(label = "XY plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
                     with gr.Row():
                         gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
                         stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
@@ -146,8 +147,8 @@ def on_ui_tabs():
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
-                esettings = gr.CheckboxGroup(label = "effective chekcer settings",choices=["save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
-    
+                pass
+
             with gr.Tab("Weights Setting"):
                 with gr.Row():
                     setalpha = gr.Button(elem_id="copytogen", value="set to alpha",variant='primary')
