@@ -161,6 +161,12 @@ def on_ui_tabs():
                     weights_b = gr.Textbox(label="weights,for beta, base beta,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2")
                 with gr.Row():
                     with gr.Column():
+                        dd_preset_weight = gr.Dropdown(label="Load preset", choices=preset_name_list(weights_presets))
+                    with gr.Column():
+                        gr.Slider(visible=False)
+
+                with gr.Row():
+                    with gr.Column():
                         base = gr.Slider(label="Base", minimum=0, maximum=1, step=0.0001, value=0.5)
                     with gr.Column():
                         gr.Slider(visible=False)
@@ -370,6 +376,17 @@ def on_ui_tabs():
         readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
         readbeta.click(fn=text2slider,inputs=weights_b,outputs=menbers)
 
+        def on_change_dd_preset_weight(preset):
+            weights = find_preset_by_name(weights_presets, preset)
+            if weights is not None:
+                return text2slider(weights)
+
+        dd_preset_weight.change(
+            fn=on_change_dd_preset_weight,
+            inputs=[dd_preset_weight],
+            outputs=menbers
+        )
+
         x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
         y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
         x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
@@ -526,6 +543,25 @@ def tagdicter(presets):
         if len([w for w in w.split(",")]) == 26:
             wdict[key.strip()]=w
     return ",".join(list(wdict.keys()))
+
+def preset_name_list(presets):
+    return tagdicter(presets).split(",")
+
+def find_preset_by_name(presets, preset):
+    presets = presets.splitlines()
+    for l in presets:
+        if ":" in l:
+            key = l.split(":",1)[0]
+            w = l.split(":",1)[1]
+        elif "\t" in l:
+            key = l.split("\t",1)[0]
+            w = l.split("\t",1)[1]
+        else:
+            continue
+        if key == preset and len([w for w in w.split(",")]) == 26:
+            return w
+
+    return None
 
 def loadkeys(model_a):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
