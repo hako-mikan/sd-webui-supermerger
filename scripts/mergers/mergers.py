@@ -507,7 +507,7 @@ def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,usebl
 
     if useblocks:
         if MODES[1] in mode:#add
-            currentmodel =f"{model_a} + ({model_b} - {model_c}) x alpha ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)})"
+            currentmodel =f"{model_a} + ({model_b} - {model_c}) x alpha ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)}"
         elif MODES[2] in mode:#triple
             currentmodel =f"{model_a} x (1-alpha-beta) + {model_b} x alpha + {model_c} x beta (alpha = {str(round(alpha,3))},{','.join(str(s) for s in weights_a)},beta = {beta},{','.join(str(s) for s in weights_b)})"
         elif MODES[3] in mode:#twice
@@ -546,7 +546,7 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             mergeid = len(mlist)
             setting.insert(0,mergedname)
             for i,x in enumerate(setting):
-                if "," in str(x):setting[i] = f'"{str(setting[i])}"'
+                if "," in str(x) or "\n" in str(x):setting[i] = f'"{str(setting[i])}"'
             text = ",".join(map(str, setting))
             text=str(mergeid)+","+datetime.datetime.now().strftime('%Y.%m.%d %H.%M.%S.%f')[:-7]+"," + text + "\n"
             f.writelines(text)
