@@ -129,6 +129,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global hear
     esettings = " ".join(esettings)
+
+    deep_ori = deep
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
     xtype = TYPES[xtype]
     ytype = TYPES[ytype]
@@ -288,7 +290,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         if "model_A" in zt:model_a = z
         if "model_B" in zt:model_b = z
         if "model_C" in zt:model_c = z
-        if "elemental" in zt:deep = z
+        if "elemental" in zt:
+            deep = deep_ori  +","+ z if "add" in zt else z
         if "calcmode" in zt:calcmode = z
         if "prompt" in zt:prompt = z
     
