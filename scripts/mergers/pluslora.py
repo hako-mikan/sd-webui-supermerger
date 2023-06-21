@@ -66,6 +66,7 @@ def on_ui_tabs():
         with gr.Row().style(equal_height=False):
           sml_calcdim = gr.Button(elem_id="calcloras", value="calculate dimension of LoRAs(It may take a few minutes if there are many LoRAs)",variant='primary')
           sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
+          sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
         sml_loras = gr.CheckboxGroup(label = "Lora",choices=[x[0] for x in lora.available_loras.items()],type="value",interactive=True,visible = True)
         sml_loraratios = gr.TextArea(label="",value=sml_lbwpresets,visible =True,interactive  = True)  
 
@@ -127,13 +128,14 @@ def on_ui_tabs():
               if d == i[1]:rl.append(f"{i[0]}({i[1]})")
           return gr.update(choices = [l for l in rl],value =[])
 
-        def llister(names):
+        def llister(names,ratio):
           if names ==[] : return ""
           else:
             for i,n in enumerate(names):
               if "(" in n:names[i] = n[:n.rfind("(")]
-            return ":1.0,".join(names)+":1.0"
-        sml_loras.change(fn=llister,inputs=[sml_loras],outputs=[sml_loranames])     
+            return f":{ratio},".join(names)+f":{ratio} "
+
+        sml_loras.change(fn=llister,inputs=[sml_loras,sml_lratio],outputs=[sml_loranames])     
         sml_dims.change(fn=dimselector,inputs=[sml_dims],outputs=[sml_loras])  
 
 def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision):
