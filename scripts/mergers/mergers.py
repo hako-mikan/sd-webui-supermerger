@@ -130,6 +130,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
+    result_is_inpainting_model = False
+    result_is_instruct_pix2pix_model = False
+
     if len(deep) > 0:
         deep = deep.replace("\n",",")
         deep = deep.split(",")
@@ -252,6 +255,24 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if key in chckpoint_dict_skip_on_merge:
                 continue
 
+            a = theta_0[key]
+            b = theta_1[key]
+
+            # this enables merging an inpainting model (A) with another one (B);
+            # where normal model would have 4 channels, for latenst space, inpainting model would
+            # have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9
+            if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
+                if a.shape[1] == 4 and b.shape[1] == 9:
+                    raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
+                if a.shape[1] == 4 and b.shape[1] == 8:
+                    raise RuntimeError("When merging instruct-pix2pix model with a normal one, A must be the instruct-pix2pix model.")
+
+                if a.shape[1] == 8 and b.shape[1] == 4:#If we have an Instruct-Pix2Pix model...
+                    result_is_instruct_pix2pix_model = True
+                else:
+                    assert a.shape[1] == 9 and b.shape[1] == 4, f"Bad dimensions for merged layer {key}: A={a.shape}, B={b.shape}"
+                    result_is_inpainting_model = True
+
             # check weighted and U-Net or not
             if weights_a is not None and 'model.diffusion_model.' in key:
                 # check block index
@@ -309,24 +330,35 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         current_alpha = dr
 
             if calcmode == "normal":
+                if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
+                    # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
+                    theta_0_a = theta_0[key][:, 0:4, :, :]
+                else:
+                    theta_0_a = theta_0[key]
+
                 if MODES[1] in mode:#Add
                     caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]",hear)
-                    theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
+                    theta_0_a = theta_0_a + current_alpha * theta_1[key]
                 elif MODES[2] in mode:#Triple
                     caster(f"model A[{key}] +  {1-current_alpha-current_beta} +  model B[{key}]*{current_alpha} + model C[{key}]*{current_beta}",hear)
-                    theta_0[key] = (1 - current_alpha-current_beta) * theta_0[key] + current_alpha * theta_1[key]+current_beta * theta_2[key]
+                    theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key]
                 elif MODES[3] in mode:#Twice
                     caster(f"model A[{key}] +  {1-current_alpha} + * model B[{key}]*{alpha}",hear)
                     caster(f"model A+B[{key}] +  {1-current_beta} + * model C[{key}]*{beta}",hear)
-                    theta_0[key] = (1 - current_alpha) * theta_0[key] + current_alpha * theta_1[key]
-                    theta_0[key] = (1 - current_beta) * theta_0[key] + current_beta * theta_2[key]
+                    theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
+                    theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
                 else:#Weight
                     if current_alpha == 1:
                         caster(f"alpha = 0,model A[{key}=model B[{key}",hear)
-                        theta_0[key] = theta_1[key]
+                        theta_0_a = theta_1[key]
                     elif current_alpha !=0:
                         caster(f"model A[{key}] +  {1-current_alpha} + * (model B)[{key}]*{alpha}",hear)
-                        theta_0[key] = (1 - current_alpha) * theta_0[key] + current_alpha * theta_1[key]
+                        theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
+
+                if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
+                    theta_0[key][:, 0:4, :, :] = theta_0_a
+                else:
+                    theta_0[key] = theta_0_a
 
             elif calcmode == "cosineA": #favors modelA's structure with details from B
                 # skip VAE model parameters to get better results

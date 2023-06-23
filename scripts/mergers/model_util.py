@@ -673,6 +673,14 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
     else:pre = ""
     ext = ".safetensors" if "safetensors" in savesets else ".ckpt"
 
+    # is it a inpainting or instruct-pix2pix2 model?
+    if "model.diffusion_model.input_blocks.0.0.weight" in state_dict.keys():
+        shape = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape
+        if shape[1] == 9:
+            pre += "-inpainting"
+        if shape[1] == 8:
+            pre += "-instruct-pix2pix"
+
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
     model_a_path= checkpoint_info.filename
     modeldir = os.path.split(model_a_path)[0]
