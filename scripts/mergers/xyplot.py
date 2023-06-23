@@ -22,7 +22,7 @@ def freezetime():
     state_mergen = True
 
 def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global numadepth
@@ -35,7 +35,7 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
         if seed =="-1": seed = str(random.randrange(4294967294))
         for men in xmens[1:]:
             numaker(xtype,men,ytype,ymen,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h,
                         hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
     elif sep  in ymen:
@@ -44,14 +44,14 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
         if seed =="-1": seed = str(random.randrange(4294967294))
         for men in ymens[1:]:
             numaker(xtype,xmen,ytype,men,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                         prompt,nprompt,steps,sampler,cfg,seed,w,h,
                         hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
 
     if normalstart:
         result,currentmodel,xyimage,a,b,c= sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                                                                              weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                                                                             useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                                                                             useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                                                                              prompt,nprompt,steps,sampler,cfg,seed,w,h,
                                                                              hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
         if xyimage is not None:grids =[xyimage[0]]
@@ -89,13 +89,13 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,esettings,
 def numaker(xtype,xmen,ytype,ymen,esettings,
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets]       
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global numadepth
     numadepth.append([len(numadepth)+1,"waiting",xtype,xmen,ytype,ymen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size])
     return numalistmaker(copy.deepcopy(numadepth))
@@ -124,7 +124,7 @@ def caster(news,hear):
 
 def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
     global hear
@@ -317,7 +317,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
             print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)} ({xcount+ycount*len(xs)+1}/{allcount})")
             if not (xtype=="seed" and xcount > 0):
                _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
-                                                                                useblocks,"","",id_sets,False,deep_in,tensor,deepprint = deepprint) 
+                                                                                useblocks,"","",id_sets,False,deep_in,tensor,bake_in_vae,deepprint = deepprint) 
                usemodelgen(theta_0,model_a,currentmodel)
                if "save model" in esettings:
                    savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
