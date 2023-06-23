@@ -13,6 +13,11 @@ If you met following error, version of diffusers is wrong. Downgrade to 0.14.0. 
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
+update 2023.06.24.0300(JST)
+- VAE bake feature added
+- support inpainting/pix2pix  
+Thanks [wkpark](https://github.com/wkpark)
+
 update 2023.05.02.1900(JST)
 - bug fix : Resolved conflict with wildcard in dynamic prompt
 - new feature : restore face and tile option added
