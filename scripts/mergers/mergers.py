@@ -15,7 +15,7 @@ import scipy.ndimage
 from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
-from modules import shared, processing, sd_models, images, sd_samplers,scripts
+from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
@@ -53,7 +53,7 @@ def casterr(*args,hear=hear):
     
   #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
-                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,
+                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                        esettings,
                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,
@@ -63,7 +63,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     result,currentmodel,modelid,theta_0,metadata = smerge(
                         weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,deepprint=deepprint
+                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint=deepprint
                         )
 
     if "ERROR" in result or "STOPPED" in result: 
@@ -90,7 +90,7 @@ NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
      
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,deepprint = False):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint = False):
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge
     stopmerge = False
@@ -413,6 +413,18 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_0.update({key:theta_1[key]})
 
     del theta_1
+
+    bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
+    if bake_in_vae_filename is not None:
+        print(f"Baking in VAE from {bake_in_vae_filename}")
+        vae_dict = sd_vae.load_vae_dict(bake_in_vae_filename, map_location='cpu')
+
+        for key in vae_dict.keys():
+            theta_0_key = 'first_stage_model.' + key
+            if theta_0_key in theta_0:
+                theta_0[theta_0_key] = vae_dict[key]
+
+        del vae_dict
 
     modelid = rwmergelog(currentmodel,mergedmodel)
 

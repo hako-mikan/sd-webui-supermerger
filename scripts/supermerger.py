@@ -88,6 +88,15 @@ def on_ui_tabs():
                             save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
                         with gr.Column(scale = 2):
                             id_sets = gr.CheckboxGroup(["image", "PNG info"], label="write merged model ID to")
+                    with gr.Row():
+                        with gr.Column():
+                            with gr.Row():
+                                bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
+                                create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
+
+                        with gr.Column():
+                            gr.Slider(visible=False)
+
                     with gr.Row():      
                         with gr.Column(min_width = 50, scale=2):
                             with gr.Row():
@@ -312,13 +321,13 @@ def on_ui_tabs():
 
         merge.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dfalse],
+            inputs=[*msettings,bake_in_vae,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dfalse],
             outputs=[submit_result,currentmodel]
         )
 
         mergeandgen.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dtrue],
+            inputs=[*msettings,bake_in_vae,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dtrue],
             outputs=[submit_result,currentmodel,*imagegal]
         )
 
