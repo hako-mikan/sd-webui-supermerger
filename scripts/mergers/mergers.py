@@ -113,7 +113,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     # mode select booleans
     save = True if SAVEMODES[0] in save_sets else False
-    usebeta = MODES[2] in mode or MODES[3] in mode or calcmode == "tensor"
+    usebeta = MODES[2] in mode or MODES[3] in mode or "tensor" in calcmode
     save_metadata = "save metadata" in save_sets
     metadata = {"format": "pt"}
 
@@ -185,7 +185,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if stopmerge: return "STOPPED", *non4
     
-    if calcmode == "tensor":
+    if  "tensor" in calcmode:
         theta_t = load_model_weights_m(model_a,True,False,save).copy()
         theta_0 ={}
         for key in theta_t:
@@ -434,6 +434,49 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
                     elif dim == 4:
                         theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
+                    theta_0[key] = theta_t
+
+            elif calcmode == "tensor2":
+                dim = theta_0[key].dim()
+                if dim == 0 : continue
+                if current_alpha+current_beta <= 1 :
+                    talphas = int(theta_0[key].shape[0]*(current_beta))
+                    talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
+                    if dim > 1:
+                        if theta_0[key].shape[1] > 100:
+                            talphas = int(theta_0[key].shape[1]*(current_beta))
+                            talphae = int(theta_0[key].shape[1]*(current_alpha+current_beta))
+                    if dim == 1:
+                        theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+
+                    elif dim == 2:
+                        theta_0[key][:,talphas:talphae] = theta_1[key][:,talphas:talphae].clone()
+
+                    elif dim == 3:
+                        theta_0[key][:,talphas:talphae,:] = theta_1[key][:,talphas:talphae,:].clone()
+
+                    elif dim == 4:
+                        theta_0[key][:,talphas:talphae,:,:] = theta_1[key][:,talphas:talphae,:,:].clone()
+
+                else:
+                    talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
+                    talphae = int(theta_0[key].shape[0]*(current_beta))
+                    theta_t = theta_1[key].clone()
+                    if dim > 1:
+                        if theta_0[key].shape[1] > 100:
+                            talphas = int(theta_0[key].shape[1]*(current_alpha+current_beta-1))
+                            talphae = int(theta_0[key].shape[1]*(current_beta))
+                    if dim == 1:
+                        theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+
+                    elif dim == 2:
+                        theta_t[:,talphas:talphae] = theta_0[key][:,talphas:talphae].clone()
+
+                    elif dim == 3:
+                        theta_t[:,talphas:talphae,:] = theta_0[key][:,talphas:talphae,:].clone()
+
+                    elif dim == 4:
+                        theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
                     theta_0[key] = theta_t
 
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
