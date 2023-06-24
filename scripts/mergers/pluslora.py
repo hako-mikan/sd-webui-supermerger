@@ -100,19 +100,21 @@ def on_ui_tabs():
         sml_update.click(fn = updateloras,outputs = [sml_loras])
 
         def calculatedim():
-          print("listing dimensions...")
-          for n in  tqdm(lora.available_loras.items()):
-              if n[0] in llist:
-                if llist[n[0]] !="": continue
-              c_lora = lora.available_loras.get(n[0], None) 
-              d,t = dimgetter(c_lora.filename)
-              if t == "LoCon" : d = f"{d}:{t}"
-              if d not in dlist:
-                if type(d) == int :dlist.append(d)
-                elif d not in dn: dn.append(d)
-              llist[n[0]] = d
-          dlist.sort()
-          return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()],value =[]),gr.update(visible =True,choices = [x for x in (dlist+dn)])
+            print("listing dimensions...")
+            for n in  tqdm(lora.available_loras.items()):
+                if n[0] in llist:
+                    if llist[n[0]] !="": continue
+                c_lora = lora.available_loras.get(n[0], None) 
+                d,t = dimgetter(c_lora.filename)
+                if t == "LoCon" :
+                    d = f"{list(set(d.values()))}"
+                    d = f"{d}:{t}"
+                if d not in dlist:
+                    if type(d) == int :dlist.append(d)
+                    elif d not in dn: dn.append(d)
+                llist[n[0]] = d
+            dlist.sort()
+            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()],value =[]),gr.update(visible =True,choices = [x for x in (dlist+dn)])
 
         sml_calcdim.click(
             fn=calculatedim,
@@ -193,6 +195,9 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         ln.append(c_lora.filename)
         lr.append(ratio)
         d,t = dimgetter(c_lora.filename)
+        if t == "LoCon":
+            d = list(set(d.values()))
+            d = d[0]
         lt.append(t)
         ld.append(d)
         if d != "LyCORIS":
@@ -205,17 +210,15 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     dim = int(dim) if dim != "no" and dim != "auto" else 0
 
     if "LyCORIS" in ld or "LoCon" in lt:
-      if len(ld) !=1:
-        return "multiple merge of LyCORIS is not supported"
-      sd = lycomerge(ln[0],lr[0])
+        sd = merge_lora_models(ln, lr, settings, True)
     elif dim > 0:
-      print("change demension to ", dim)
-      sd = merge_lora_models_dim(ln, lr, dim,settings)
+        print("change demension to ", dim)
+        sd = merge_lora_models_dim(ln, lr, dim,settings)
     elif "auto" in settings and ld.count(ld[0]) != len(ld):
-      print("change demension to ",dmax)
-      sd = merge_lora_models_dim(ln, lr, dmax,settings)
+        print("change demension to ",dmax)
+        sd = merge_lora_models_dim(ln, lr, dmax,settings)
     else:
-      sd = merge_lora_models(ln, lr,settings)
+        sd = merge_lora_models(ln, lr, settings, False)
 
     if os.path.isfile(filename) and not "overwrite" in settings:
         _err_msg = f"Output file ({filename}) existed and was not saved"
@@ -295,28 +298,39 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
         msd_key, lora_key = fullkey.split(".", 1)
 
         if "lora_down" in key:
-          up_key = key.replace("lora_down", "lora_up")
-          alpha_key = key[:key.index("lora_down")] + 'alpha'
+            up_key = key.replace("lora_down", "lora_up")
+            alpha_key = key[:key.index("lora_down")] + 'alpha'
 
-          # print(f"apply {key} to {module}")
+            # print(f"apply {key} to {module}")
 
-          down_weight = lora_sd[key].to(device="cpu")
-          up_weight = lora_sd[up_key].to(device="cpu")
+            down_weight = lora_sd[key].to(device="cpu")
+            up_weight = lora_sd[up_key].to(device="cpu")
 
-          dim = down_weight.size()[0]
-          alpha = lora_sd.get(alpha_key, dim)
-          scale = alpha / dim
-          # W <- W + U * D
-          weight = theta_0[keychanger[msd_key]].to(device="cpu")
+            dim = down_weight.size()[0]
+            alpha = lora_sd.get(alpha_key, dim)
+            scale = alpha / dim
+            # W <- W + U * D
+            weight = theta_0[keychanger[msd_key]].to(device="cpu")
 
-          if not len(down_weight.size()) == 4:
-            # linear
-            weight = weight  + ratio * (up_weight @ down_weight) * scale
-          else:
-            # conv2d
-            weight = weight  + ratio * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)
-                                        ).unsqueeze(2).unsqueeze(3) * scale
-          theta_0[keychanger[msd_key]] = torch.nn.Parameter(weight)
+            if len(weight.size()) == 2:
+                # linear
+                weight = weight + ratio * (up_weight @ down_weight) * scale
+
+            elif down_weight.size()[2:4] == (1, 1):
+                # conv2d 1x1
+                weight = (
+                    weight
+                    + ratio
+                    * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3)
+                    * scale
+                )
+            else:
+                # conv2d 3x3
+                conved = torch.nn.functional.conv2d(down_weight.permute(1, 0, 2, 3), up_weight).permute(1, 0, 2, 3)
+                # print(conved.size(), weight.size(), module.stride, module.padding)
+                weight = weight + ratio * conved * scale
+                                       
+            theta_0[keychanger[msd_key]] = torch.nn.Parameter(weight)
     #usemodelgen(theta_0,model)
     settings.append(precision)
     result = savemodel(theta_0,dname,output,settings,model)
@@ -556,6 +570,7 @@ def dimgetter(filename):
 
     if "lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight" in lora_sd.keys():
       type = "LoCon"
+      _, _, dim, _ = dimalpha(lora_sd)
 
     for key, value in lora_sd.items():
   
@@ -575,9 +590,9 @@ def dimgetter(filename):
     else:
       return "unknown","unknown"
 
-def blockfromkey(key):
+def blockfromkey(key,keylist):
     fullkey = convert_diffusers_name_to_compvis(key)
-    for i,n in enumerate(LORABLOCKS):
+    for i,n in enumerate(keylist):
       if n in  fullkey: return i
     return 0
 
@@ -612,7 +627,7 @@ def merge_lora_models_dim(models, ratios, new_rank,sets):
       else:
         weight = merged_sd[lora_module_name]
 
-      ratio = ratios[blockfromkey(key)]
+      ratio = ratios[blockfromkey(key,LORABLOCKS)]
       if "same to Strength" in sets:
         ratio, fugou = (ratio**0.5,1) if ratio > 0 else (abs(ratio)**0.5,-1)
       #print(lora_module_name, ratio)
@@ -663,17 +678,7 @@ def merge_lora_models_dim(models, ratios, new_rank,sets):
 
   return merged_lora_sd
 
-def merge_lora_models(models, ratios,sets):
-  base_alphas = {}                          # alpha for merged model
-  base_dims = {}
-  merge_dtype = torch.float
-  merged_sd = {}
-  fugou = 1
-  for model, ratios in zip(models, ratios):
-    print(f"merging {model}: {ratios}")
-    lora_sd = load_state_dict(model, merge_dtype)
-
-    # get alpha and dim
+def dimalpha(lora_sd, base_dims={}, base_alphas={}):
     alphas = {}                             # alpha for current model
     dims = {}                               # dims for current model
     for key in lora_sd.keys():
@@ -696,6 +701,31 @@ def merge_lora_models(models, ratios,sets):
         alphas[lora_module_name] = alpha
         if lora_module_name not in base_alphas:
           base_alphas[lora_module_name] = alpha
+    return base_dims, base_alphas, dims, alphas
+
+def merge_lora_models(models, ratios, sets, locon):
+  base_alphas = {}                          # alpha for merged model
+  base_dims = {}
+  merge_dtype = torch.float
+  merged_sd = {}
+  fugou = 1
+  for model, ratios in zip(models, ratios):
+    if locon:
+        if len(ratios) == 17:
+            r0 = 1
+            ratios = [ratios[0]] + [r0] + ratios[1:3]+ [r0] + ratios[3:5]+[r0] + ratios[5:7]+[r0,r0,r0] + [ratios[7]] + [r0,r0,r0] + ratios[8:]
+        keylist = LYCOBLOCKS
+    else:
+        keylist = LORABLOCKS
+
+    print(f"merging {model}: {ratios}")
+    lora_sd = load_state_dict(model, merge_dtype)
+
+    # get alpha and dim
+    alphas = {}                             # alpha for current model
+    dims = {}                               # dims for current model
+
+    base_dims, base_alphas, dims, alphas = dimalpha(lora_sd, base_dims, base_alphas)
     
     print(f"dim: {list(set(dims.values()))}, alpha: {list(set(alphas.values()))}")
 
@@ -710,7 +740,7 @@ def merge_lora_models(models, ratios,sets):
       base_alpha = base_alphas[lora_module_name]
       alpha = alphas[lora_module_name]
 
-      ratio = ratios[blockfromkey(key)]
+      ratio = ratios[blockfromkey(key,keylist)]
       if "same to Strength" in sets:
         ratio, fugou = (ratio**0.5,1) if ratio > 0 else (abs(ratio)**0.5,-1)
 
@@ -746,40 +776,50 @@ def makeloraname(model_a,model_b):
     model_b=filenamecutter(model_b)
     return "lora_"+model_a+"-"+model_b
 
-def lycomerge(filename,ratios):
-    sd = load_state_dict(filename, torch.float)
+def locomerge(filenames,ratioss):
+    for filename in filenames:
+        _, ltype = dimgetter(filename)
+        if ltype == "LoCon":
+            sd_0 = load_state_dict(filename, torch.float)
+    
+    for key in sd_0.keys():
+        sd_0[key] = sd_0[key] * 0
 
-    if len(ratios) == 17:
-      r0 = 1
-      ratios = [ratios[0]] + [r0] + ratios[1:3]+ [r0] + ratios[3:5]+[r0] + ratios[5:7]+[r0,r0,r0] + [ratios[7]] + [r0,r0,r0] + ratios[8:]
+    for filename, ratios in zip(filenames,ratioss):
+        sd = load_state_dict(filename, torch.float)
+        if len(ratios) == 17:
+            r0 = 1
+            ratios = [ratios[0]] + [r0] + ratios[1:3]+ [r0] + ratios[3:5]+[r0] + ratios[5:7]+[r0,r0,r0] + [ratios[7]] + [r0,r0,r0] + ratios[8:]
 
-    print("LyCORIS: " , ratios)
+        print("Locon/C3Lier: " ,filename , ratios)
 
-    keys_failed_to_match = []
+        keys_failed_to_match = []
 
-    for lkey, weight in sd.items():
-        ratio = 1
-        picked = False
-        if 'alpha' in lkey:
-          continue
-        
-        fullkey = convert_diffusers_name_to_compvis(lkey)
-        key, lora_key = fullkey.split(".", 1)
+        for lkey, weight in sd.items():
+            ratio = 1
+            picked = False
+            if 'alpha' in lkey:
+                continue
+            
+            fullkey = convert_diffusers_name_to_compvis(lkey)
+            key, lora_key = fullkey.split(".", 1)
 
-        for i,block in enumerate(LYCOBLOCKS):
-            if block in key:
-                ratio = ratios[i]
-                picked = True
-        if not picked: keys_failed_to_match.append(key)
+            for i,block in enumerate(LYCOBLOCKS):
+                if block in key:
+                    ratio = ratios[i]
+                    picked = True
+            if not picked: keys_failed_to_match.append(key)
 
-        sd[lkey] = weight * math.sqrt(abs(float(ratio)))
+            sd[lkey] = weight * math.sqrt(abs(float(ratio)))
 
-        if "down" in lkey and ratio < 0:
-          sd[key] = sd[key] * -1
-        
-    if len(keys_failed_to_match) > 0:
-      print(keys_failed_to_match)
-  
+            if "down" in lkey and ratio < 0:
+                sd[key] = sd[key] * -1
+
+            sd_0[lkey] = sd_0[lkey] + sd[lkey]
+            
+        if len(keys_failed_to_match) > 0:
+            print(keys_failed_to_match)
+    
     return sd 
 
 LORABLOCKS=["encoder",
@@ -965,31 +1005,6 @@ def create_network(multiplier, network_dim, network_alpha, vae, text_encoder, un
         else:
             conv_alpha = float(conv_alpha)
 
-    """
-    block_dims = kwargs.get("block_dims")
-    block_alphas = None
-    if block_dims is not None:
-    block_dims = [int(d) for d in block_dims.split(',')]
-    assert len(block_dims) == NUM_BLOCKS, f"Number of block dimensions is not same to {NUM_BLOCKS}"
-    block_alphas = kwargs.get("block_alphas")
-    if block_alphas is None:
-        block_alphas = [1] * len(block_dims)
-    else:
-        block_alphas = [int(a) for a in block_alphas(',')]
-    assert len(block_alphas) == NUM_BLOCKS, f"Number of block alphas is not same to {NUM_BLOCKS}"
-    conv_block_dims = kwargs.get("conv_block_dims")
-    conv_block_alphas = None
-    if conv_block_dims is not None:
-    conv_block_dims = [int(d) for d in conv_block_dims.split(',')]
-    assert len(conv_block_dims) == NUM_BLOCKS, f"Number of block dimensions is not same to {NUM_BLOCKS}"
-    conv_block_alphas = kwargs.get("conv_block_alphas")
-    if conv_block_alphas is None:
-        conv_block_alphas = [1] * len(conv_block_dims)
-    else:
-        conv_block_alphas = [int(a) for a in conv_block_alphas(',')]
-    assert len(conv_block_alphas) == NUM_BLOCKS, f"Number of block alphas is not same to {NUM_BLOCKS}"
-  """
-
     network = LoRANetwork(
         text_encoder,
         unet,
@@ -1000,7 +1015,6 @@ def create_network(multiplier, network_dim, network_alpha, vae, text_encoder, un
         conv_alpha=conv_alpha,
     )
     return network
-
 
 
 class LoRANetwork(torch.nn.Module):
