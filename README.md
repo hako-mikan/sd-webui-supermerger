@@ -13,6 +13,11 @@ If you met following error, version of diffusers is wrong. Downgrade to 0.14.0. 
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
+update 2023.06.27.2030
+- Add new calcmode "trainDifference"[detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#trainDifference) (Thanks [SwiftIllusion](https://github.com/SwiftIllusion))
+- Add Z axis for XY plot
+- Add Analysis tab for caclrating the difference of models (thanks [Mohamed-Desouki](https://github.com/Mohamed-Desouki))
+
 update 2023.06.24.0300(JST)
 - VAE bake feature added
 - support inpainting/pix2pix  
