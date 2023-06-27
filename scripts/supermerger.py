@@ -131,7 +131,9 @@ def on_ui_tabs():
                     xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
                     y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
                     ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
-                    esettings = gr.CheckboxGroup(label = "XY plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
+                    z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")    
+                    zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
+                    esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
                     with gr.Row():
                         gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
                         stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
@@ -312,7 +314,7 @@ def on_ui_tabs():
 
         msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
-        xysettings=[x_type,xgrid,y_type,ygrid,esettings]
+        xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
@@ -396,8 +398,9 @@ def on_ui_tabs():
             outputs=menbers
         )
 
-        x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
-        y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
+        x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
+        y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
+        z_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
         x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
 
         import subprocess
@@ -517,16 +520,17 @@ def makerand(num):
     text = text[:-1]
     return text
 
-#row_blockids,row_checkpoints,row_inputers,ygrid
-def showxy(x,y):
-    flags =[False]*6
+#0 row_blockids, 1 row_checkpoints, 2 row_inputers,3 ygrid, 4 zgrid, 5 row_esets, 6 row_calcmode
+def showxy(x,y,z):
+    flags =[False]*7
     t = TYPESEG
-    txy = t[x] + t[y]
+    txy = t[x] + t[y] + t[z]
     if "model" in txy : flags[1] = flags[2] = True
     if "pinpoint" in txy : flags[0] = flags[2] = True
-    if "effective" in txy or "element" in txy : flags[4] = True
-    if "calcmode" in txy : flags[5] = True
+    if "effective" in txy or "element" in txy : flags[5] = True
+    if "calcmode" in txy : flags[6] = True
     if not "none" in t[y] : flags[3] = flags[2] = True
+    if not "none" in t[z] : flags[4] = flags[2] = True
     return [gr.update(visible = x) for x in flags]
 
 def text2slider(text):
