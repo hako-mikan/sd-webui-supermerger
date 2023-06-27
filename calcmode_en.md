@@ -49,20 +49,20 @@ now it 'trains' that difference as if it was finetuning it relative to model (A)
 
 ### Comparisons
 - **Regular addDifference vs trainDifference**
-With [rev animated](https://civitai.com/models/7371/rev-animated) and [isometric-future](https://civitai.com/models/10063/isometric-future)
-*"IsometricFuture, garden, IsometricFuture"*
-**Generated with addDifference ('rev animated')+('isometric future'-'sdv1.5')**
-![IsometricA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/bde0c09b-4cc4-447b-acf9-da175192b546)
-**Generated with trainDifference ('rev animated')+('isometric future'-'sdv1.5')**
-![IsometricB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/afb053aa-2ace-4fe5-8b62-e7e29ae5edaf)
-With [rev animated](https://civitai.com/models/7371/rev-animated) and [anything v3](https://civitai.com/models/66?modelVersionId=75)
+With [rev animated](https://civitai.com/models/7371/rev-animated) and [isometric-future](https://civitai.com/models/10063/isometric-future)  
+*"IsometricFuture, garden, IsometricFuture"*  
+**Generated with addDifference ('rev animated')+('isometric future'-'sdv1.5')**   
+![IsometricA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/bde0c09b-4cc4-447b-acf9-da175192b546)  
+**Generated with trainDifference ('rev animated')+('isometric future'-'sdv1.5')**  
+![IsometricB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/afb053aa-2ace-4fe5-8b62-e7e29ae5edaf)  
+With [rev animated](https://civitai.com/models/7371/rev-animated) and [anything v3](https://civitai.com/models/66?modelVersionId=75)  
 *"man smiling"*
-**Generated with 'rev animated'**
-![FaceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/796400d6-b740-466b-beae-0ffd70276850)
-**Generated with addDifference ('rev animated')+('anything v3'-'sdv1.4')**
-![FaceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/d44d9a08-427c-47c9-9cde-d2750e880a54)
-**Generated with trainDifference ('rev animated')+('anything v3'-'sdv1.4')**
-![FaceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/872259c4-af29-4624-ac65-a820d5edfd33)
+**Generated with 'rev animated'**  
+![FaceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/796400d6-b740-466b-beae-0ffd70276850)  
+**Generated with addDifference ('rev animated')+('anything v3'-'sdv1.4')**  
+![FaceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/d44d9a08-427c-47c9-9cde-d2750e880a54)  
+**Generated with trainDifference ('rev animated')+('anything v3'-'sdv1.4')**  
+![FaceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/872259c4-af29-4624-ac65-a820d5edfd33)  
 - **Lora vs trainDifference**
 Lora's obviously aren't invalidated by this because of their utility, plug-and-play flexibility, etc.
 However it's often discussed how some models 'don't work well' with Lora's, and you've got some models like 'AnyLoRA' which was developed for that user on civitai to train their Lora's with in relation to this. You can see how to take advantage of this and trainDifference [here](#LoramergingfortrainDifference).
@@ -126,17 +126,17 @@ Sometimes weightsum merging the final model with a version of it using the SDv1.
 - One of the simpler ways you can take advantage of this is for more natural/accurate Lora styling of a different model.
 In this we'll use [BreakDomainAnime](https://civitai.com/models/72675/breakdomainanime) and [Mika Pikazo Style LoRA](https://civitai.com/models/8479/mika-pikazo-style-lora) that was trained on [AnyLora](https://civitai.com/models/23900?modelVersionId=28562)
 *"1girl, smiling, scenic background BREAK [mika-pikazo]"*
-**Generated with 'BreakDomainAnime'**
-![LoraDifferenceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/cbcbf1bf-c58b-4e70-b8af-1baf6d4102ce)
-**Generated with 'BreakDomainAnime' using 'Mika Pikazo Style LoRA' at 1 strength**
-![LoraDifferenceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/332a61f1-d1d1-4c84-9639-f56c94e556db)
+**Generated with 'BreakDomainAnime'**  
+![LoraDifferenceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/cbcbf1bf-c58b-4e70-b8af-1baf6d4102ce)  
+**Generated with 'BreakDomainAnime' using 'Mika Pikazo Style LoRA' at 1 strength**  
+![LoraDifferenceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/332a61f1-d1d1-4c84-9639-f56c94e556db)  
 Now instead of having the Lora apply over 'BreakDomainAnime', we'll use trainDifference to get a better alignment.
 Using the Lora tab of SuperMerger, Merge to Checkpoint 'Mika Pikazo Style LoRA' onto "anyloraCheckpoint_novaeFp16" (the checkpoint they describe as the one to use for training, so assumed to be what they use for their training) as "anyloraCheckpoint_mika_pikazo".
-Then **trainDifference ('BreakDomainAnime')+('Desired Lora combination merged onto AnyLora, in this case anyloraCheckpoint_mika_pikazo'-'AnyLora') to generate**
-![LoraDifferenceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/50457b98-b2ad-4e28-a048-b023a86a2530)
+Then **trainDifference ('BreakDomainAnime')+('Desired Lora combination merged onto AnyLora, in this case anyloraCheckpoint_mika_pikazo'-'AnyLora') to generate**  
+![LoraDifferenceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/50457b98-b2ad-4e28-a048-b023a86a2530)   
 Another more immediately visible comparison between Lora/the above technique, for a trainDifference of a background Lora that was originally trained on an anime model moved to a realistic model.
-*"An eco-friendly residential building covered in vertical gardens in an urban setting"*
-![LoraTraindifferenceBackgroundExamplepng](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/c40c1833-f166-49b5-abfe-56a28780a736)
+*"An eco-friendly residential building covered in vertical gardens in an urban setting"*  
+![LoraTraindifferenceBackgroundExamplepng](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/c40c1833-f166-49b5-abfe-56a28780a736)  
 
 ## <a id="smooth">smoothAdd</a>
 ### _Available modes :_ Add difference
