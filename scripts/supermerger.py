@@ -22,6 +22,7 @@ import csv
 import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen)
 from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
+from scripts.mergers.model_util import filenamecutter
 
 gensets=argparse.Namespace()
 
@@ -71,7 +72,7 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB", "smoothAdd","tensor","tensor2"], value = "normal") 
+                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","tensor","tensor2"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -121,7 +122,7 @@ def on_ui_tabs():
                             esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
-                    
+
                     with gr.Accordion("Tensor Merge",open = False,visible=False):
                         tensor = gr.Textbox(label="Blocks:Tensors",lines=2,value="")
                     
@@ -131,7 +132,9 @@ def on_ui_tabs():
                     xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
                     y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
                     ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
-                    esettings = gr.CheckboxGroup(label = "XY plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
+                    z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")    
+                    zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
+                    esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
                     with gr.Row():
                         gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
                         stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
@@ -152,7 +155,7 @@ def on_ui_tabs():
             with gr.Row(visible = False) as row_blockids:
                 blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
             with gr.Row(visible = False) as row_calcmode:
-                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB", "smoothAdd","tensor","tensor2"],type="value",interactive=True)
+                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","tensor","tensor2"],type="value",interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
@@ -258,6 +261,25 @@ def on_ui_tabs():
         with gr.Tab("LoRA", elem_id="tab_lora"):
             pluslora.on_ui_tabs()
 
+                    
+        with gr.Tab("Analysis", elem_id="tab_analysis"):
+            with gr.Row():
+                an_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                create_refresh_button(an_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                an_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
+                create_refresh_button(an_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+            with gr.Row():
+                an_mode  = gr.Radio(label = "Analysis Mode",choices = ["ASimilarity","Block","Element","Both"], value = "ASimilarity",type  = "value") 
+                an_calc  = gr.Radio(label = "Block method",choices = ["Mean","Min","attn2"], value = "Mean",type  = "value") 
+                an_include  = gr.CheckboxGroup(label = "Include",choices = ["Textencoder(BASE)","U-Net","VAE"], value = ["Textencoder(BASE)","U-Net"],type  = "value") 
+                an_settings = gr.CheckboxGroup(label = "Settings",choices=["save as txt", "save as csv"],type="value",interactive=True)
+            with gr.Row():
+                run_analysis = gr.Button(value="Run Analysis",variant='primary')
+            with gr.Row():
+                analysis_cosdif = gr.Dataframe(headers=["block","key","similarity[%]"],)
+
+        run_analysis.click(fn=calccosinedif,inputs=[an_model_a,an_model_b,an_mode,an_settings,an_include,an_calc],outputs=[analysis_cosdif])    
+
         with gr.Tab("History", elem_id="tab_history"):
             
             with gr.Row():
@@ -312,7 +334,7 @@ def on_ui_tabs():
 
         msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
-        xysettings=[x_type,xgrid,y_type,ygrid,esettings]
+        xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
@@ -396,8 +418,9 @@ def on_ui_tabs():
             outputs=menbers
         )
 
-        x_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
-        y_type.change(fn=showxy,inputs=[x_type,y_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,row_esets,row_calcmode])
+        x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
+        y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
+        z_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
         x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
 
         import subprocess
@@ -517,16 +540,17 @@ def makerand(num):
     text = text[:-1]
     return text
 
-#row_blockids,row_checkpoints,row_inputers,ygrid
-def showxy(x,y):
-    flags =[False]*6
+#0 row_blockids, 1 row_checkpoints, 2 row_inputers,3 ygrid, 4 zgrid, 5 row_esets, 6 row_calcmode
+def showxy(x,y,z):
+    flags =[False]*7
     t = TYPESEG
-    txy = t[x] + t[y]
+    txy = t[x] + t[y] + t[z]
     if "model" in txy : flags[1] = flags[2] = True
     if "pinpoint" in txy : flags[0] = flags[2] = True
-    if "effective" in txy or "element" in txy : flags[4] = True
-    if "calcmode" in txy : flags[5] = True
+    if "effective" in txy or "element" in txy : flags[5] = True
+    if "calcmode" in txy : flags[6] = True
     if not "none" in t[y] : flags[3] = flags[2] = True
+    if not "none" in t[z] : flags[4] = flags[2] = True
     return [gr.update(visible = x) for x in flags]
 
 def text2slider(text):
@@ -572,43 +596,187 @@ def find_preset_by_name(presets, preset):
 
     return None
 
+BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
+
+def blockfromkey(key):
+    re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
+    re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
+    re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
+
+    weight_index = -1
+
+    NUM_INPUT_BLOCKS = 12
+    NUM_MID_BLOCK = 1
+    NUM_OUTPUT_BLOCKS = 12
+    NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
+
+    if 'time_embed' in key:
+        weight_index = -2                # before input blocks
+    elif '.out.' in key:
+        weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
+    else:
+        m = re_inp.search(key)
+        if m:
+            inp_idx = int(m.groups()[0])
+            weight_index = inp_idx
+        else:
+            m = re_mid.search(key)
+            if m:
+                weight_index = NUM_INPUT_BLOCKS
+            else:
+                m = re_out.search(key)
+                if m:
+                    out_idx = int(m.groups()[0])
+                    weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
+    return BLOCKID[weight_index+1]
+
 def loadkeys(model_a):
-    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-    sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+    sd = loadmodel(model_a)
     keys = []
     for i, key in enumerate(sd.keys()):
-        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
-        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
-        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
-
-        weight_index = -1
-        blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
-
-        NUM_INPUT_BLOCKS = 12
-        NUM_MID_BLOCK = 1
-        NUM_OUTPUT_BLOCKS = 12
-        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
-
-        if 'time_embed' in key:
-            weight_index = -2                # before input blocks
-        elif '.out.' in key:
-            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
-        else:
-            m = re_inp.search(key)
-            if m:
-                inp_idx = int(m.groups()[0])
-                weight_index = inp_idx
-            else:
-                m = re_mid.search(key)
-                if m:
-                    weight_index = NUM_INPUT_BLOCKS
-                else:
-                    m = re_out.search(key)
-                    if m:
-                        out_idx = int(m.groups()[0])
-                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-        keys.append([i,blockid[weight_index+1],key])
+        keys.append([i,blockfromkey(key),key])
     return keys
+
+def loadmodel(model):
+    checkpoint_info = sd_models.get_closet_checkpoint_match(model)
+    sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+    return sd
+
+from tqdm import tqdm
+import torch
+from statistics import mean
+import csv
+import pprint
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+def calccosinedif(model_a,model_b,mode,settings,include,calc):
+    inc = " ".join(include)
+    settings = " ".join(settings)
+    a, b = loadmodel(model_a), loadmodel(model_b)
+    name = filenamecutter(model_a) + "-" + filenamecutter(model_b)
+    cosine_similarities = []
+    blocksim = {}
+    blockvals = []
+    attn2 = {}
+    for bl in BLOCKID:
+        blocksim[bl] = []
+    blocksim["VAE"] = []
+
+    if "ASim" in mode:
+        result = asimilarity(a,b)
+        if len(settings) > 1: savecalc(result,name,settings,True,"Asim")
+        return result
+    else:
+        for key in tqdm(a.keys(), desc="Calculating cosine similarity"):
+            block = None
+            if blockfromkey(key) == "Not Merge": continue
+            if "model_ema" in key: continue
+            if "model" not in key:continue
+            if "first_stage_model" in key and not ("VAE" in inc):
+                continue
+            elif "first_stage_model" in key and "VAE" in inc:
+                block = "VAE"
+            if "diffusion_model" in key and not ("U-Net" in inc): continue
+            if "encoder" in key and not ("encoder" in inc): continue
+            if key in b and a[key].size() == b[key].size():
+                a_flat = a[key].view(-1).to(torch.float32)
+                b_flat = b[key].view(-1).to(torch.float32)
+                simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
+                if block is None: block = blockfromkey(key)
+                cosine_similarities.append([block, key, round(simab.item()*100,3)])
+                blocksim[block].append(round(simab.item()*100,3))
+                if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
+
+        for bl in BLOCKID:
+            val = None
+            if bl == "Not Merge": continue
+            if bl not in blocksim.keys():continue
+            if "Mean" in calc:
+                val = mean(blocksim[bl])
+            elif "Min" in calc:
+                val = min(blocksim[bl])
+            else:
+                if bl in attn2.keys():val = attn2[bl]
+            if val:blockvals.append([bl,"",round(val,3)])
+            if mode != "Element": cosine_similarities.insert(0,[bl,"",round(mean(blocksim[bl]),3)])
+
+        if mode == "Block":
+            if len(settings) > 1: savecalc(blockvals,name,settings,True,"Blocks")
+            return blockvals
+        else:
+            if len(settings) > 1: savecalc(cosine_similarities,name,settings,False,"Elements",)
+            return cosine_similarities
+
+def savecalc(data,name,settings,blocks,add):
+    name = name + "_" + add
+    csvpath = os.path.join(path_root,f"{name}.csv")
+    txtpath = os.path.join(path_root,f"{name}.txt")
+
+    txt = ""
+    for row in data:
+        row = [str(r) for r in row]
+        txt = txt + ",".join(row)+"\n"
+        if blocks: txt = txt.replace(",,",",")
+
+    if "txt" in settings:
+        with  open(txtpath, 'w+') as f:
+            f.writelines(txt)
+            print("file saved to ",txtpath)
+    if "csv" in settings:
+        with  open(csvpath, 'w+') as f:
+            f.writelines(txt)
+            print("file saved to ",csvpath)
+
+#code from https://huggingface.co/JosephusCheung/ASimilarityCalculatior
+
+def cal_cross_attn(to_q, to_k, to_v, rand_input):
+    hidden_dim, embed_dim = to_q.shape
+    attn_to_q = nn.Linear(hidden_dim, embed_dim, bias=False)
+    attn_to_k = nn.Linear(hidden_dim, embed_dim, bias=False)
+    attn_to_v = nn.Linear(hidden_dim, embed_dim, bias=False)
+    attn_to_q.load_state_dict({"weight": to_q})
+    attn_to_k.load_state_dict({"weight": to_k})
+    attn_to_v.load_state_dict({"weight": to_v})
+    
+    return torch.einsum(
+        "ik, jk -> ik", 
+        F.softmax(torch.einsum("ij, kj -> ik", attn_to_q(rand_input), attn_to_k(rand_input)), dim=-1),
+        attn_to_v(rand_input)
+    )
+       
+def eval(model, n, input, block):
+    qk = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_q.weight"
+    uk = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_k.weight"
+    vk = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_v.weight"
+    atoq, atok, atov = model[qk], model[uk], model[vk]
+
+    attn = cal_cross_attn(atoq, atok, atov, input)
+    return attn
+
+ATTN1BLOCKS = [[1,"input"],[2,"input"],[4,"input"],[5,"input"],[5,"input"],[8,"input"],["","middle"],
+[3,"output"],[4,"output"],[5,"output"],[6,"output"],[7,"output"],[8,"output"],[9,"output"],[10,"output"],[11,"output"]]
+
+def asimilarity(model_a,model_b):
+    torch.manual_seed(2244096)
+    sims = []
+  
+    for nblock in  tqdm(ATTN1BLOCKS, desc="Calculating cosine similarity"):
+        n,block = nblock[0],nblock[1]
+        if n != "": n = f"s.{n}"
+        key = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_q.weight"
+
+        hidden_dim, embed_dim = model_a[key].shape
+        rand_input = torch.randn([embed_dim, hidden_dim])
+
+        attn_a = eval(model_a, n, rand_input, block)
+        attn_b = eval(model_b, n, rand_input, block)
+
+        sim = torch.mean(torch.cosine_similarity(attn_a, attn_b))
+        sims.append([blockfromkey(key),"",round(sim.item() * 100,3)])
+        
+    return sims
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)

@@ -336,6 +336,7 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
             theta_0[keychanger[msd_key]] = torch.nn.Parameter(weight)
     #usemodelgen(theta_0,model)
     settings.append(precision)
+    settings.append("safetensors")
     result = savemodel(theta_0,dname,output,settings,model)
     del theta_0
     gc.collect()

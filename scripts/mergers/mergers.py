@@ -130,6 +130,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
+    if calcmode == calcmode == "trainDifference" and "Add" not in mode:
+        print("mode changed to add difference")
+        mode = "Add"
+
     result_is_inpainting_model = False
     result_is_instruct_pix2pix_model = False
 
@@ -173,15 +177,18 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
-        theta_2 = load_model_weights_m(model_c,False,False,save).copy()
-        for key in tqdm(theta_1.keys()):
-            if 'model' in key:
-                if key in theta_2:
-                    t2 = theta_2.get(key, torch.zeros_like(theta_1[key]))
-                    theta_1[key] = theta_1[key]- t2
-                else:
-                    theta_1[key] = torch.zeros_like(theta_1[key])
-        del theta_2
+        if calcmode == "trainDifference":
+            theta_2 = load_model_weights_m(model_c,True,False,save).copy()
+        else:
+            theta_2 = load_model_weights_m(model_c,False,False,save).copy()
+            for key in tqdm(theta_1.keys()):
+                if 'model' in key:
+                    if key in theta_2:
+                        t2 = theta_2.get(key, torch.zeros_like(theta_1[key]))
+                        theta_1[key] = theta_1[key]- t2
+                    else:
+                        theta_1[key] = torch.zeros_like(theta_1[key])
+            del theta_2
 
     if stopmerge: return "STOPPED", *non4
     
@@ -197,7 +204,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
         theta_2 = load_model_weights_m(model_c,False,False,save).copy()
     else:
-        theta_2 = {}
+        if calcmode != "trainDifference":
+            theta_2 = {}
 
     alpha = base_alpha
     beta = base_beta
@@ -245,8 +253,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
         if "model" in key and key in theta_1:
-            if usebeta and (not key in theta_2) and (not theta_2 == {}) :
-                continue
+            if calcmode == "trainDifference":
+                if key not in theta_2:
+                    continue
+            else:
+               if usebeta and (not key in theta_2) and (not theta_2 == {}) :
+                    continue
 
             weight_index = -1
             current_alpha = alpha
@@ -312,6 +324,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 for d in deep:
                     if d.count(":") != 2 :continue
                     dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
+                    dbs = blocker(dbs)
                     dbs,dws = dbs.split(" "), dws.split(" ")
                     dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
                     dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
@@ -372,9 +385,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
                     combined_similarity = (simab + magnitude_similarity) / 2.0
                     k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-                    k = k - current_alpha
-                    k = k.clip(min=.0,max=1.)
-                    caster(f"model A[{key}] +  {1-k} + * (model B)[{key}]*{k}",hear)
+                    k = k - abs(current_alpha)
+                    k = k.clip(min=0,max=1.0)
+                    caster(f"model A[{key}] {1-k} +  (model B)[{key}]*{k}",hear)
                     theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
 
             elif calcmode == "cosineB": #favors modelB's structure with details from A
@@ -387,9 +400,29 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     combined_similarity = (simab + magnitude_similarity) / 2.0
                     k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
                     k = k - current_alpha
-                    k = k.clip(min=.0,max=1.)
-                    caster(f"model A[{key}] +  {1-k} + * (model B)[{key}]*{k}",hear)
+                    k = k.clip(min=0,max=1.0)
+                    caster(f"model A[{key}] *{1-k} + (model B)[{key}]*{k}",hear)
                     theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+
+            elif calcmode == "trainDifference":
+                # Check if theta_1[key] is equal to theta_2[key]
+                if torch.allclose(theta_1[key].float(), theta_2[key].float(), rtol=0, atol=0):
+                    theta_2[key] = theta_0[key]
+                    continue
+
+                diff_AB = theta_1[key].float() - theta_2[key].float()
+
+                distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
+                distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
+
+                sum_distances = distance_A0 + distance_A1
+
+                scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
+                sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
+                scale = sign_scale * torch.abs(scale)
+
+                new_diff = scale * torch.abs(diff_AB)
+                theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
 
             elif calcmode == "smoothAdd":
                 caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
@@ -488,6 +521,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_0.update({key:theta_1[key]})
 
     del theta_1
+
+    if calcmode == "trainDifference":
+        del theta_2
 
     bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
     if bake_in_vae_filename is not None:
@@ -644,21 +680,17 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             out = "ERROR: OUT of ID index"
         return out
 
+def get_font(fontsize):
+    path_root = scripts.basedir()
+    fontpath = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "Roboto-Regular.ttf")
+    try:
+        return ImageFont.truetype(opts.font or fontpath, fontsize)
+    except Exception:
+        return ImageFont.truetype(fontpath, fontsize)
+
 def draw_origin(grid, text,width,height,width_one):
     grid_d= Image.new("RGB", (grid.width,grid.height), "white")
     grid_d.paste(grid,(0,0))
-    def get_font(fontsize):
-        try:
-            from fonts.ttf import Roboto
-            try:
-                return ImageFont.truetype(opts.font or Roboto, fontsize)
-            except Exception:
-                return ImageFont.truetype(Roboto, fontsize)
-        except Exception:
-            try:
-                return ImageFont.truetype(shared.opts.font or 'javascript/roboto.ttf', fontsize)
-            except Exception:
-                return ImageFont.truetype('javascript/roboto.ttf', fontsize)
 
     d= ImageDraw.Draw(grid_d)
     color_active = (0, 0, 0)
@@ -788,3 +820,22 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
         images.save_image(grid, opts.outdir_txt2img_grids, "grid", p.seed, p.prompt, opts.grid_format, info=infotext, short_filename=not opts.grid_extended_filename, p=p, grid=True)
     shared.state.end()
     return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),p
+
+def blocker(blocks):
+    blocks = blocks.split(" ")
+    output = ""
+    for w in blocks:
+        flagger=[False]*26
+        changer = True
+        if "-" in w:
+            wt = [wt.strip() for wt in w.split('-')]
+            if  blockid.index(wt[1]) > blockid.index(wt[0]):
+                flagger[blockid.index(wt[0]):blockid.index(wt[1])+1] = [changer]*(blockid.index(wt[1])-blockid.index(wt[0])+1)
+            else:
+                flagger[blockid.index(wt[1]):blockid.index(wt[0])+1] = [changer]*(blockid.index(wt[0])-blockid.index(wt[1])+1)
+        else:
+            output = output + " " + w if output != "" else w
+            return output
+        for i in range(26):
+            if flagger[i]: output = output + " " + blockid[i] if output !="" else blockid[i]
+        return output

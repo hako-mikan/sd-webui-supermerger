@@ -2,6 +2,7 @@
 
 - [normal](#normal)
 - [cosineA/cosineB](#cosine)
+- [trainDifference](#train)
 - [smoothAdd](#smooth)
 - [tensor](#tensor)
 
@@ -40,6 +41,102 @@ Note also how the second model is more the 'reference point' for the merging loo
 - CosineA merge results between FeverDream and AnythingV3 model
 ![MergeOppositeCosineA](https://user-images.githubusercontent.com/6239068/232741034-ce3c9739-7f5a-4a7d-b979-fec4ac7d9b71.png)
 
+## <a id="train">trainDifference</a>
+### _Available modes :_ Add difference
+This method at its simplest, can be thought of as a 'super Lora' for permanent merges,
+it no longer adds the calculated difference between (B)-(C) models to model (A),
+now it 'trains' that difference as if it was finetuning it relative to model (A).
+
+### Comparisons
+- **Regular addDifference vs trainDifference**
+With [rev animated](https://civitai.com/models/7371/rev-animated) and [isometric-future](https://civitai.com/models/10063/isometric-future)  
+*"IsometricFuture, garden, IsometricFuture"*  
+**Generated with addDifference ('rev animated')+('isometric future'-'sdv1.5')**   
+![IsometricA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/bde0c09b-4cc4-447b-acf9-da175192b546)  
+**Generated with trainDifference ('rev animated')+('isometric future'-'sdv1.5')**  
+![IsometricB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/afb053aa-2ace-4fe5-8b62-e7e29ae5edaf)  
+With [rev animated](https://civitai.com/models/7371/rev-animated) and [anything v3](https://civitai.com/models/66?modelVersionId=75)  
+*"man smiling"*
+**Generated with 'rev animated'**  
+![FaceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/796400d6-b740-466b-beae-0ffd70276850)  
+**Generated with addDifference ('rev animated')+('anything v3'-'sdv1.4')**  
+![FaceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/d44d9a08-427c-47c9-9cde-d2750e880a54)  
+**Generated with trainDifference ('rev animated')+('anything v3'-'sdv1.4')**  
+![FaceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/872259c4-af29-4624-ac65-a820d5edfd33)  
+- **Lora vs trainDifference**
+Lora's obviously aren't invalidated by this because of their utility, plug-and-play flexibility, etc.
+However it's often discussed how some models 'don't work well' with Lora's, and you've got some models like 'AnyLoRA' which was developed for that user on civitai to train their Lora's with in relation to this. You can see how to take advantage of this and trainDifference [here](#LoramergingfortrainDifference).
+Using [FeverDream](https://civitai.com/models/26396?modelVersionId=32375) (a model definitely further away from the 'compatibility' an anime Lora would require), and [Thicker Lines Anime Style LoRA Mix](https://civitai.com/models/13910?modelVersionId=16368) who provided both a Lora version and pre-merged with [Anything V4.5](https://huggingface.co/andite/anything-v4.0/blob/main/anything-v4.5-pruned.safetensors) version we'll use for this, a direct comparison between the Lora on 'FeverDream' vs trainDifference ('Feverdream')+('Thicker Lines'-'Anythingv4.5') can be seen.
+We'll compare at 1/1.2/1.4/1.6 lora/merge strength, as it's easiest to see at the extremes how the Lora pulls apart compared to the train difference.
+![CompareLora](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/6ad4c28f-c282-4005-8542-2cb697790b65)
+
+### Usage guidance
+#### Possibilities and general usage
+<details>
+  <summary> Expand a model with new concepts, or reinforce existing concepts (and quality output), instead of mixing</summary>
+
+Sci-Fi Diffusion as an example https://civitai.com/models/4404?modelVersionId=4980 was trained on general sci-fi images.
+You don't have to merge/mix into it anymore, you can use this to practically train Sci-Fi into your model by trainDifferencing it against SDv1.5, you aren't limited to generating an aproximated Lora difference for expansion.
+Another example is you could cosime similarity merge [Analog Diffusion](https://civitai.com/models/1265/analog-diffusion) and [Timeless Diffusion](https://civitai.com/models/3557?modelVersionId=3936) that are similar in nature (and you wouldn't want to re-inforce the negative elements of the photographs too much) then trainDifference [Modelshoot Style](https://civitai.com/models/2147/modelshoot-style) ontop of that which focuses on medium body shots with a stronger photography foundation built by the previous merge.
+The potential for models, being able to now in a sense 'continue training' with broad models like [Surreality](https://civitai.com/models/21666?modelVersionId=25854) and [seek.art MEGA](https://civitai.com/models/1315?modelVersionId=22808) that gratefully lifted their license restrictions with V2, is now much larger than when it was limited to mixing them into models (though of course the utility for styling with different weighting of ins/outs etc all still has its value, and everything depends on your goal).
+Also models like [RPG](https://civitai.com/models/1116?modelVersionId=7133) with v5 sounding like it is being developed from SDv1.5 instead of a merge, with this can be trained into models without the heavy NSFW/female bias in many from F222/etc merges.
+</details>
+<details>
+  <summary> Direction of trainDifference and style of the difference matters</summary>
+
+It is harder for a model to learn to be realistic, than to be stylistic.
+For example if building a model that intends to eventually be stylistic, consider having multiple model branches based on similar styles, to eventually trainDifference the stylistic branch onto the most realistic branch.
+Generally you should merge anime/cartoon > stylish > realistic, if the styles differ.
+</details>
+<details>
+  <summary> trainDifference is not always the best solution</summary>
+
+Sometimes depending on the type/scope of the difference, cosine similarity merge can provide better results (if the differences aren't from SDv1.5 already, trainDifference both onto SDv1.5, and then cosine similiarity merge them from there before you trainDifference it back onto your working model).
+Also, sometimes if the material is similar but large and varied, the best result can come from using trainDifference in both directions, and then weight-sum merge between those 2 to find the best result, like [waifu diffusion](https://huggingface.co/hakurei/waifu-diffusion-v1-3) and [Acertainty](https://huggingface.co/JosephusCheung/ACertainty).
+</details>
+<details>
+  <summary> Gain the benefits of a trained model anywhere</summary>
+
+Models like [knollingcase](https://civitai.com/models/1092?modelVersionId=1093) and [Bubble Toys](https://civitai.com/models/23945/bubble-toys-the-model) are cool, but their effort has been limited by the framework they were trained on. Now you can trainDifference them onto any of the newer models that people have developed.
+Additionally some people that have made checkpoints instead of Lora's mentioned trying Lora first but without getting valuable results, with trainDifference their work can still be applied onto any model.
+</details>
+
+#### Limitations and what to avoid/problems and solutions
+<details>
+  <summary> Knowing and having access to the origin of the model pre-training is required</summary>
+
+A lot of models have some mix of SDv1.4 now. This trainDifference merge is accurate enough that, if you were to try and for example train 'rev animated' onto 'Sci-fi Diffusion' with SDv1.5 as model (C), because 'rev animated's origin is an unknown ratio between SDv1.4 and SDv1.5 (and mix of individual in/out weights too), the merge would negatively affect the output (the 'training' would be offset/distorted), but you could trainDifference 'sci-fi Diffusion' onto 'rev animated' because it was trained on SDv1.5.
+</details>
+<details>
+  <summary> After enough time / with similar materials, 'burning'/'over training' can eventually occur</summary>
+
+You can 'pull back' the model at this point by cosine similarity merging it with SDv1.5, which helps ground it while keeping more qualities from the training.
+</details>
+<details>
+  <summary> After enough merges, the 'clip/comprehension' can become heavy, negatively effecting simple prompts</summary>
+
+For example complex prompts may still look good, but 'female portrait, blue eyes' could spill the 'blue' concept too much.
+To help avoid this, as you make trainDifference merges or large scope, you can use [model toolkit](https://github.com/arenasys/stable-diffusion-webui-model-toolkit) to manipulate the clip.
+Load the final model into that extension, and create 2 different models. 'clipA' importing the clip of your base model, 'clipB' importing the clip of what you trained into it, and use a regular weightsum merge to find the best output/comprehension between those 2 models, to soften out the clip as you expand your model.
+Sometimes weightsum merging the final model with a version of it using the SDv1.5 clip can be better than mixing between clipA and clipB.
+</details>
+
+<a id="LoramergingfortrainDifference"></a>
+#### Practical demonstration
+- One of the simpler ways you can take advantage of this is for more natural/accurate Lora styling of a different model.
+In this we'll use [BreakDomainAnime](https://civitai.com/models/72675/breakdomainanime) and [Mika Pikazo Style LoRA](https://civitai.com/models/8479/mika-pikazo-style-lora) that was trained on [AnyLora](https://civitai.com/models/23900?modelVersionId=28562)
+*"1girl, smiling, scenic background BREAK [mika-pikazo]"*
+**Generated with 'BreakDomainAnime'**  
+![LoraDifferenceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/cbcbf1bf-c58b-4e70-b8af-1baf6d4102ce)  
+**Generated with 'BreakDomainAnime' using 'Mika Pikazo Style LoRA' at 1 strength**  
+![LoraDifferenceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/332a61f1-d1d1-4c84-9639-f56c94e556db)  
+Now instead of having the Lora apply over 'BreakDomainAnime', we'll use trainDifference to get a better alignment.
+Using the Lora tab of SuperMerger, Merge to Checkpoint 'Mika Pikazo Style LoRA' onto "anyloraCheckpoint_novaeFp16" (the checkpoint they describe as the one to use for training, so assumed to be what they use for their training) as "anyloraCheckpoint_mika_pikazo".
+Then **trainDifference ('BreakDomainAnime')+('Desired Lora combination merged onto AnyLora, in this case anyloraCheckpoint_mika_pikazo'-'AnyLora') to generate**  
+![LoraDifferenceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/50457b98-b2ad-4e28-a048-b023a86a2530)   
+Another more immediately visible comparison between Lora/the above technique, for a trainDifference of a background Lora that was originally trained on an anime model moved to a realistic model.
+*"An eco-friendly residential building covered in vertical gardens in an urban setting"*  
+![LoraTraindifferenceBackgroundExamplepng](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/c40c1833-f166-49b5-abfe-56a28780a736)  
 
 ## <a id="smooth">smoothAdd</a>
 ### _Available modes :_ Add difference
