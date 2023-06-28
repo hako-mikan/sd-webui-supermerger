@@ -763,7 +763,7 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
     p.prompt = prompt if s_prompt == "" else s_prompt
     p.negative_prompt = nprompt if s_nprompt == "" else s_nprompt
     p.steps = steps if s_steps == 0 else s_steps
-    p.sampler_name = sd_samplers.samplers[sampler].name if s_sampler == 0 else sd_samplers.samplers[s_sampler-1].name
+    p.sampler_name = sd_samplers.samplers[sampler].name if s_sampler == 0 or s_sampler == None else sd_samplers.samplers[s_sampler-1].name
     p.cfg_scale = cfg  if s_cfg == 0 else s_cfg
     p.seed = seed  if s_seed == 0 else s_seed
     p.width = w  if s_w == 0 else s_w
