@@ -3,6 +3,7 @@ import gc
 import os
 import os.path
 import re
+import json
 import shutil
 from importlib import reload
 from pprint import pprint
@@ -11,6 +12,7 @@ from modules import (devices, script_callbacks, scripts, sd_hijack, sd_models,sd
 from modules.scripts import basedir
 from modules.sd_models import checkpoints_loaded
 from modules.shared import opts
+from modules.sd_samplers import samplers
 from modules.ui import create_output_panel, create_refresh_button
 import scripts.mergers.mergers
 import scripts.mergers.pluslora
@@ -106,7 +108,18 @@ def on_ui_tabs():
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
 
-                    with gr.Accordion("Restore faces, Tiling, Hires. fix, Batch size",open = False):
+                    with gr.Accordion("Generation Parameters",open = False):
+                        gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
+                        prompt = gr.Textbox(label="prompt",lines=1,value="")
+                        neg_prompt = gr.Textbox(label="neg_prompt",lines=1,value="")
+                        with gr.Row():
+                            sampler = gr.Dropdown(label='Sampling method', elem_id=f"sampling", choices=[" ",*[x.name for x in samplers]], value="", type="index")
+                            steps = gr.Slider(minimum=0.0, maximum=150, step=1, label='Steps',value=0, elem_id="Steps")
+                            cfg = gr.Slider(minimum=0.0, maximum=30, step=0.5, label='CFG scale', value=0, elem_id="cfg")
+                        with gr.Row():
+                            width = gr.Slider(minimum=0, maximum=2048, step=8, label="Width", value=0, elem_id="txt2img_width")
+                            height = gr.Slider(minimum=0, maximum=2048, step=8, label="Height", value=0, elem_id="txt2img_height")
+                            seed = gr.Slider(minimum=-1, maximum=4294967295, step=1, label='Seed', value=0, elem_id="seed")
                         batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
                         genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value")    
                         with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
@@ -114,8 +127,10 @@ def on_ui_tabs():
                             hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
                             denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
                             hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
-                            
-                    hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
+                        with gr.Row():
+                            setdefault = gr.Button(elem_id="setdefault", value="set to default",variant='primary')
+                            resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
+                            resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
 
                     with gr.Accordion("Elemental Merge",open = False):
                         with gr.Row():
@@ -335,6 +350,18 @@ def on_ui_tabs():
         msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
+        genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
+        hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
+
+        setdefault.click(fn = configdealer,
+            inputs =[*genparams,*hiresfix[1:],dfalse],
+        )
+
+        resetdefault.click(fn = configdealer,
+            inputs =[*genparams,*hiresfix[1:],dtrue],
+        )
+
+        resetcurrent.click(fn = lambda x : [gr.update(value = x) for x in RESETVALS] ,outputs =[*genparams,*hiresfix[1:]],)
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
@@ -343,43 +370,43 @@ def on_ui_tabs():
 
         merge.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dfalse],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,*genparams,currentmodel,dfalse],
             outputs=[submit_result,currentmodel]
         )
 
         mergeandgen.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,dtrue],
+            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,*genparams,currentmodel,dtrue],
             outputs=[submit_result,currentmodel,*imagegal]
         )
 
         gen.click(
             fn=simggen,
-            inputs=[*gensets.txt2img_preview_params,*hiresfix,batch_size,currentmodel,id_sets],
+            inputs=[*gensets.txt2img_preview_params,*hiresfix,*genparams,currentmodel,id_sets],
             outputs=[*imagegal],
         )
 
         s_reserve.click(
             fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[numaframe]
         )
 
         s_reserve1.click(
             fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
+            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[numaframe]
         )
 
         gengrid.click(
             fn=numanager,
-            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
+            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,batch_size],
+            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
@@ -777,6 +804,29 @@ def asimilarity(model_a,model_b):
         sims.append([blockfromkey(key),"",round(sim.item() * 100,3)])
         
     return sims
+
+CONFIGS = ["prompt","neg_prompt","Steps","Sampling method","CFG scale","Seed","Width","Height","Batch size","Upscaler","Hires steps","Denoising strength","Upscale by"]
+RESETVALS = ["","",0," ",0,0,0,0,1,"Latent",0,0.7,2]
+
+def configdealer(prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size,
+                        hrupscaler,hr2ndsteps,denois_str,hr_scale,reset):
+
+    data = [prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size,
+                        hrupscaler,hr2ndsteps,denois_str,hr_scale]
+
+    current_directory = os.getcwd()
+    jsonpath = os.path.join(current_directory,"ui-config.json")
+    print(jsonpath)
+
+    with open(jsonpath, 'r') as file:
+        json_data = json.load(file)
+
+    for name,men,default in zip(CONFIGS,data,RESETVALS):
+        key = f"supermerger/{name}/value"
+        json_data[key] = default if reset else men
+
+    with open(jsonpath, 'w') as file:
+        json.dump(json_data, file, indent=4)
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)

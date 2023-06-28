@@ -56,7 +56,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
                        calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                        esettings,
                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                       hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,
+                       hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                       s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,
                        currentmodel,imggen):
 
     deepprint  = True if "print change" in esettings else False
@@ -78,7 +79,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     gc.collect()
 
     if imggen :
-        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,currentmodel,id_sets,modelid)
+        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,currentmodel,id_sets,modelid)
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -748,7 +750,8 @@ def longhashfromname(name):
     checkpoint_info.calculate_shorthash()
     return checkpoint_info.sha256
 
-def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
+def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                   s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
     p = processing.StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
@@ -757,14 +760,14 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
         do_not_reload_embeddings=True,
     )
     p.batch_size = int(batch_size)
-    p.prompt = prompt
-    p.negative_prompt = nprompt
-    p.steps = steps
-    p.sampler_name = sd_samplers.samplers[sampler].name
-    p.cfg_scale = cfg
-    p.seed = seed
-    p.width = w
-    p.height = h
+    p.prompt = prompt if s_prompt == "" else s_prompt
+    p.negative_prompt = nprompt if s_nprompt == "" else s_nprompt
+    p.steps = steps if s_steps == 0 else s_steps
+    p.sampler_name = sd_samplers.samplers[sampler].name if s_sampler == 0 else sd_samplers.samplers[s_sampler-1].name
+    p.cfg_scale = cfg  if s_cfg == 0 else s_cfg
+    p.seed = seed  if s_seed == 0 else s_seed
+    p.width = w  if s_w == 0 else s_w
+    p.height = h  if s_h == 0 else s_h
     p.seed_resize_from_w=0
     p.seed_resize_from_h=0
     p.denoising_strength=None
