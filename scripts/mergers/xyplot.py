@@ -21,50 +21,36 @@ def freezetime():
     global state_mergen
     state_mergen = True
 
+def separator(allsets,index,sep,men,seed):
+    if sep  in men:
+        mens = men.split(sep)
+    allsets[index] = mens[0]
+    if seed =="-1": allsets[30] = str(random.randrange(4294967294))
+    for men in mens[1:]:
+        numaker([*allsets[0:index],men,*allsets[index+1:]])
+    return allsets
+
 def numanager(normalstart,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size):
     global numadepth
     grids = []
     sep = "|"
 
-    if sep  in xmen:
-        xmens = xmen.split(sep)
-        xmen = xmens[0]
-        if seed =="-1": seed = str(random.randrange(4294967294))
-        for men in xmens[1:]:
-            numaker(xtype,men,ytype,ymen,ztype,zmen,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
+    allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
+                  weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
+                  prompt,nprompt,steps,sampler,cfg,seed,w,h,
+                  hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                  s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size]
+
+    if sep  in xmen: allsets = separator(allsets,1,sep,xmen,seed)
+    if sep  in ymen: allsets = separator(allsets,3,sep,ymen,seed)
+    if sep  in zmen: allsets = separator(allsets,5,sep,zmen,seed)
                         
-    elif sep  in ymen:
-        ymens = ymen.split(sep)
-        ymen = ymens[0]
-        if seed =="-1": seed = str(random.randrange(4294967294))
-        for men in ymens[1:]:
-            numaker(xtype,xmen,ytype,men,ztype,zmen,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
-
-    elif sep  in zmen:
-        zmens = zmen.split(sep)
-        zmen = zmens[0]
-        if seed =="-1": seed = str(random.randrange(4294967294))
-        for men in zmens[1:]:
-            numaker(xtype,xmen,ytype,ymen,ztype,men,esettings,
-                        weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
-
     if normalstart:
-        result,currentmodel,xyimage,a,b,c= sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
-                                                                             weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                                                                             useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                                                                             prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                                                                             hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size)
+        result,currentmodel,xyimage,a,b,c= sgenxyplot(*allsets)
         if xyimage is not None:grids = xyimage
         else:print(result)
     else:
@@ -97,18 +83,9 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     return result,currentmodel,grids,a,b,c
 
-def numaker(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
-#msettings=[weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets]       
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                    prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
+def numaker(allsets):
     global numadepth
-    numadepth.append([len(numadepth)+1,"waiting",xtype,xmen,ytype,ymen,ztype,zmen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                    prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size])
+    numadepth.append([len(numadepth)+1,"waiting",*allsets])
     return numalistmaker(copy.deepcopy(numadepth))
 
 def nulister(redel):
@@ -137,7 +114,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                     useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size):
+                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size):
     global hear
     esettings = " ".join(esettings)
 
@@ -164,6 +142,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     pinpoint = "pinpoint blocks" in xyz and "alpha" in xyz
 
     usebeta = modes[2] in mode or modes[3] in mode
+
+    if "prompt" in xyz: s_prompt = ""
+    if "seed" in xyz: s_seed = 0
 
     #check and adjust format
     print(f"XY plot start, mode:{mode}, X: {xtype}, Y: {ytype}, Z: {ztype} MBW: {useblocks}")
@@ -345,7 +326,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
                                 # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
-                image_temp = simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,currentmodel,id_sets,modelid)
+                image_temp = simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                                       s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,currentmodel,id_sets,modelid)
                 xyimage.append(image_temp[0][0])
                 xcount+=1
                 deep = deepy
