@@ -338,7 +338,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     deep_in = deep
 
                 print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount})")
-                if not ((xtype=="seed") or (xtype=="prompt") and xcount > 0):
+                if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,tensor,bake_in_vae,deepprint = deepprint) 
                     usemodelgen(theta_0,model_a,currentmodel)
