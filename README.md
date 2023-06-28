@@ -13,6 +13,11 @@ If you met following error, version of diffusers is wrong. Downgrade to 0.14.0. 
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
+update 2023.06.27.2030
+- Add new calcmode "trainDifference"[detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#trainDifference) (Thanks [SwiftIllusion](https://github.com/SwiftIllusion))
+- Add Z axis for XY plot
+- Add Analysis tab for caclrating the difference of models (thanks [Mohamed-Desouki](https://github.com/Mohamed-Desouki))
+
 update 2023.06.24.0300(JST)
 - VAE bake feature added
 - support inpainting/pix2pix  
@@ -157,7 +162,18 @@ If the same to Strength option is not used, the result is the same as the merge 
 The following figures show the generated images for each case of normal image generation/same to Strength option/normal merge, using  merged LoRAs of figmization and ukiyoE. You can see that in the case of normal merge, even in the negative direction, the image is squared and positive.
 ![xyz_grid-0014-1534704891](https://user-images.githubusercontent.com/122196982/218322034-b7171298-5159-4619-be1d-ac684da92ed9.jpg)
 
-For hierarchical merges see
+
+## Analysis
+Analyze the differences between two models. Select the models you wish to compare, model A and model B.
+### Mode
+
+The ASimilality mode compares tensors computed from qkv. Other modes calculates from the cosine similarity of each element. It seems that the calculated difference becomes smaller in modes other than ASimilality mode. Since the ASimilality mode gives a result that is closer to the difference in output images, you should generally use this one.
+This Asimilality analysis was created by extending the [Asimilality script](https://huggingface.co/JosephusCheung/ASimilarityCalculatior).
+### Block mode
+
+This is a method to calculate the ratio for each hierarchy in modes other than the ASimilality mode. Mean represents the average, min represents the minimum value, and attn2 outputs the value of attn2 as the calculation result of the block.
+
+For block merges see
 
 https://github.com/bbc-mc/sdweb-merge-block-weighted-gui
 

@@ -175,7 +175,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     if model_a ==[] and "model_A" not in xyz:return f"ERROR: model_A is not selected",*None5
     if model_b ==[] and "model_B" not in xyz:return f"ERROR: model_B is not selected",*None5
     if model_c ==[] and usebeta and "model_C" not in xyz:return "ERROR: model_C is not selected",*None5
-    if xtype == ytype: return "ERROR: same type selected for X,Y",*None5
+    if xtype == ytype and xtype != "add elemental": return "ERROR: same type selected for X,Y",*None5
 
     if useblocks:
         weights_a_in=wpreseter(weights_a,wpresets)
@@ -305,7 +305,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "model_B" in wt:model_b = w
         if "model_C" in wt:model_c = w
         if "elemental" in wt:
-            deep = deep_ori  +","+ w if "add" in wt else w
+            deep = deep  +","+ w if "add" in wt else w
         if "calcmode" in wt:calcmode = w
         if "prompt" in wt:prompt = w
     
@@ -320,9 +320,11 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         xyimage = []
         xydealer(z,ztype,xtype,ytype)
         for y in ys:
+            deep = deep_ori
             xydealer(y,ytype,xtype,ztype)
             xcount = 0
             for x in xs:
+                deepy = deep
                 xydealer(x,xtype,ytype,ztype)
                 if pinpoint:
                     weights_a_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_a)
@@ -336,16 +338,17 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     deep_in = deep
 
                 print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount})")
-                if not (xtype=="seed" and xcount > 0):
+                if not ((xtype=="seed") or (xtype=="prompt") and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,tensor,bake_in_vae,deepprint = deepprint) 
-                usemodelgen(theta_0,model_a,currentmodel)
+                    usemodelgen(theta_0,model_a,currentmodel)
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
                                 # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
                 image_temp = simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,batch_size,currentmodel,id_sets,modelid)
                 xyimage.append(image_temp[0][0])
                 xcount+=1
+                deep = deepy
                 if state_mergen:
                     flag = True
                     break
