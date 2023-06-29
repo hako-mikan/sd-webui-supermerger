@@ -188,7 +188,9 @@ def on_ui_tabs():
                     weights_b = gr.Textbox(label="weights for beta: base beta,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2")
                 with gr.Row():
                     with gr.Column():
-                        dd_preset_weight = gr.Dropdown(label="Load preset", choices=preset_name_list(weights_presets))
+                        with gr.Row():
+                            dd_preset_weight = gr.Dropdown(label="Load preset", choices=preset_name_list(weights_presets), interactive=True, elem_id="refresh_presets")
+                            preset_refresh = gr.Button(value='\U0001f504', elem_classes=["tool"])
                     with gr.Column():
                         gr.Slider(visible=False)
 
@@ -434,15 +436,25 @@ def on_ui_tabs():
         readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
         readbeta.click(fn=text2slider,inputs=weights_b,outputs=menbers)
 
-        def on_change_dd_preset_weight(preset):
-            weights = find_preset_by_name(weights_presets, preset)
+        def on_change_dd_preset_weight(presets, preset):
+            weights = find_preset_by_name(presets, preset)
             if weights is not None:
                 return text2slider(weights)
 
         dd_preset_weight.change(
             fn=on_change_dd_preset_weight,
-            inputs=[dd_preset_weight],
+            inputs=[wpresets, dd_preset_weight],
             outputs=menbers
+        )
+
+        def refresh_presets(presets):
+            choices = preset_name_list(presets)
+            return gr.update(choices = choices)
+
+        preset_refresh.click(
+            fn=refresh_presets,
+            inputs=[wpresets],
+            outputs=[dd_preset_weight]
         )
 
         x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
@@ -457,7 +469,9 @@ def on_ui_tabs():
         def reloadpresets():
             try:
                 with open(filepath) as f:
-                    return f.read()
+                    weights_presets = f.read()
+                    choices = preset_name_list(weights_presets)
+                    return [weights_presets, gr.update(choices = choices)]
             except OSError as e:
                 pass
 
@@ -465,7 +479,7 @@ def on_ui_tabs():
             with open(filepath,mode = 'w') as f:
                 f.write(text)
 
-        s_reloadtext.click(fn=reloadpresets,inputs=[],outputs=[wpresets])
+        s_reloadtext.click(fn=reloadpresets,inputs=[],outputs=[wpresets, dd_preset_weight])
         s_reloadtags.click(fn=tagdicter,inputs=[wpresets],outputs=[weightstags])
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
