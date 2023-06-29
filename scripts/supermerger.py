@@ -782,7 +782,7 @@ def eval(model, n, input, block):
     attn = cal_cross_attn(atoq, atok, atov, input)
     return attn
 
-ATTN1BLOCKS = [[1,"input"],[2,"input"],[4,"input"],[5,"input"],[5,"input"],[8,"input"],["","middle"],
+ATTN1BLOCKS = [[1,"input"],[2,"input"],[4,"input"],[5,"input"],[7,"input"],[8,"input"],["","middle"],
 [3,"output"],[4,"output"],[5,"output"],[6,"output"],[7,"output"],[8,"output"],[9,"output"],[10,"output"],[11,"output"]]
 
 def asimilarity(model_a,model_b):
