@@ -389,26 +389,26 @@ def on_ui_tabs():
         )
 
         s_reserve.click(
-            fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
+            fn=numanager,
+            inputs=[gr.Textbox(value="reserve",visible="False"),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[numaframe]
         )
 
         s_reserve1.click(
-            fn=numaker,
-            inputs=[*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
+            fn=numanager,
+            inputs=[gr.Textbox(value="reserve",visible="False"),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[numaframe]
         )
 
         gengrid.click(
             fn=numanager,
-            inputs=[dtrue,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
+            inputs=[gr.Textbox(value="normal",visible="False"),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[dfalse,*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
+            inputs=[gr.Textbox(value=" ",visible="False"),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
