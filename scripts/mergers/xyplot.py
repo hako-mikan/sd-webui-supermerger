@@ -110,7 +110,7 @@ def numalistmaker(numa):
     for i,r in enumerate(numa):
         r[2] =  TYPES[int(r[2])]
         r[4] =  TYPES[int(r[4])]
-        numa[i] = r[0:6]+r[8:11]+r[12:16]+r[6:8]
+        numa[i] = r[0:8]+r[11:14]+r[14:18]+r[9:11]
     return numa
 
 def caster(news,hear):
