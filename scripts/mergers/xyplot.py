@@ -21,16 +21,20 @@ def freezetime():
     global state_mergen
     state_mergen = True
 
-def separator(allsets,index,sep,men,seed):
-    if sep  in men:
-        mens = men.split(sep)
-    allsets[index] = mens[0]
+def separator(allsets,index,sep,men,seed,startmode):
     if seed =="-1": allsets[30] = str(random.randrange(4294967294))
-    for men in mens[1:]:
-        numaker([*allsets[0:index],men,*allsets[index+1:]])
+    mens = men.split(sep)
+    if "reserve" not in startmode:
+        allsets[index] = mens[0]
+        for men in mens[1:]:
+            numaker([*allsets[0:index],men,*allsets[index+1:]])
+    else:
+        allsets[index] = mens[-1]
+        for men in mens[:-1]:
+            numaker([*allsets[0:index],men,*allsets[index+1:]])
     return allsets
 
-def numanager(normalstart,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
+def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
@@ -45,11 +49,13 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
                   s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size]
 
-    if sep  in xmen: allsets = separator(allsets,1,sep,xmen,seed)
-    if sep  in ymen: allsets = separator(allsets,3,sep,ymen,seed)
-    if sep  in zmen: allsets = separator(allsets,5,sep,zmen,seed)
-                        
-    if normalstart:
+    if sep in xmen: allsets = separator(allsets,1,sep,xmen,seed,startmode)
+    if sep in ymen: allsets = separator(allsets,3,sep,ymen,seed,startmode)
+    if sep in zmen: allsets = separator(allsets,5,sep,zmen,seed,startmode)
+
+    if "reserve" in startmode : return numaker(allsets)
+
+    if "normal" in startmode:
         result,currentmodel,xyimage,a,b,c= sgenxyplot(*allsets)
         if xyimage is not None:grids = xyimage
         else:print(result)
@@ -83,7 +89,7 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     return result,currentmodel,grids,a,b,c
 
-def numaker(*allsets):
+def numaker(allsets):
     global numadepth
     numadepth.append([len(numadepth)+1,"waiting",*allsets])
     return numalistmaker(copy.deepcopy(numadepth))
