@@ -263,6 +263,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     def xydealer(w,wt,awt,bwt):
         wta = awt + bwt
         nonlocal alpha,beta,seed,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,prompt
+        if "prompt" in wt:
+            prompt = w
+            return
         if pinpoint or "pinpoint element" in wt or "effective" in wt:return
         if "mbw" in wt:
             def weightser(w):return w, w.split(',',1)[0]
@@ -288,7 +291,6 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "elemental" in wt:
             deep = deep  +","+ w if "add" in wt else w
         if "calcmode" in wt:calcmode = w
-        if "prompt" in wt:prompt = w
     
     def elementdealer(xyzval,xyztype):
         return str(xyzval[blockid.index("pinpoint element")]) + ":" + str(xyzval[blockid.index("effective")])
