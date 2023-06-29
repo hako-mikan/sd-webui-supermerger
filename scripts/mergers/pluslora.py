@@ -1,3 +1,4 @@
+from random import choices
 import re
 from sklearn.linear_model import PassiveAggressiveClassifier
 import torch
@@ -15,8 +16,12 @@ from modules import  sd_models,scripts
 from scripts.mergers.model_util import load_models_from_stable_diffusion_checkpoint,filenamecutter,savemodel
 from modules.ui import create_refresh_button
 
+selectable = []
+
 def on_ui_tabs():
     import lora
+    global selectable
+    selectable = [x[0] for x in lora.available_loras.items()]
     sml_path_root = scripts.basedir()
     LWEIGHTSPRESETS="\
     NONE:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n\
@@ -59,16 +64,23 @@ def on_ui_tabs():
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
             precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
         with gr.Row().style(equal_height=False):
-          sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",*[2**(x+2) for x in range(9)]],value = "no",type = "value") 
-          sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
+            sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",*[2**(x+2) for x in range(9)]],value = "no",type = "value") 
+            sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
         sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True)
         sml_dims = gr.CheckboxGroup(label = "limit dimension",choices=[],value = [],type="value",interactive=True,visible = False)
         with gr.Row().style(equal_height=False):
-          sml_calcdim = gr.Button(elem_id="calcloras", value="calculate dimension of LoRAs(It may take a few minutes if there are many LoRAs)",variant='primary')
-          sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
-          sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
-        sml_loras = gr.CheckboxGroup(label = "Lora",choices=[x[0] for x in lora.available_loras.items()],type="value",interactive=True,visible = True)
+            sml_calcdim = gr.Button(elem_id="calcloras", value="calculate dimension of LoRAs(It may take a few minutes if there are many LoRAs)",variant='primary')
+            sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
+            sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
+
+        with gr.Row():
+            sml_selectall = gr.Button(elem_id="sml_selectall", value="select all",variant='primary')
+            sml_deselectall = gr.Button(elem_id="slm_deselectall", value="deselect all",variant='primary')
+        sml_loras = gr.CheckboxGroup(label = "Lora",choices = selectable,type="value",interactive=True,visible = True)
         sml_loraratios = gr.TextArea(label="",value=sml_lbwpresets,visible =True,interactive  = True)  
+
+        sml_selectall.click(fn = lambda x:gr.update(value = selectable),outputs = [sml_loras])
+        sml_deselectall.click(fn = lambda x:gr.update(value =[]),outputs = [sml_loras])
 
         sml_merge.click(
             fn=lmerge,
@@ -92,10 +104,18 @@ def on_ui_tabs():
         dn = []
 
         def updateloras():
-          lora.list_available_loras()
-          for n in  lora.available_loras.items():
-            if n[0] not in llist:llist[n[0]] = ""
-          return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
+            lora.list_available_loras()
+            names = []
+            dels = []
+            for n in  lora.available_loras.items():
+                if n[0] not in llist:llist[n[0]] = ""
+                names.append(n[0])
+            for l in list(llist.keys()):
+                if l not in names:llist.pop(l)
+
+            global selectable
+            selectable = [f"{x[0]}({x[1]})" for x in llist.items()]
+            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
 
         sml_update.click(fn = updateloras,outputs = [sml_loras])
 
@@ -114,6 +134,8 @@ def on_ui_tabs():
                     elif d not in dn: dn.append(d)
                 llist[n[0]] = d
             dlist.sort()
+            global selectable
+            selectable = [f"{x[0]}({x[1]})" for x in llist.items()]
             return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()],value =[]),gr.update(visible =True,choices = [x for x in (dlist+dn)])
 
         sml_calcdim.click(
@@ -123,12 +145,16 @@ def on_ui_tabs():
         )
 
         def dimselector(dims):
-          if dims ==[]:return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
-          rl=[]
-          for d in dims:
-            for i in llist.items():
-              if d == i[1]:rl.append(f"{i[0]}({i[1]})")
-          return gr.update(choices = [l for l in rl],value =[])
+            if dims ==[]:return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
+            rl=[]
+            for d in dims:
+                for i in llist.items():
+                    if d == i[1]:rl.append(f"{i[0]}({i[1]})")
+
+            global selectable
+            selectable = rl.copy()
+
+            return gr.update(choices = [l for l in rl],value =[])
 
         def llister(names,ratio):
           if names ==[] : return ""
