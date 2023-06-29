@@ -83,7 +83,7 @@ def numanager(normalstart,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     return result,currentmodel,grids,a,b,c
 
-def numaker(allsets):
+def numaker(*allsets):
     global numadepth
     numadepth.append([len(numadepth)+1,"waiting",*allsets])
     return numalistmaker(copy.deepcopy(numadepth))
