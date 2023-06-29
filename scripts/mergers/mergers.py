@@ -364,7 +364,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
                 else:#Weight
                     if current_alpha == 1:
-                        caster(f"alpha = 0,model A[{key}=model B[{key}",hear)
+                        caster(f"alpha = 1,model A[{key}=model B[{key}",hear)
                         theta_0_a = theta_1[key]
                     elif current_alpha !=0:
                         caster(f"model A[{key}] +  {1-current_alpha} + * (model B)[{key}]*{alpha}",hear)
