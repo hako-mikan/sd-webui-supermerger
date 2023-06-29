@@ -113,7 +113,7 @@ def on_ui_tabs():
                         prompt = gr.Textbox(label="prompt",lines=1,value="")
                         neg_prompt = gr.Textbox(label="neg_prompt",lines=1,value="")
                         with gr.Row():
-                            sampler = gr.Dropdown(label='Sampling method', elem_id=f"sampling", choices=[" ",*[x.name for x in samplers]], value="", type="index")
+                            sampler = gr.Dropdown(label='Sampling method', elem_id=f"sampling", choices=[" ",*[x.name for x in samplers]], value=" ", type="index")
                             steps = gr.Slider(minimum=0.0, maximum=150, step=1, label='Steps',value=0, elem_id="Steps")
                             cfg = gr.Slider(minimum=0.0, maximum=30, step=0.5, label='CFG scale', value=0, elem_id="cfg")
                         with gr.Row():
