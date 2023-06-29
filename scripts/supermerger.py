@@ -61,6 +61,10 @@ def on_ui_tabs():
                     gr.HTML(value="<p>Merge models and load it for generation</p>")
 
                     with gr.Row():
+                        s_reverse= gr.Button(value="Load settings from:")
+                        mergeid = gr.Textbox(label="merged model ID (-1 for last)", elem_id="model_converter_custom_name",value = "-1")
+
+                    with gr.Row():
                         model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model A",interactive=True)
                         create_refresh_button(model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
 
@@ -82,31 +86,27 @@ def on_ui_tabs():
                         #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
 
                     with gr.Row():
-                        merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
-                        mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
-                        gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
-                        stopmerge = gr.Button(elem_id="stopmerge", value="Stop",variant='primary')
-                    with gr.Row():
-                        with gr.Column(scale = 4):
+                        with gr.Column(scale = 3):
                             save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
-                        with gr.Column(scale = 2):
-                            id_sets = gr.CheckboxGroup(["image", "PNG info"], label="write merged model ID to")
+                        with gr.Column(min_width = 50, scale = 1):
+                            id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+
                     with gr.Row():
+                        with gr.Column(min_width = 50):
+                            with gr.Row():
+                                custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
+
                         with gr.Column():
                             with gr.Row():
                                 bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
                                 create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
 
-                        with gr.Column():
-                            gr.Slider(visible=False)
 
-                    with gr.Row():      
-                        with gr.Column(min_width = 50, scale=2):
-                            with gr.Row():
-                                custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
-                                mergeid = gr.Textbox(label="merge from ID", elem_id="model_converter_custom_name",value = "-1")
-                        with gr.Column(min_width = 50, scale=1):
-                            with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
+                    with gr.Row():
+                        merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
+                        mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
+                        gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
+                        stopmerge = gr.Button(elem_id="stopmerge", value="Stop")
 
                     with gr.Accordion("Generation Parameters",open = False):
                         gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
@@ -184,8 +184,8 @@ def on_ui_tabs():
                     readbeta = gr.Button(elem_id="copytogen", value="read from beta",variant='primary')
                     setx = gr.Button(elem_id="copytogen", value="set to X",variant='primary')
                 with gr.Row():
-                    weights_a = gr.Textbox(label="weights for alpha, base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
-                    weights_b = gr.Textbox(label="weights,for beta, base beta,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2")
+                    weights_a = gr.Textbox(label="weights for alpha: base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
+                    weights_b = gr.Textbox(label="weights for beta: base beta,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2")
                 with gr.Row():
                     with gr.Column():
                         dd_preset_weight = gr.Dropdown(label="Load preset", choices=preset_name_list(weights_presets))
