@@ -259,7 +259,7 @@ def on_ui_tabs():
                     s_delnum = gr.Number(value=1, label="Delete num : ", interactive=True, visible = True,precision =0)
                 with gr.Row():
                     numaframe = gr.Dataframe(
-                        headers=["No.","status","xtype","xmenber", "ytype","ymenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
+                        headers=["No.","status","xtype","xmenber","ytype","ymenber","ztype","zmenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
                         row_count=5,)
             # with gr.Tab("manual"):
             #     with gr.Row():
