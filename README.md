@@ -12,7 +12,7 @@ If you met following error, version of diffusers is wrong. Downgrade to 0.14.0. 
 
 # known problem
 BASEのみを変化させたとき正常にロードされない問題が発生しているようです。保存時には正常にマージされています。  
-It seems that there is an issue where the changes to the BASE are not being loaded correctly, although they are merging successfully during the save operation.
+When only the BASE is changed, there is a problem with it not loading properly. Although they are merging successfully during the save.
 
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
