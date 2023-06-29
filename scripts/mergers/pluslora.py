@@ -156,8 +156,11 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision):
         print(_err_msg)
         return _err_msg
 
-    svd(fullpathfromname(model_a),fullpathfromname(model_b),False,dim,precision,saveto,alpha,beta)
-    return f"saved to {saveto}"
+    result = svd(fullpathfromname(model_a),fullpathfromname(model_b),False,dim,precision,saveto,alpha,beta)
+    if "ERROR" in result:
+        return result
+    else:
+        return f"saved to {saveto}"
 
 def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     import lora
@@ -447,14 +450,16 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
   save_dtype = str_to_dtype(save_precision)
 
   if model_a == model_b:
-    text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
+    text_encoder_t, _, unet_t, result = load_models_from_stable_diffusion_checkpoint(v2, model_a)
     text_encoder_o, _, unet_o = text_encoder_t, _, unet_t
   else:
     print(f"loading SD model : {model_b}")
-    text_encoder_o, _, unet_o = load_models_from_stable_diffusion_checkpoint(v2, model_b)
+    text_encoder_o, _, unet_o, result  = load_models_from_stable_diffusion_checkpoint(v2, model_b)
     
     print(f"loading SD model : {model_a}")
-    text_encoder_t, _, unet_t = load_models_from_stable_diffusion_checkpoint(v2, model_a)
+    text_encoder_t, _, unet_t, result  = load_models_from_stable_diffusion_checkpoint(v2, model_a)
+   
+  if "ERROR" in result: return result
 
   # create LoRA network to extract weights: Use dim (rank) as alpha
   lora_network_o = create_network(1.0, dim, dim, None, text_encoder_o, unet_o)
@@ -551,7 +556,7 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
 
   lora_network_o.save_weights(save_to, save_dtype, metadata)
   print(f"LoRA weights are saved to: {save_to}")
-  return save_to  
+  return "Finished"  
 
 def load_state_dict(file_name, dtype):
   if os.path.splitext(file_name)[1] == '.safetensors':

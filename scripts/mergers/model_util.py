@@ -725,7 +725,10 @@ def filenamecutter(name,model_a = False):
 def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   import diffusers
   print("diffusers version : ",diffusers.__version__)
-  print("version of diffusers must be 0.10.2 to 0.14.0")
+  version = diffusers.__version__.split(".")[1]
+  if int(version) > 14:
+    return None,None,None, f"ERROR: version of diffusers is different, use version 0.10.2 - 0.14.0, your version is {diffusers.__version__}"
+
   state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
   if dtype is not None:
     for k, v in state_dict.items():
@@ -780,7 +783,7 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
     info = text_model.load_state_dict(converted_text_encoder_checkpoint)
   print("loading text encoder:", info)
 
-  return text_model, vae, unet
+  return text_model, vae, unet, info
 
 def usemodelgen(theta_0,model_a,model_name):
   from modules import lowvram, devices, sd_hijack,shared, sd_vae
