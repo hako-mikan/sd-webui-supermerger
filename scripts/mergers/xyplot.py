@@ -315,12 +315,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             for x in xs:
                 deepy = deep
                 xydealer(x,xtype,ytype,ztype)
-                weights_a_in = weights_a
-                weights_b_in = weights_b
                 if pinpoint and "alpha" in [xtype,ytype,ztype]:
                     weights_a_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_a,"alpha")
+                    weights_b_in = weights_b
                 if pinpoint and "beta" in [xtype,ytype,ztype]:
                     weights_b_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_b,"beta")
+                    weights_a_in = weights_a
                 if "pinpoint element" in xyz or "effective" in xyz:
                     deep_in = deep + elementdealer([x,y,z],[xtype,ytype,ztype])
                 else:
