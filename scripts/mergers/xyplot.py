@@ -228,10 +228,10 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint ]
     blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
     #format ,IN00 IN03,IN04-IN09,OUT4,OUT05
-    def weightsdealer(xyzval,xyztype,weights):
+    def weightsdealer(xyzval: list,xyztype: list,weights: str, mode: str):
         caster(f"weights from : {weights}",hear)
-        ww = xyzval[blockid.index("pinpoint blocks")]
-        wa = xyzval[blockid.index("alpha")]
+        ww = xyzval[xyztype.index("pinpoint blocks")]
+        wa = xyzval[xyztype.index(mode)]
         ww = [w.strip() for w in ww.split(' ')]
         weights_t = [w.strip() for w in weights.split(',')]
         if ww[0]!="NOT":
@@ -307,12 +307,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             for x in xs:
                 deepy = deep
                 xydealer(x,xtype,ytype,ztype)
-                if pinpoint:
-                    weights_a_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_a)
-                    weights_b_in = weights_b
-                if pinpoint:
-                    weights_b_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_b)
-                    weights_a_in = weights_a
+                weights_a_in = weights_a
+                weights_b_in = weights_b
+                if pinpoint and "alpha" in [xtype,ytype,ztype]:
+                    weights_a_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_a,"alpha")
+                if pinpoint and "beta" in [xtype,ytype,ztype]:
+                    weights_b_in = weightsdealer([x,y,z],[xtype,ytype,ztype],weights_b,"beta")
                 if "pinpoint element" in xyz or "effective" in xyz:
                     deep_in = deep + elementdealer([x,y,z],[xtype,ytype,ztype])
                 else:
