@@ -772,6 +772,12 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
     p.seed_resize_from_h=0
     p.denoising_strength=None
 
+    p.cached_c = [None,None]
+    p.cached_uc = [None,None]
+
+    p.cached_hr_c = [None, None]
+    p.cached_hr_uc = [None, None]
+
     #"Restore faces", "Tiling", "Hires. fix"
 
     if "Hires. fix" in genoptions:
