@@ -163,13 +163,14 @@ def on_ui_tabs():
                 blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
         
                 with gr.Column(scale = 2):
-                    gr.HTML(value="<p>Leave it to luck!</p>")
                     currentmodel = gr.Textbox(label="Current Model",lines=1,value="")  
                     submit_result = gr.Textbox(label="Message")
                     mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
                     with gr.Accordion("Let the Dice roll",open = False,visible=True):    
                         with gr.Row():
-                            luckmode = gr.Radio(label = "Luck Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
+                            gr.HTML(value="<p>R:0 - 0, U: -0.5-1.5</p>")
+                            luckmode = gr.Radio(label = "Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
+                        with gr.Row():
                             lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta"],value=["alpha"],type="value",interactive=True)
                         with gr.Row():
                             luckseed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed for Random Ratio', value=-1, elem_id="luckseed")
