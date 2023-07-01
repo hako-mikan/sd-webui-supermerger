@@ -160,6 +160,17 @@ U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R
 U,0,0,0,0,0,0,0,0,0,0,0,0,ER,0,0,0,0,0,0,X,0,0,0,0,0
 ```
 
+### XYZ Mode
+You can use the XYZ mode by setting the `type` to `random`. Enter the number of times you want to randomize, and the parameters will be set accordingly.
+
+For example:
+```
+X type: seed, -1, -1, -1
+Y type: random, 5
+```
+
+With this configuration, a 3x5 grid will be created, and the model will generate images using weights randomly set for 5 iterations. Please make sure to set the randomization option on the random panel. It will not function properly if it is set to `off`.
+
 ### About Cache
 By storing models in memory, continuous merging and other operations can be sped up.
 Cache settings can be configured from web-ui's setting menu.
