@@ -15,47 +15,76 @@ hearm = False
 
 state_mergen = False
 
+RANDCOL = 10
+NUM = "num"
+RAND = "random"
+
 numadepth = []
 
 def freezetime():
     global state_mergen
     state_mergen = True
 
-def separator(allsets,index,sep,men,seed,startmode):
-    if seed =="-1": allsets[30] = str(random.randrange(4294967294))
-    mens = men.split(sep)
-    if "reserve" not in startmode:
-        allsets[index] = mens[0]
-        for men in mens[1:]:
-            numaker([*allsets[0:index],men,*allsets[index+1:]])
-    else:
-        allsets[index] = mens[-1]
-        for men in mens[:-1]:
-            numaker([*allsets[0:index],men,*allsets[index+1:]])
-    return allsets
+def crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,start):
+    if start == RAND:
+        if lserial > RANDCOL:
+            xtype = ytype = TYPES.index(RAND)
+            xmen = RANDCOL
+            ymen = lserial // RANDCOL + 1 
+        else:
+            xtype = TYPES.index(RAND)
+            xmen = lserial
+
+    if "alpha" in lsets:
+        if "custom" in lmode:
+            weights_a = lcustom
+        else:
+            weights_a = ",".join([lmode]*26)
+
+    if "beta" in lsets:
+        if "custom" in lmode:
+            weights_b = lcustom
+        else:
+            weights_b = ",".join([lmode]*26)
+
+    return xtype,xmen,ytype,ymen,weights_a,weights_b
 
 def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
+                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
-                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size):
+                    prompt_s,nprompt_s,steps_s,sampler_s,cfg_s,seed_s,w_s,h_s,batch_size,
+                    lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom):
     global numadepth
     grids = []
     sep = "|"
 
-    allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
-                  weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                  prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                  hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
-                  s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size]
+    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom}
+    gensets = [prompt,nprompt,steps,sampler,cfg,seed,w,h]
+    gensets_s = [prompt_s,nprompt_s,steps_s,sampler_s,cfg_s,seed_s,w_s,h_s]
+    hr_sets = [hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale]
 
-    if sep in xmen: allsets = separator(allsets,1,sep,xmen,seed,startmode)
-    if sep in ymen: allsets = separator(allsets,3,sep,ymen,seed,startmode)
-    if sep in zmen: allsets = separator(allsets,5,sep,zmen,seed,startmode)
+    if RAND in startmode and "off" in lmode:return "Random mode is off",*[None]*5
+    if RAND in startmode or RAND in [xtype,ytype,ztype]:
+        lucks["on"] = True
+        xtype,xmen,ytype,ymen,weights_a,weights_b = crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,startmode)
+
+    allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
+                  weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
+                  useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
+                  gensets,hr_sets,gensets_s,batch_size,lucks]
+
+    print(xtype,xmen,ytype,ymen,weights_a,weights_b)
+
+    if RAND not in startmode:
+        if sep in xmen: allsets = separator(allsets,1,sep,xmen,seed,startmode)
+        if sep in ymen: allsets = separator(allsets,3,sep,ymen,seed,startmode)
+        if sep in zmen: allsets = separator(allsets,5,sep,zmen,seed,startmode)
 
     if "reserve" in startmode : return numaker(allsets)
 
-    if "normal" in startmode:
+    if "normal" or RAND in startmode:
         result,currentmodel,xyimage,a,b,c= sgenxyplot(*allsets)
         if xyimage is not None:grids = xyimage
         else:print(result)
@@ -89,6 +118,19 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     return result,currentmodel,grids,a,b,c
 
+def separator(allsets,index,sep,men,seed,startmode):
+    if seed =="-1": allsets[30] = str(random.randrange(4294967294))
+    mens = men.split(sep)
+    if "reserve" not in startmode:
+        allsets[index] = mens[0]
+        for men in mens[1:]:
+            numaker([*allsets[0:index],men,*allsets[index+1:]])
+    else:
+        allsets[index] = mens[-1]
+        for men in mens[:-1]:
+            numaker([*allsets[0:index],men,*allsets[index+1:]])
+    return allsets
+
 def numaker(allsets):
     global numadepth
     numadepth.append([len(numadepth)+1,"waiting",*allsets])
@@ -117,11 +159,9 @@ def caster(news,hear):
     if hear: print(news)
 
 def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
-                    weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
-                    prompt,nprompt,steps,sampler,cfg,seed,w,h,
-                    hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
-                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size):
+                  weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,
+                  calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
+                  gensets,hr_sets,gensets_s,batch_size,lucks):
     global hear
     esettings = " ".join(esettings)
 
@@ -142,15 +182,16 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     deepprint  = True if "print change" in esettings else False
 
     def castall(hear):
-        if hear :print(f"xmen:{xmen}, ymen:{ymen},zmen:{zmen}, xtype:{xtype}, ytype:{ytype}, ztype:{ztype} weights_a:{weights_a_in}, weights_b:{weights_b_in}, model_A:{model_a},model_B :{model_b}, model_C:{model_c}, alpha:{alpha},\
+        if hear :print(f"xmen:{xmen}, ymen:{ymen},zmen:{zmen}, xtype:{xtype}, ytype:{ytype}, ztype:{ztype}\
+        weights_a:{weights_a_in}, weights_b:{weights_b_in}, model_A:{model_a},model_B :{model_b}, model_C:{model_c}, alpha:{alpha},\
         beta :{beta}, mode:{mode}, blocks:{useblocks}")
 
     pinpoint = "pinpoint blocks" in xyz and "alpha" in xyz
 
     usebeta = modes[2] in mode or modes[3] in mode
 
-    if "prompt" in xyz: s_prompt = ""
-    if "seed" in xyz: s_seed = 0
+    if "prompt" in xyz: gensets_s[0] = ""
+    if "seed" in xyz: gensets_s[5] = 0
 
     #check and adjust format
     print(f"XY plot start, mode:{mode}, X: {xtype}, Y: {ytype}, Z: {ztype} MBW: {useblocks}")
@@ -162,14 +203,14 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     if model_a ==[] and "model_A" not in xyz:return f"ERROR: model_A is not selected",*None5
     if model_b ==[] and "model_B" not in xyz:return f"ERROR: model_B is not selected",*None5
     if model_c ==[] and usebeta and "model_C" not in xyz:return "ERROR: model_C is not selected",*None5
-    if xtype == ytype and xtype != "add elemental": return "ERROR: same type selected for X,Y",*None5
+    if xtype == ytype and not (xtype == "add elemental" or xtype == RAND): return "ERROR: same type selected for X,Y",*None5
 
     if useblocks:
         weights_a_in=wpreseter(weights_a,wpresets)
         weights_b_in=wpreseter(weights_b,wpresets)
 
     #for X only plot, use same seed
-    if seed == -1: seed = int(random.randrange(4294967294))
+    if gensets[5] == -1: gensets[5] = int(random.randrange(4294967294))
 
     #for XY plot, use same seed
     def dicedealer(zs):
@@ -187,6 +228,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 caster(ws,hear)
         elif "elemental" in wtype:
             ws = wmen.split("\n\n")
+        elif RAND in wtype:
+            ws = [""] * int(wmen)
         else:
             if "pinpoint element" in wtype:
                 wmen = wmen.replace("\n",",")
@@ -224,7 +267,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         print(f"MBW mode enabled")
 
     xcount = ycount = zcount = 0
-    allcount = len(xs)*len(ys)*len(zs)
+    allcount = len(xs)*len(ys)*len(zs) if not lucks["on"] else lucks["num"]
 
     #for STOP XY bottun
     flag = False
@@ -268,9 +311,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     def xydealer(w,wt,awt,bwt):
         wta = awt + bwt
-        nonlocal alpha,beta,seed,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,prompt
+        nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode
         if "prompt" in wt:
-            prompt = w
+            gensets[0] = w
             return
         if pinpoint or "pinpoint element" in wt or "effective" in wt:return
         if "mbw" in wt:
@@ -278,19 +321,17 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             if "mbw alpha and beta" in wt:
                 weights_a_in,alpha = weightser(wpreseter(w[0],wpresets))
                 weights_b_in,beta = weightser(wpreseter(w[1],wpresets))
-                return
             elif "alpha" in wt:
                 weights_a_in,alpha = weightser(wpreseter(w,wpresets))
-                return
             else:
                 weights_b_in,beta = weightser(wpreseter(w,wpresets))
-                return
-        if "and" in wt:
+            return
+        if "alpha and" in wt:
             alpha,beta = abdealer(w)
             return
         if "alpha" in wt and not ("pinpoint element" in wta or "effective" in wta):alpha = w
         if "beta" in wt: beta = w
-        if "seed" in wt:seed = int(w)
+        if "seed" in wt:gensets[5] = int(w)
         if "model_A" in wt:model_a = w
         if "model_B" in wt:model_b = w
         if "model_C" in wt:model_c = w
@@ -329,19 +370,20 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount})")
                 if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
-                                                                                        useblocks,"","",id_sets,False,deep_in,tensor,bake_in_vae,deepprint = deepprint) 
+                                                                                        useblocks,"","",id_sets,False,deep_in,tensor,bake_in_vae,deepprint = deepprint,lucks = lucks) 
                     usemodelgen(theta_0,model_a,currentmodel)
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
-                                # simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,mergeinfo="",id_sets=[],modelid = "no id"):
-                image_temp = simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
-                                       s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,currentmodel,id_sets,modelid)
+
+                image_temp = simggen(*gensets,*hr_sets,*gensets_s,batch_size,currentmodel,id_sets,modelid)
+                
                 xyimage.append(image_temp[0][0])
                 xcount+=1
                 deep = deepy
                 if state_mergen:
                     flag = True
                     break
+            if lucks["on"] and (len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1) >= lucks["num"]:flag = True
             ycount+=1
             if flag:break
 
