@@ -42,7 +42,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     hr_sets = [hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale]
 
     if RAND in startmode and "off" in lmode:return "Random mode is off",*[None]*5
-    if RAND in startmode or RAND in [xtype,ytype,ztype]:
+    if RAND in startmode or TYPES.index(RAND) in [xtype,ytype,ztype]:
         lucks["on"] = True
         xtype,xmen,ytype,ymen,weights_a,weights_b = crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,startmode)
 

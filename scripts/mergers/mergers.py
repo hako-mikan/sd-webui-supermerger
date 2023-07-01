@@ -779,7 +779,7 @@ def randdealer(w:str,randomer,ab,lucks,deep):
         if r.strip() =="R":
             out.append(str(round(randomer[i+add],3)))
         elif r.strip() == "U":
-            out.append(str(round(-2 * randomer[i+add] + 1,3)))
+            out.append(str(round(-2 * randomer[i+add] + 1.5,3)))
         elif r.strip() == "X":
             out.append(str(round((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),3)))
         elif "E" in r:
