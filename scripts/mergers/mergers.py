@@ -841,13 +841,12 @@ def blocker(blocks):
         changer = True
         if "-" in w:
             wt = [wt.strip() for wt in w.split('-')]
-            if  blockid.index(wt[1]) > blockid.index(wt[0]):
-                flagger[blockid.index(wt[0]):blockid.index(wt[1])+1] = [changer]*(blockid.index(wt[1])-blockid.index(wt[0])+1)
+            if  BLOCKID.index(wt[1]) > BLOCKID.index(wt[0]):
+                flagger[BLOCKID.index(wt[0]):BLOCKID.index(wt[1])+1] = [changer]*(BLOCKID.index(wt[1])-BLOCKID.index(wt[0])+1)
             else:
-                flagger[blockid.index(wt[1]):blockid.index(wt[0])+1] = [changer]*(blockid.index(wt[0])-blockid.index(wt[1])+1)
+                flagger[BLOCKID.index(wt[1]):BLOCKID.index(wt[0])+1] = [changer]*(BLOCKID.index(wt[0])-BLOCKID.index(wt[1])+1)
         else:
-            output = output + " " + w if output != "" else w
-            return output
+            output = output + " " + w if output else w
         for i in range(26):
-            if flagger[i]: output = output + " " + blockid[i] if output !="" else blockid[i]
-        return output
+            if flagger[i]: output = output + " " + BLOCKID[i] if output else BLOCKID[i]
+    return output
