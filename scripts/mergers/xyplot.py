@@ -25,30 +25,6 @@ def freezetime():
     global state_mergen
     state_mergen = True
 
-def crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,start):
-    if start == RAND:
-        if lserial > RANDCOL:
-            xtype = ytype = TYPES.index(RAND)
-            xmen = RANDCOL
-            ymen = lserial // RANDCOL + 1 
-        else:
-            xtype = TYPES.index(RAND)
-            xmen = lserial
-
-    if "alpha" in lsets:
-        if "custom" in lmode:
-            weights_a = lcustom
-        else:
-            weights_a = ",".join([lmode]*26)
-
-    if "beta" in lsets:
-        if "custom" in lmode:
-            weights_b = lcustom
-        else:
-            weights_b = ",".join([lmode]*26)
-
-    return xtype,xmen,ytype,ymen,weights_a,weights_b
-
 def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                     useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
@@ -587,3 +563,27 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
         outs = [imgs[0]]*len(diffs)  + imgs[1:]+ diffs
         ss = ["source",ss[0],"diff"]
         return outs,ls,ss
+
+def crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,start):
+    if start == RAND:
+        if lserial > RANDCOL:
+            xtype = ytype = TYPES.index(RAND)
+            xmen = RANDCOL
+            ymen = lserial // RANDCOL + 1 
+        else:
+            xtype = TYPES.index(RAND)
+            xmen = lserial
+
+    if "alpha" in lsets:
+        if "custom" in lmode:
+            weights_a = lcustom
+        else:
+            weights_a = ",".join([lmode]*26)
+
+    if "beta" in lsets:
+        if "custom" in lmode:
+            weights_b = lcustom
+        else:
+            weights_b = ",".join([lmode]*26)
+
+    return xtype,xmen,ytype,ymen,weights_a,weights_b
