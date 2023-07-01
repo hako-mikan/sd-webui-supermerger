@@ -135,6 +135,31 @@ Inputing "0.1,0.2,0.3,0.4,0.5|0.6,0.7,0.8,0.9,1.0"
 0.6,0.7,0.8,0.9,1.0  
 The grid is divided into two reservations, "0.1,0.2,0.3,0.4,0.5" and "0.6,0.7,0.8,0.9,1.0" executed. This may be useful when there are too many elements and the grid becomes too large.
 
+# Random Merge
+Determines the merge ratio randomly.
+
+## Usage
+Select the `Random Mode` and press `Run Rand` to generate images with randomly set weights for the number of challenges specified by `Num of challenge`. The generation operates in XYZ mode, so the `STOP` button is effective. At that time, please set `Seed for Random Ratio` to `-1`. Using the same seed ensures reproducibility. If the number of generations exceeds 10, the grid will automatically become two-dimensional. Checking the `alpha` and `beta` in `Settings` will randomize them. For Elemental, `beta` will be disabled.
+
+## Modes
+### R, U, X
+Random weights are set for all 26 blocks. The difference between `R`, `U`, and `X` is the range of random values. For X, specify `lower limit` to `upper limit` for each layer.
+R: 0 ~ 1
+U: -0.5 ~ 1.5
+X: lower limit ~ upper limit
+
+### ER, EU, EX
+Random weights are set for all Elementals. The difference between `ER`, `EU`, and `EX` is the range of random values. For X, specify `lower limit` to `upper limit` for each layer.
+
+### Custom
+Specifies the hierarchical level to be randomized. Specify it as `custom`.
+You can use `R`, `U`, `X`, `ER`, `EU`, and `EX`.
+Example:
+```
+U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R
+U,0,0,0,0,0,0,0,0,0,0,0,0,ER,0,0,0,0,0,0,X,0,0,0,0,0
+```
+
 ### About Cache
 By storing models in memory, continuous merging and other operations can be sped up.
 Cache settings can be configured from web-ui's setting menu.
