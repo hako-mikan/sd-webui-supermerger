@@ -168,8 +168,9 @@ def on_ui_tabs():
                     mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
                     with gr.Accordion("Let the Dice roll",open = False,visible=True):    
                         with gr.Row():
-                            gr.HTML(value="<p>R:0 - 0, U: -0.5-1.5</p>")
-                            luckmode = gr.Radio(label = "Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
+                            gr.HTML(value="<p>R:0~1, U: -0.5~1.5</p>")
+                        with gr.Row():
+                            luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
                         with gr.Row():
                             lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta"],value=["alpha"],type="value",interactive=True)
                         with gr.Row():
