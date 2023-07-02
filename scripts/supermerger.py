@@ -172,9 +172,10 @@ def on_ui_tabs():
                         with gr.Row():
                             luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
                         with gr.Row():
-                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta"],value=["alpha"],type="value",interactive=True)
+                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta","save E-list"],value=["alpha"],type="value",interactive=True)
                         with gr.Row():
                             luckseed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed for Random Ratio', value=-1, elem_id="luckseed")
+                            luckround = gr.Number(minimum=1, maximum=4294967295, step=1, label='Round', value=3, elem_id="luckround")
                             luckserial = gr.Number(minimum=1, maximum=4294967295, step=1, label='Num of challenge', value=1, elem_id="luckchallenge")
                         with gr.Row():  
                             luckcustom = gr.Textbox(label="custom",value = "U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R")
@@ -372,7 +373,7 @@ def on_ui_tabs():
         xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
         hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
-        lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom]
+        lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom,luckround]
 
         setdefault.click(fn = configdealer,
             inputs =[*genparams,*hiresfix[1:],dfalse],
@@ -427,13 +428,13 @@ def on_ui_tabs():
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[gr.Textbox(value=" ",visible="False"),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value=" ",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         rand_merge.click(
             fn=numanager,
-            inputs=[gr.Textbox(value="random",visible="False"),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value="random",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
