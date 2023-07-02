@@ -160,6 +160,10 @@ U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R
 U,0,0,0,0,0,0,0,0,0,0,0,0,ER,0,0,0,0,0,0,X,0,0,0,0,0
 ```
 
+### Settings
+- `round` sets the decimal places for rounding. With the initial value of 3, it becomes 0.123.
+- `save E-list` saves the key and ratio of Elemental in csv format to `script/data/`.
+
 ### XYZ Mode
 You can use the XYZ mode by setting the `type` to `random`. Enter the number of times you want to randomize, and the parameters will be set accordingly.
 
