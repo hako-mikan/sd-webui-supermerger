@@ -58,10 +58,10 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,
-                       lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,
+                       lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
                        currentmodel,imggen):
 
-    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom}
+    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
 
     deepprint  = True if "print change" in esettings else False
 
@@ -97,7 +97,7 @@ BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","
 RANDMAP = [0,50,100] #alpha,beta,elements
 
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint, lucks):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint,lucks):
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge
     stopmerge = False
@@ -268,6 +268,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
 
+    keyratio = []
+
     for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
         if "model" in key and key in theta_1:
@@ -359,6 +361,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         dr = eratiodealer(dr,randomer,weight_index+1,num,lucks)
                         if deepprint :print(dbs,dws,key,dr)
                         current_alpha = dr
+            
+            keyratio.append([key,current_alpha, current_beta])
 
             if calcmode == "normal":
                 if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
@@ -556,6 +560,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         del vae_dict
 
     modelid = rwmergelog(currentmodel,mergedmodel)
+    if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
 
     caster(mergedmodel,False)
 
@@ -699,6 +704,20 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             out = "ERROR: OUT of ID index"
         return out
 
+def saveekeys(keyratio,modelid):
+    import csv
+    path_root = scripts.basedir()
+    dir_path = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "data")
+
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    
+    filepath = os.path.join(dir_path,f"{modelid}.csv")
+
+    with open(filepath, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(keyratio)
+
 def get_font(fontsize):
     path_root = scripts.basedir()
     fontpath = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "Roboto-Regular.ttf")
@@ -777,11 +796,11 @@ def randdealer(w:str,randomer,ab,lucks,deep):
     add = RANDMAP[ab]
     for i, r in enumerate (w.split(",")):
         if r.strip() =="R":
-            out.append(str(round(randomer[i+add],3)))
+            out.append(str(round(randomer[i+add],lucks["round"])))
         elif r.strip() == "U":
-            out.append(str(round(-2 * randomer[i+add] + 1.5,3)))
+            out.append(str(round(-2 * randomer[i+add] + 1.5,lucks["round"])))
         elif r.strip() == "X":
-            out.append(str(round((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),3)))
+            out.append(str(round((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),lucks["round"])))
         elif "E" in r:
             key = r.strip().replace("E","")
             outd[key].append(BLOCKID[i])
@@ -799,11 +818,11 @@ def eratiodealer(dr,randomer,block,num,lucks):
         up,low = (up.split(","),low.split(","))
         add = RANDMAP[2]
         if dr.strip() =="R":
-            return round(randomer[num+add],3)
+            return round(randomer[num+add],lucks["round"])
         elif dr.strip() == "U":
-            return round(-2 * randomer[num+add] + 1,3)
+            return round(-2 * randomer[num+add] + 1,lucks["round"])
         elif dr.strip() == "X":
-            return round((float(low[block])-float(up[block]))* randomer[num+add] + float(up[block]),3)
+            return round((float(low[block])-float(up[block]))* randomer[num+add] + float(up[block]),lucks["round"])
     else:
         return float(dr)
 

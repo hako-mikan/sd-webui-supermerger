@@ -31,19 +31,19 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     prompt,nprompt,steps,sampler,cfg,seed,w,h,
                     hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
                     prompt_s,nprompt_s,steps_s,sampler_s,cfg_s,seed_s,w_s,h_s,batch_size,
-                    lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom):
+                    lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround):
     global numadepth
     grids = []
     sep = "|"
 
-    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom}
+    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
     gensets = [prompt,nprompt,steps,sampler,cfg,seed,w,h]
     gensets_s = [prompt_s,nprompt_s,steps_s,sampler_s,cfg_s,seed_s,w_s,h_s]
     hr_sets = [hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale]
 
     if RAND in startmode and "off" in lmode:return "Random mode is off",*[None]*5
     if RAND in startmode or TYPES.index(RAND) in [xtype,ytype,ztype]:
-        lucks["on"] = True
+        lucks["on"] = startmode == RAND
         xtype,xmen,ytype,ymen,weights_a,weights_b = crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,startmode)
 
     allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
@@ -359,7 +359,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 if state_mergen:
                     flag = True
                     break
-            if lucks["on"] and (len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1) >= lucks["num"]:flag = True
+            if lucks["on"] and (len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1) >= lucks["num"]: flag = True
             ycount+=1
             if flag:break
 
