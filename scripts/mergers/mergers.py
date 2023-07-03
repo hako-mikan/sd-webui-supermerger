@@ -24,6 +24,11 @@ from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 
 from inspect import currentframe
 
+from math import ceil
+from multiprocessing import cpu_count
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 stopmerge = False
 
 def freezemtime():
@@ -252,6 +257,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
 
+    key_and_alpha = {}
+
     for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
         if "model" in key and key in theta_1:
@@ -436,6 +443,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 # Add the filtered differences to the original weights
                 theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
 
+            elif calcmode == "smoothAdd MT":
+                key_and_alpha[key] = current_alpha
+
             elif calcmode == "tensor":
                 dim = theta_0[key].dim()
                 if dim == 0 : continue
@@ -514,6 +524,15 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
                     theta_0[key] = theta_t
 
+    if calcmode == "smoothAdd MT":
+        # setting threads to higher than 8 doesn't significantly affect the time for merging
+        threads = cpu_count()
+        tasks_per_thread = 8
+
+        theta_0, theta_1, stopped = multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear)
+        if stopped:
+            return "STOPPED", *non4
+
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
 
     for key in tqdm(theta_1.keys(), desc="Stage 2/2"):
@@ -583,6 +602,58 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
 
     return "",currentmodel,modelid,theta_0,metadata
+
+def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear):  
+    lock_theta_0 = Lock()
+    lock_theta_1 = Lock()
+    lock_progress = Lock()
+
+    def thread_callback(keys):
+        nonlocal theta_0, theta_1
+        
+        if stopmerge:
+            return False
+
+        for key in keys:
+            caster(f"model A[{key}] +  {key_and_alpha[key]} + * (model B - model C)[{key}]", hear)
+            filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
+            filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
+            with lock_theta_1:
+                theta_1[key] = torch.tensor(filtered_diff)
+            with lock_theta_0:
+                theta_0[key] = theta_0[key] + key_and_alpha[key] * theta_1[key]
+        
+        with lock_progress:
+            progress.update(len(keys))
+        
+        return True
+
+    def extract_and_remove(input_list, count):
+        extracted = input_list[:count]
+        del input_list[:count]
+
+        return extracted
+
+    keys = list(key_and_alpha.keys())
+
+    total_threads = ceil(len(keys) / int(tasks_per_thread))
+    print(f"max threads = {threads}, total threads = {total_threads}, tasks per thread = {tasks_per_thread}")
+
+    progress = tqdm(key_and_alpha.keys(), desc="smoothAdd MT")
+
+    futures = []
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        futures = [executor.submit(thread_callback, extract_and_remove(keys, int(tasks_per_thread))) for i in range(total_threads)]
+            
+        for future in as_completed(futures):
+            if not future.result():
+                executor.shutdown()
+                return theta_0, theta_1, True
+        
+        del progress
+
+    return theta_0, theta_1, False
+
 def forkforker(filename):
     try:
         return sd_models.read_state_dict(filename,"cuda")
