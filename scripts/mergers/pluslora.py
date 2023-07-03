@@ -1091,6 +1091,7 @@ class LoRANetwork(torch.nn.Module):
         # create module instances
         def create_modules(prefix, root_module: torch.nn.Module, target_replace_modules) -> List[LoRAModule]:
             loras = []
+            processed = {}
             for name, module in root_module.named_modules():
                 if module.__class__.__name__ in target_replace_modules:
                     # TODO get block index here
@@ -1101,6 +1102,9 @@ class LoRANetwork(torch.nn.Module):
                         if is_linear or is_conv2d:
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
+                            if lora_name in processed:
+                                continue
+                            processed[lora_name] = True
 
                             if modules_dim is not None:
                                 if lora_name not in modules_dim:
