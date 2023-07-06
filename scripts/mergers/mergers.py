@@ -21,6 +21,10 @@ from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded
 from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
+from math import ceil
+from multiprocessing import cpu_count
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from inspect import currentframe
 
@@ -31,8 +35,9 @@ def freezemtime():
     stopmerge = True
 
 mergedmodel=[]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","tensors","calcmode","prompt","random"]
-TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","tensor","calcmode","prompt","random"]
+FINETUNEX = ["IN","OUT","OUT2","CONT","COL1","COL2","COL3"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","finetune","pinpoint finetune (IN,OUT,OUT2,CONT,COL1,COL2,,COL3)","calcmode","prompt","random"]
+TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","finetune","pinpoint finetune","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
@@ -62,7 +67,6 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
                        currentmodel,imggen):
 
     lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
-
     deepprint  = True if "print change" in esettings else False
 
     result,currentmodel,modelid,theta_0,metadata = smerge(
@@ -96,12 +100,15 @@ BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","
 
 RANDMAP = [0,50,100] #alpha,beta,elements
 
+statistics = {"sum":{},"mean":{},"max":{},"min":{}}
+
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint,lucks):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks):
     caster("merge start",hearm)
-    global hear,mergedmodel,stopmerge
+    global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
 
+    # finetune
     gc.collect()
 
     # for from file
@@ -140,11 +147,15 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"]].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine].copy()
 
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
+
+    if fine:
+        fine = [float(t) for t in fine.split(",")]
+        fine = fineman(fine)
 
     caster(mergedmodel,False)
 
@@ -155,8 +166,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     result_is_inpainting_model = False
     result_is_instruct_pix2pix_model = False
 
+    #elementals
     if len(deep) > 0:
         deep = deep.replace("\n",",")
+        deep = deep.replace(calcmode+",","")
         deep = deep.split(",")
 
     #format check
@@ -190,6 +203,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  CalcMode \t: {calcmode}")
     print(f"  Elemental \t: {deep}")
     print(f"  Weights Seed\t: {lucks['ceed']}")
+    print(f"  Finetune \t: {fine}")
 
     theta_1=load_model_weights_m(model_b,False,True,save).copy()
 
@@ -269,6 +283,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
 
     keyratio = []
+    key_and_alpha = {}
 
     for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
@@ -361,8 +376,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         dr = eratiodealer(dr,randomer,weight_index+1,num,lucks)
                         if deepprint :print(dbs,dws,key,dr)
                         current_alpha = dr
-            
+
             keyratio.append([key,current_alpha, current_beta])
+            #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
 
             if calcmode == "normal":
                 if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
@@ -456,6 +472,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 # Add the filtered differences to the original weights
                 theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
 
+            elif calcmode == "smoothAdd MT":
+                key_and_alpha[key] = current_alpha
+
             elif calcmode == "tensor":
                 dim = theta_0[key].dim()
                 if dim == 0 : continue
@@ -534,6 +553,27 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
                     theta_0[key] = theta_t
 
+            if any(item in key for item in FINETUNES) and fine:
+                index = FINETUNES.index(key)
+                print(key,fine[index])
+                if 5 > index : 
+                    theta_0[key] =theta_0[key]* fine[index] 
+                else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
+
+            # statistics["sum"][key] = [torch.sum(theta_0[key]).item()] if key not in statistics["sum"].keys() else statistics["sum"][key] + [torch.sum(theta_0[key]).item()]
+            # statistics["mean"][key] = [torch.mean(theta_0[key]).item()] if key not in statistics["mean"].keys() else statistics["mean"][key] + [torch.mean(theta_0[key]).item()]
+            # statistics["max"][key] = [torch.max(theta_0[key]).item()] if key not in statistics["max"].keys() else statistics["max"][key] + [torch.max(theta_0[key]).item()]
+            # statistics["min"][key] = [torch.min(theta_0[key]).item()] if key not in statistics["min"].keys() else statistics["min"][key] + [torch.min(theta_0[key]).item()]
+
+    if calcmode == "smoothAdd MT":
+        # setting threads to higher than 8 doesn't significantly affect the time for merging
+        threads = cpu_count()
+        tasks_per_thread = 8
+
+        theta_0, theta_1, stopped = multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear)
+        if stopped:
+            return "STOPPED", *non4
+
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
 
     for key in tqdm(theta_1.keys(), desc="Stage 2/2"):
@@ -604,6 +644,58 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
 
     return "",currentmodel,modelid,theta_0,metadata
+
+
+def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear):  
+    lock_theta_0 = Lock()
+    lock_theta_1 = Lock()
+    lock_progress = Lock()
+
+    def thread_callback(keys):
+        nonlocal theta_0, theta_1
+
+        if stopmerge:
+            return False
+
+        for key in keys:
+            caster(f"model A[{key}] +  {key_and_alpha[key]} + * (model B - model C)[{key}]", hear)
+            filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
+            filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
+            with lock_theta_1:
+                theta_1[key] = torch.tensor(filtered_diff)
+            with lock_theta_0:
+                theta_0[key] = theta_0[key] + key_and_alpha[key] * theta_1[key]
+
+        with lock_progress:
+            progress.update(len(keys))
+
+        return True
+
+    def extract_and_remove(input_list, count):
+        extracted = input_list[:count]
+        del input_list[:count]
+
+        return extracted
+
+    keys = list(key_and_alpha.keys())
+
+    total_threads = ceil(len(keys) / int(tasks_per_thread))
+    print(f"max threads = {threads}, total threads = {total_threads}, tasks per thread = {tasks_per_thread}")
+
+    progress = tqdm(key_and_alpha.keys(), desc="smoothAdd MT")
+
+    futures = []
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        futures = [executor.submit(thread_callback, extract_and_remove(keys, int(tasks_per_thread))) for i in range(total_threads)]
+
+        for future in as_completed(futures):
+            if not future.result():
+                executor.shutdown()
+                return theta_0, theta_1, True
+
+        del progress
+
+    return theta_0, theta_1, False
 
 def forkforker(filename):
     try:
@@ -717,6 +809,11 @@ def saveekeys(keyratio,modelid):
     with open(filepath, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(keyratio)
+
+def savestatics(modelid):
+    for key in statistics.keys():
+        result = [[tkey] + list(statistics[key][tkey]) for tkey in statistics[key].keys()]
+        saveekeys(result,f"{modelid}_{key}")
 
 def get_font(fontsize):
     path_root = scripts.basedir()
@@ -926,3 +1023,24 @@ def blocker(blocks):
         for i in range(26):
             if flagger[i]: output = output + " " + BLOCKID[i] if output else BLOCKID[i]
     return output
+
+def fineman(fine):
+    fine = [
+        1 - fine[0] * 0.01,
+        1+ fine[0] * 0.02,
+        1 - fine[1] * 0.01,
+        1+ fine[1] * 0.02,
+        1 - fine[2] * 0.01,
+        [x*0.02 for x in fine[3:]]
+                ]
+    return fine
+
+FINETUNES = [
+"model.diffusion_model.input_blocks.0.0.weight",
+"model.diffusion_model.input_blocks.0.0.bias",
+"model.diffusion_model.out.0.weight",
+"model.diffusion_model.out.0.bias",
+"model.diffusion_model.out.2.weight",
+"model.diffusion_model.out.2.bias",
+]
+
