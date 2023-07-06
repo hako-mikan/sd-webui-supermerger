@@ -5,17 +5,6 @@
 ### English / 日本語
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
-## Important: making/extracting LoRA
-If you met following error, version of diffusers is wrong. Downgrade to 0.14.0. How to downgrade is depending on your environment. Search it out on your own.
- 
-`AssertionError: duplicated lora name: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q`
-
-
-# ~~known problem~~
-~~BASEのみを変化させたとき正常にロードされない問題が発生しているようです。保存時には正常にマージされています。~~  
-~~When only the BASE is changed, there is a problem with it not loading properly. Although they are merging successfully during the save.~~
-修正しました。web-uiの更新によって発生していたようです。現象としてはBASEとプロンプトが変更されない場合、プロンプトをテキストエンコーダーに通した結果を使い回していたようです。
-
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
