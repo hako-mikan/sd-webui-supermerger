@@ -18,7 +18,8 @@ from modules.ui import create_output_panel, create_refresh_button
 import scripts.mergers.mergers
 import scripts.mergers.pluslora
 import scripts.mergers.xyplot
-reload(scripts.mergers.mergers) # update without restarting web-ui.bat
+from importlib import reload
+reload(scripts.mergers.mergers)
 reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
@@ -81,7 +82,7 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","tensor","tensor2"], value = "normal") 
+                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -135,14 +136,13 @@ def on_ui_tabs():
                             resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
                             resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
 
-                    with gr.Accordion("Elemental Merge",open = False):
+                    with gr.Accordion("Elemental Merge, Finetune",open = False):
                         with gr.Row():
                             esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
-
-                    with gr.Accordion("Tensor Merge",open = False,visible=False):
-                        tensor = gr.Textbox(label="Blocks:Tensors",lines=2,value="")
+                        with gr.Row():    
+                            tensor = gr.Textbox(label="Finetune(IN,OUT,contarst,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
                     
                     with gr.Row():
                         x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
@@ -192,7 +192,7 @@ def on_ui_tabs():
             with gr.Row(visible = False) as row_blockids:
                 blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
             with gr.Row(visible = False) as row_calcmode:
-                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","tensor","tensor2"],type="value",interactive=True)
+                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","smoothAdd MT","tensor","tensor2"],type="value",interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
@@ -387,7 +387,7 @@ def on_ui_tabs():
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode,luckseed]
+            outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode,luckseed,tensor]
         )
 
         merge.click(
@@ -549,11 +549,10 @@ def searchhistory(words,searchmode):
 
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
 #13  deep,14 calcmode,15 luckseed
-MSETSNUM = 15
+MSETSNUM = 16
 
 def reversparams(id):
     from modules.shared import opts
-    print(opts.experimental_persistent_cond_cache)
     def selectfromhash(hash):
         for model in sd_models.checkpoint_tiles():
             if hash in model:
@@ -578,7 +577,7 @@ def reversparams(id):
     mgs[10] = [x.strip() for x in mgs[10].split(",")]
     mgs[11] = mgs[11].replace("[","").replace("]","").replace("'", "") 
     mgs[11] = [x.strip() for x in mgs[11].split(",")]
-    while len(mgs) < 14:
+    while len(mgs) < MSETSNUM:
         mgs.append("")
     mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
     mgs[14] = -1 if mgs[14] == "" else mgs[14] 
@@ -619,8 +618,9 @@ def text2slider(text):
     return [gr.update(value = float(v)) for v in vals]
 
 def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset):
-    w = find_preset_by_name(presets, preset)
-    if any(element in w for element in RANCHA):return w
+    az = find_preset_by_name(presets, preset)
+    if presets is not None and preset is not None:
+        if any(element in az for element in RANCHA):return az
     numbers = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z]
     numbers = [str(x) for x in numbers]
     return gr.update(value = ",".join(numbers) )
