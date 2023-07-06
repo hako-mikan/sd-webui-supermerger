@@ -704,10 +704,14 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
         return _err_msg
 
     print("Saving...")
-    if ext == ".safetensors":
-        safetensors.torch.save_file(state_dict, fname, metadata=metadata)
-    else:
-        torch.save(state_dict, fname)
+    try:
+      if ext == ".safetensors":
+          safetensors.torch.save_file(state_dict, fname, metadata=metadata)
+      else:
+          torch.save(state_dict, fname)
+    except:
+      print(f"ERROR: Couldn't saved:{fname}")
+      return f"ERROR: Couldn't saved:{fname}"
     print("Done!")
     return "Merged model saved in "+fname
 
@@ -725,6 +729,9 @@ def filenamecutter(name,model_a = False):
 def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   import diffusers
   print("diffusers version : ",diffusers.__version__)
+  version = diffusers.__version__.split(".")[1]
+  if int(version) > 14:
+    return None,None,None, f"ERROR: version of diffusers is different, use version 0.10.2 - 0.14.0, your version is {diffusers.__version__}"
 
   state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path)
   if dtype is not None:
