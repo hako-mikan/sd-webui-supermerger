@@ -272,7 +272,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "prompt" in wt:
             prompt = w
             return
-        if pinpoint or "pinpoint element" in wt or "effective" in wt:return
+        if "pinpoint blocks" in wt or "pinpoint element" in wt or "effective" in wt:return
         if "mbw" in wt:
             def weightser(w):return w, w.split(',',1)[0]
             if "mbw alpha and beta" in wt:
