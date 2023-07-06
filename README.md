@@ -152,6 +152,7 @@ LoCon will match reasonably well even with non-integers.
 Merge LoRAs into a model. Multiple LoRAs can be merged at the same time.  
 Enter LoRA name1:ratio1:block1,LoRA name2:ratio2:block2,... 
 LoRA can also be used alone. The ":block" part can be omitted. The ratio can be any value, including negative values. There is no restriction that the total must sum to 1 (of course, if it greatly exceeds 1, it will break down).
+To use ":block", use a block preset name from the bottom list of presets, or create your own. Ex: `LoRaname1:ratio1:ALL`
 
 ### Make LoRA
 Generates a LoRA from the difference of two models.
