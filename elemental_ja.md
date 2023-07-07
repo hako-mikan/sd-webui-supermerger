@@ -95,9 +95,7 @@ Elemental, AdjustのAdjust欄で設定します。空欄の場合無視されま
 
 #### 4.コントラスト/描き込み量
 ここを調節するとコントラストや明るさがかわり、同時に描き込み量も変わります。サンプルを見てもらった方が早いですね。
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample5.jpg)
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample4.jpg)
-　よりリアルな表現が可能になったりします。
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample3.jpg)
 
 #### 5,6,7 色調
 色調を補正できます。概ねカラーバランスに対応するようです。
