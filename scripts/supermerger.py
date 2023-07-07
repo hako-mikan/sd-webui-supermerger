@@ -136,13 +136,13 @@ def on_ui_tabs():
                             resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
                             resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
 
-                    with gr.Accordion("Elemental Merge, Finetune",open = False):
+                    with gr.Accordion("Elemental Merge, Adjust",open = False):
                         with gr.Row():
                             esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
                         with gr.Row():    
-                            tensor = gr.Textbox(label="Finetune(IN,OUT,contarst,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
+                            tensor = gr.Textbox(label="Adjust(IN,OUT,contarst,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
                     
                     with gr.Row():
                         x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
