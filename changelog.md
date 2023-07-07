@@ -1,4 +1,27 @@
 # Changelog
+update 2023.06.28.2000(JST)
+- add Image Generation Parameters(prompt,seed,etc.)  
+for Vlad fork users, use this panel
+
+update 2023.06.27.2030
+- Add new calcmode "trainDifference"[detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#trainDifference) (Thanks [SwiftIllusion](https://github.com/SwiftIllusion))
+- Add Z axis for XY plot
+- Add Analysis tab for caclrating the difference of models (thanks [Mohamed-Desouki](https://github.com/Mohamed-Desouki))
+
+update 2023.06.24.0300(JST)
+- VAE bake feature added
+- support inpainting/pix2pix  
+Thanks [wkpark](https://github.com/wkpark)
+
+update 2023.05.02.1900(JST)
+- bug fix : Resolved conflict with wildcard in dynamic prompt
+- new feature : restore face and tile option added
+
+update 2023.04.19.2030(JST)
+- New feature, optimization using cosine similarity method updated [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
+- New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
+- New XY plot type : calcmode,prompt
+
 ### bug fix 2023.02.19.2330(JST)
 いくつかのバグが修正されました
 - LOWRAMオプション有効時にエラーになる問題
