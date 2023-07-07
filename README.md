@@ -10,7 +10,7 @@ All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerg
 
 update 2023.07.07.2000(JST)
 - add new feature:[Random merge](#random-merge)
-- add new feature:[Adjust detail/colors](#https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_en.md#adjust)
+- add new feature:[Adjust detail/colors](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_en.md#adjust)
 
 ## Requirements
 - diffusers(0.10.2 to 0.14.0)
