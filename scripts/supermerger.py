@@ -142,7 +142,7 @@ def on_ui_tabs():
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
                         with gr.Row():    
-                            tensor = gr.Textbox(label="Adjust(IN,OUT,contarst,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
+                            tensor = gr.Textbox(label="Adjust(IN,OUT,contrast,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
                     
                     with gr.Row():
                         x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
