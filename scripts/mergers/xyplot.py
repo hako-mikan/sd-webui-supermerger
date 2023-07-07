@@ -207,7 +207,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     #adjust parameters, alpha,beta,models,seed: list of single parameters, mbw(no beta):list of text,mbw(usebeta); list of pair text
     def adjuster(wmen,wtype,awtype,bwtype):
-        if "mbw" in wtype or "prompt" in wtype or "finetune" == wtype:#men separated by newline
+        if "mbw" in wtype or "prompt" in wtype or "adjust" == wtype:#men separated by newline
             ws = wmen.splitlines()
             caster(ws,hear)
             if "mbw alpha and beta" in wtype:
@@ -316,7 +316,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "alpha and" in wt:
             alpha,beta = abdealer(w)
             return
-        if "alpha" in wt and not ("pinpoint element" in wta or "effective" in wta or "pinpoint finetune" in wta):alpha = w
+        if "alpha" in wt and not ("pinpoint element" in wta or "effective" in wta or "pinpoint adjust" in wta):alpha = w
         if "beta" in wt: beta = w
         if "seed" in wt:gensets[5] = int(w)
         if "model_A" in wt:model_a = w
@@ -325,14 +325,14 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "elemental" in wt:
             deep = deep  +","+ w if "add" in wt else w
         if "calcmode" in wt:calcmode = w
-        if "finetune" == wt:fine = w
+        if "adjust" == wt:fine = w
     
     def elementdealer(xyzval,xyztype):
         t = "pinpoint element" if "pinpoint element" in xyztype else "effective"
         return str(xyzval[xyztype.index(t)]) + ":" + str(xyzval[xyztype.index("alpha")])
 
     def finedealer(fine,xyzval: list,xyztype: list):
-        f = xyzval[xyztype.index("pinpoint finetune")]
+        f = xyzval[xyztype.index("pinpoint adjust")]
         a = xyzval[xyztype.index("alpha")]
         fine_in = fine.copy()
         fine_in[FINETUNEX.index(f)] = a
@@ -364,7 +364,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     deep_in = deep + "," + elementdealer(xyzv,xyzt) if deep else elementdealer(xyzv,xyzt)
                 else:
                     deep_in = deep
-                if "pinpoint finetune" in XYZ and "alpha" in XYZ:
+                if "pinpoint adjust" in XYZ and "alpha" in XYZ:
                     fine_in = finedealer(fine,xyzv,xyzt)
                 else:
                     fine_in = fine
@@ -623,5 +623,5 @@ def alldealer(mens,types):
     for i, men in enumerate(mens):
         if men == "ALL":
             if types[i] == "pinpoint blocks":mens[i] = "BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00|OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11"
-            if types[i] == "pinpoint finetune":mens[i] ="IN,OUT,OUT2,CONT,COL1,COL2,COL3" 
+            if types[i] == "pinpoint adjust":mens[i] ="IN,OUT,OUT2,CONT,COL1,COL2,COL3" 
     return mens

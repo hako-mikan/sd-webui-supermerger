@@ -36,8 +36,8 @@ def freezemtime():
 
 mergedmodel=[]
 FINETUNEX = ["IN","OUT","OUT2","CONT","COL1","COL2","COL3"]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","finetune","pinpoint finetune (IN,OUT,OUT2,CONT,COL1,COL2,,COL3)","calcmode","prompt","random"]
-TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","finetune","pinpoint finetune","calcmode","prompt","random"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,COL1,COL2,,COL3)","calcmode","prompt","random"]
+TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","adjust","pinpoint adjust","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
@@ -108,7 +108,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
 
-    # finetune
     gc.collect()
 
     # for from file
@@ -153,6 +152,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
 
+    #adjust
     if fine:
         fine = [float(t) for t in fine.split(",")]
         fine = fineman(fine)
@@ -203,7 +203,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  CalcMode \t: {calcmode}")
     print(f"  Elemental \t: {deep}")
     print(f"  Weights Seed\t: {lucks['ceed']}")
-    print(f"  Finetune \t: {fine}")
+    print(f"  Adjust \t: {fine}")
 
     theta_1=load_model_weights_m(model_b,False,True,save).copy()
 
@@ -555,7 +555,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
             if any(item in key for item in FINETUNES) and fine:
                 index = FINETUNES.index(key)
-                print(key,fine[index])
                 if 5 > index : 
                     theta_0[key] =theta_0[key]* fine[index] 
                 else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
