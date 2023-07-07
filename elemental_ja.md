@@ -1,5 +1,5 @@
 - [Elemental](#elementalmerge)
-- [Finetune](#finetune)
+- [Adjust](#adjust)
 
 # Elemental Merge
 - 階層マージを越えた階層マージです
