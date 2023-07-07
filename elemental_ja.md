@@ -65,11 +65,11 @@ elemental用のXY plotを複数用意しています。入力例はsample.txtに
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample5-1.jpg)
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample5-2.jpg)
 
-# Finetune
+# Adjust
 モデルの描き込み量や色調を補正します。LoRAとは異なる仕組みを用いています。U-Netの入出力に当たる部分を調整することで画像の描き込みや色調を調節します。
-
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample0.jpg)
 ## 使い方
-Elemental, FinetuneのFinetune欄で設定します。空欄の場合無視されます。
+Elemental, AdjustのAdjust欄で設定します。空欄の場合無視されます。
 入力は7つの数値をカンマで区切って入力して下さい。  
 ```
 0,0,0,0,0,0
@@ -79,7 +79,7 @@ Elemental, FinetuneのFinetune欄で設定します。空欄の場合無視さ�
 7つの数値は  
 1. 描き込み量/ノイズ 
 2. 描き込み量/ノイズ
-3. 描き込み量/ノイズ(基本的には使用しない)
+3. 描き込み量/ノイズ
 4. コントラスト/描き込み
 5. 色調1
 6. 色調2
@@ -87,13 +87,11 @@ Elemental, FinetuneのFinetune欄で設定します。空欄の場合無視さ�
 
 に対応します。 
 描き込み量が増えると必然的にノイズも増えることになるので気を付けてください。また、Hires.fix使用時では出力が違って見える場合があるので想定される設定で試すことをおすすめします。
-数値は大体5までの値を入れるとちょうど良いはずですがそこはモデルにも依存します。正の値を入力すると描き込みが増えたりします。色調に関しては三種類ありますがRGBなどの色コードに対応しているわけでは無くLatent特有の色指定があるようでこれは試してみるしか無いようです。
-
+数値は大体5までの値を入れるとちょうど良いはずですがそこはモデルにも依存します。正の値を入力すると描き込みが増えたりします。色調に関しては三種類あり、概ねカラーバランスに対応しているようです。
 
 #### 1.描き込み量/ノイズ
 この要素はU-Netの入り口に相当する部分です。ここを調節すると画像の描き込み量が調節できます。ここはOUTに比べて構図が変わりやすいです。マイナスにするとフラットに、そして少しぼけた感じに。プラスにすると描き込みが増えノイジーになります。通常の生成でノイジーでもhires.fixできれいになることがあるので注意してください。
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample2.jpg)
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample1.png)
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample1.jpg)
 #### 2.描き込み量/ノイズ
 U-Netの出口に相当する部分です。1と同じ効果があります。1と併用することも可能です。リアル系モデルにおいてきれいすぎてリアリティが失われてしまっているのを修正したりできるかもしれません。
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample3.jpg)
