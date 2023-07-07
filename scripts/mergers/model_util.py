@@ -692,6 +692,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
         fname = fname if ext in fname else fname +pre+ext
 
     fname = os.path.join(modeldir, fname)
+    fname = fname.replace("_x86_","(x86)")
 
     if len(fname) > 255:
        fname.replace(ext,"")
