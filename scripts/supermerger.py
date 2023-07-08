@@ -715,17 +715,11 @@ def blockfromkey(key,modeltype):
         if "first_stage_model" in key : return "VAE"
         if "model.diffusion_model" in key:
             if "model.diffusion_model.out." in key: return "OUT8"
-            block = re.findall(r'(in|middle|out)_block', key)
-            if block : block = block[0][0].upper().replace("DLE","")
-            nums = re.findall(r'\d+', key)
-            if nums:mus = []
-            print(key,block)
-            block = "".join(x.upper().replace("DLE","") for x in block[0])
-            if "transformer" in key:
-                add = re.findall(r'transformer_blocks.(\d+).',key)
-                if add and block: block = block + add[0]
-
-            return block
+            block = re.findall(r'input|mid|output', key)
+            block = block[0].upper().replace("PUT","") if block else ""
+            nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
+            add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
+            return block + nums + add
 
     return "Not Merge"
 
