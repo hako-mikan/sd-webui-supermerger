@@ -7,7 +7,6 @@ import json
 import shutil
 from importlib import reload
 from pprint import pprint
-from tkinter import W
 import gradio as gr
 from modules import (devices, script_callbacks, scripts, sd_hijack, sd_models,sd_vae, shared)
 from modules.scripts import basedir
@@ -619,7 +618,7 @@ def text2slider(text):
 
 def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset):
     az = find_preset_by_name(presets, preset)
-    if presets is not None and preset is not None:
+    if az is not None:
         if any(element in az for element in RANCHA):return az
     numbers = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z]
     numbers = [str(x) for x in numbers]
@@ -677,43 +676,69 @@ def find_preset_by_name(presets, preset):
 
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
 
-def blockfromkey(key):
-    re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
-    re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
-    re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
+def blockfromkey(key,modeltype):
+    if modeltype != "XL":
+        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
+        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
+        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
 
-    weight_index = -1
+        weight_index = -1
 
-    NUM_INPUT_BLOCKS = 12
-    NUM_MID_BLOCK = 1
-    NUM_OUTPUT_BLOCKS = 12
-    NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
+        NUM_INPUT_BLOCKS = 12
+        NUM_MID_BLOCK = 1
+        NUM_OUTPUT_BLOCKS = 12
+        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 
-    if 'time_embed' in key:
-        weight_index = -2                # before input blocks
-    elif '.out.' in key:
-        weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
-    else:
-        m = re_inp.search(key)
-        if m:
-            inp_idx = int(m.groups()[0])
-            weight_index = inp_idx
+        if 'time_embed' in key:
+            weight_index = -2                # before input blocks
+        elif '.out.' in key:
+            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
         else:
-            m = re_mid.search(key)
+            m = re_inp.search(key)
             if m:
-                weight_index = NUM_INPUT_BLOCKS
+                inp_idx = int(m.groups()[0])
+                weight_index = inp_idx
             else:
-                m = re_out.search(key)
+                m = re_mid.search(key)
                 if m:
-                    out_idx = int(m.groups()[0])
-                    weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-    return BLOCKID[weight_index+1]
+                    weight_index = NUM_INPUT_BLOCKS
+                else:
+                    m = re_out.search(key)
+                    if m:
+                        out_idx = int(m.groups()[0])
+                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
+        return BLOCKID[weight_index+1] 
+
+    
+    else:
+        if "label_emb" in key or "time_embed" in key: return "Not Merge"
+        if "conditioner.embedders" in key : return "BASE"
+        if "first_stage_model" in key : return "VAE"
+        if "model.diffusion_model" in key:
+            if "model.diffusion_model.out." in key: return "OUT8"
+            block = re.findall(r'(input|middle|output)_blocks?.(\d+\.\d+)', key)
+            print(key,block)
+            block = "".join(x.upper().replace("PUT","").replace("DLE","").replace(".","") for x in block[0])
+            if "transformer" in key:
+                add = re.findall(r'transformer_blocks.(\d+).',key)
+                if add and block: block = block + add[0]
+
+            return block
+
+    return "Not Merge"
+  
 
 def loadkeys(model_a):
     sd = loadmodel(model_a)
     keys = []
+    if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
+        modeltype = "XL"
+    else:
+        modeltype = "1.X or 2.X"
     for i, key in enumerate(sd.keys()):
-        keys.append([i,blockfromkey(key),key])
+        
+        keys.append([i,blockfromkey(key,modeltype),key])
+
     return keys
 
 def loadmodel(model):
