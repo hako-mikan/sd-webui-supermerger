@@ -709,16 +709,18 @@ def blockfromkey(key,modeltype):
                         weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
         return BLOCKID[weight_index+1] 
 
-    
     else:
         if "label_emb" in key or "time_embed" in key: return "Not Merge"
         if "conditioner.embedders" in key : return "BASE"
         if "first_stage_model" in key : return "VAE"
         if "model.diffusion_model" in key:
             if "model.diffusion_model.out." in key: return "OUT8"
-            block = re.findall(r'(input|middle|output)_blocks?.(\d+\.\d+)', key)
+            block = re.findall(r'(in|middle|out)_block', key)
+            if block : block = block[0][0].upper().replace("DLE","")
+            nums = re.findall(r'\d+', key)
+            if nums:mus = []
             print(key,block)
-            block = "".join(x.upper().replace("PUT","").replace("DLE","").replace(".","") for x in block[0])
+            block = "".join(x.upper().replace("DLE","") for x in block[0])
             if "transformer" in key:
                 add = re.findall(r'transformer_blocks.(\d+).',key)
                 if add and block: block = block + add[0]
@@ -726,18 +728,21 @@ def blockfromkey(key,modeltype):
             return block
 
     return "Not Merge"
-  
 
-def loadkeys(model_a):
-    sd = loadmodel(model_a)
-    keys = []
+def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
         modeltype = "XL"
     else:
         modeltype = "1.X or 2.X"
+    return modeltype
+
+def loadkeys(model_a):
+    sd = loadmodel(model_a)
+    keys = []
+    mtype = modeltype(sd)
     for i, key in enumerate(sd.keys()):
         
-        keys.append([i,blockfromkey(key,modeltype),key])
+        keys.append([i,blockfromkey(key,mtype),key])
 
     return keys
 
@@ -750,7 +755,6 @@ from tqdm import tqdm
 import torch
 from statistics import mean
 import csv
-import pprint
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -769,18 +773,19 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
     blocksim = {}
     blockvals = []
     attn2 = {}
+    mtype = modeltype(a)
     for bl in BLOCKID:
         blocksim[bl] = []
     blocksim["VAE"] = []
 
     if "ASim" in mode:
-        result = asimilarity(a,b)
+        result = asimilarity(a,b,mtype)
         if len(settings) > 1: savecalc(result,name,settings,True,"Asim")
         return result
     else:
         for key in tqdm(a.keys(), desc="Calculating cosine similarity"):
             block = None
-            if blockfromkey(key) == "Not Merge": continue
+            if blockfromkey(key,mtype) == "Not Merge": continue
             if "model_ema" in key: continue
             if "model" not in key:continue
             if "first_stage_model" in key and not ("VAE" in inc):
@@ -793,7 +798,7 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
                 a_flat = a[key].view(-1).to(torch.float32)
                 b_flat = b[key].view(-1).to(torch.float32)
                 simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
-                if block is None: block = blockfromkey(key)
+                if block is None: block = blockfromkey(key,mtype)
                 cosine_similarities.append([block, key, round(simab.item()*100,3)])
                 blocksim[block].append(round(simab.item()*100,3))
                 if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
@@ -867,7 +872,7 @@ def eval(model, n, input, block):
 ATTN1BLOCKS = [[1,"input"],[2,"input"],[4,"input"],[5,"input"],[7,"input"],[8,"input"],["","middle"],
 [3,"output"],[4,"output"],[5,"output"],[6,"output"],[7,"output"],[8,"output"],[9,"output"],[10,"output"],[11,"output"]]
 
-def asimilarity(model_a,model_b):
+def asimilarity(model_a,model_b,mtype):
     torch.manual_seed(2244096)
     sims = []
   
@@ -883,7 +888,7 @@ def asimilarity(model_a,model_b):
         attn_b = eval(model_b, n, rand_input, block)
 
         sim = torch.mean(torch.cosine_similarity(attn_a, attn_b))
-        sims.append([blockfromkey(key),"",round(sim.item() * 100,3)])
+        sims.append([blockfromkey(key,mtype),"",round(sim.item() * 100,3)])
         
     return sims
 
