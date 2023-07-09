@@ -5,42 +5,12 @@
 ### English / 日本語
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
-## Important: making/extracting LoRA
-If you met following error, version of diffusers is wrong. Downgrade to 0.14.0. How to downgrade is depending on your environment. Search it out on your own.
- 
-`AssertionError: duplicated lora name: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q`
-
-
-# ~~known problem~~
-~~BASEのみを変化させたとき正常にロードされない問題が発生しているようです。保存時には正常にマージされています。~~  
-~~When only the BASE is changed, there is a problem with it not loading properly. Although they are merging successfully during the save.~~
-修正しました。web-uiの更新によって発生していたようです。現象としてはBASEとプロンプトが変更されない場合、プロンプトをテキストエンコーダーに通した結果を使い回していたようです。
-
 # Recent Update
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
-update 2023.06.28.2000(JST)
-- add Image Generation Parameters(prompt,seed,etc.)  
-for Vlad fork users, use this panel
-
-update 2023.06.27.2030
-- Add new calcmode "trainDifference"[detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#trainDifference) (Thanks [SwiftIllusion](https://github.com/SwiftIllusion))
-- Add Z axis for XY plot
-- Add Analysis tab for caclrating the difference of models (thanks [Mohamed-Desouki](https://github.com/Mohamed-Desouki))
-
-update 2023.06.24.0300(JST)
-- VAE bake feature added
-- support inpainting/pix2pix  
-Thanks [wkpark](https://github.com/wkpark)
-
-update 2023.05.02.1900(JST)
-- bug fix : Resolved conflict with wildcard in dynamic prompt
-- new feature : restore face and tile option added
-
-update 2023.04.19.2030(JST)
-- New feature, optimization using cosine similarity method updated [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
-- New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
-- New XY plot type : calcmode,prompt
+update 2023.07.07.2000(JST)
+- add new feature:[Random merge](#random-merge)
+- add new feature:[Adjust detail/colors](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_en.md#adjust)
 
 ## Requirements
 - diffusers(0.10.2 to 0.14.0)
@@ -135,6 +105,46 @@ Inputing "0.1,0.2,0.3,0.4,0.5|0.6,0.7,0.8,0.9,1.0"
 0.6,0.7,0.8,0.9,1.0  
 The grid is divided into two reservations, "0.1,0.2,0.3,0.4,0.5" and "0.6,0.7,0.8,0.9,1.0" executed. This may be useful when there are too many elements and the grid becomes too large.
 
+# Random Merge
+Determines the merge ratio randomly.
+
+## Usage
+Select the `Random Mode` and press `Run Rand` to generate images with randomly set weights for the number of challenges specified by `Num of challenge`. The generation operates in XYZ mode, so the `STOP` button is effective. At that time, please set `Seed for Random Ratio` to `-1`. Using the same seed ensures reproducibility. If the number of generations exceeds 10, the grid will automatically become two-dimensional. Checking the `alpha` and `beta` in `Settings` will randomize them. For Elemental, `beta` will be disabled.
+
+## Modes
+### R, U, X
+Random weights are set for all 26 blocks. The difference between `R`, `U`, and `X` is the range of random values. For X, specify `lower limit` to `upper limit` for each layer.
+R: 0 ~ 1
+U: -0.5 ~ 1.5
+X: lower limit ~ upper limit
+
+### ER, EU, EX
+Random weights are set for all Elementals. The difference between `ER`, `EU`, and `EX` is the range of random values. For X, specify `lower limit` to `upper limit` for each layer.
+
+### Custom
+Specifies the hierarchical level to be randomized. Specify it as `custom`.
+You can use `R`, `U`, `X`, `ER`, `EU`, and `EX`.
+Example:
+```
+U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R
+U,0,0,0,0,0,0,0,0,0,0,0,0,ER,0,0,0,0,0,0,X,0,0,0,0,0
+```
+
+### Settings
+- `round` sets the decimal places for rounding. With the initial value of 3, it becomes 0.123.
+- `save E-list` saves the key and ratio of Elemental in csv format to `script/data/`.
+
+### XYZ Mode
+You can use the XYZ mode by setting the `type` to `random`. Enter the number of times you want to randomize, and the parameters will be set accordingly.
+
+For example:
+```
+X type: seed, -1, -1, -1
+Y type: random, 5
+```
+
+With this configuration, a 3x5 grid will be created, and the model will generate images using weights randomly set for 5 iterations. Please make sure to set the randomization option on the random panel. It will not function properly if it is set to `off`.
+
 ### About Cache
 By storing models in memory, continuous merging and other operations can be sped up.
 Cache settings can be configured from web-ui's setting menu.
@@ -152,6 +162,7 @@ LoCon will match reasonably well even with non-integers.
 Merge LoRAs into a model. Multiple LoRAs can be merged at the same time.  
 Enter LoRA name1:ratio1:block1,LoRA name2:ratio2:block2,... 
 LoRA can also be used alone. The ":block" part can be omitted. The ratio can be any value, including negative values. There is no restriction that the total must sum to 1 (of course, if it greatly exceeds 1, it will break down).
+To use ":block", use a block preset name from the bottom list of presets, or create your own. Ex: `LoRaname1:ratio1:ALL`
 
 ### Make LoRA
 Generates a LoRA from the difference of two models.

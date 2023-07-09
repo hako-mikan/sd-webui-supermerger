@@ -1,5 +1,5 @@
 from linecache import clearcache
-
+import random
 import os
 import gc
 import numpy as np
@@ -21,6 +21,10 @@ from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded
 from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
+from math import ceil
+from multiprocessing import cpu_count
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from inspect import currentframe
 
@@ -36,8 +40,9 @@ def freezemtime():
     stopmerge = True
 
 mergedmodel=[]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","tensors","calcmode","prompt"]
-TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","tensor","calcmode","prompt"]
+FINETUNEX = ["IN","OUT","OUT2","CONT","COL1","COL2","COL3"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,COL1,COL2,,COL3)","calcmode","prompt","random"]
+TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","adjust","pinpoint adjust","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
@@ -63,13 +68,15 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
                        prompt,nprompt,steps,sampler,cfg,seed,w,h,
                        hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,
+                       lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
                        currentmodel,imggen):
 
+    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
     deepprint  = True if "print change" in esettings else False
 
     result,currentmodel,modelid,theta_0,metadata = smerge(
                         weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint=deepprint
+                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint,lucks
                         )
 
     if "ERROR" in result or "STOPPED" in result: 
@@ -94,12 +101,16 @@ NUM_INPUT_BLOCKS = 12
 NUM_MID_BLOCK = 1
 NUM_OUTPUT_BLOCKS = 12
 NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
-blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
-     
+BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
+
+RANDMAP = [0,50,100] #alpha,beta,elements
+
+statistics = {"sum":{},"mean":{},"max":{},"min":{}}
+
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint = False):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks):
     caster("merge start",hearm)
-    global hear,mergedmodel,stopmerge
+    global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
 
     gc.collect()
@@ -109,6 +120,17 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         useblocks = True if useblocks =="True" else False
     if type(base_alpha) == str:base_alpha = float(base_alpha)
     if type(base_beta) == str:base_beta  = float(base_beta)
+
+    #random
+    if lucks != {}:
+        if lucks["seed"] == -1: lucks["ceed"] = str(random.randrange(4294967294))
+        else: lucks["ceed"] = lucks["seed"] 
+    else: lucks["ceed"]  = 0
+    np.random.seed(int(lucks["ceed"]))
+    randomer = np.random.rand(2500)
+
+    weights_a,deep = randdealer(weights_a,randomer,0,lucks,deep)
+    weights_b,_ = randdealer(weights_b,randomer,1,lucks,None)
 
     weights_a_orig = weights_a
     weights_b_orig = weights_b
@@ -129,11 +151,16 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,tensor].copy()
-    
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine].copy()
+
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
+
+    #adjust
+    if fine:
+        fine = [float(t) for t in fine.split(",")]
+        fine = fineman(fine)
 
     caster(mergedmodel,False)
 
@@ -144,8 +171,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     result_is_inpainting_model = False
     result_is_instruct_pix2pix_model = False
 
+    #elementals
     if len(deep) > 0:
         deep = deep.replace("\n",",")
+        deep = deep.replace(calcmode+",","")
         deep = deep.split(",")
 
     #format check
@@ -178,7 +207,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  MBW \t\t: {useblocks}")
     print(f"  CalcMode \t: {calcmode}")
     print(f"  Elemental \t: {deep}")
-    print(f"  Tensors \t: {tensor}")
+    print(f"  Weights Seed\t: {lucks['ceed']}")
+    print(f"  Adjust \t: {fine}")
 
     theta_1=load_model_weights_m(model_b,False,True,save).copy()
 
@@ -257,9 +287,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
 
+    keyratio = []
     key_and_alpha = {}
 
-    for key in (tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
+    for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
         if "model" in key and key in theta_1:
             if calcmode == "trainDifference":
@@ -329,7 +360,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 count_target_of_basealpha = count_target_of_basealpha + 1
 
             if len(deep) > 0:
-                skey = key + blockid[weight_index+1]
+                skey = key + BLOCKID[weight_index+1]
                 for d in deep:
                     if d.count(":") != 2 :continue
                     dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
@@ -347,9 +378,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         if dw in skey:
                             flag = not dwn
                     if flag:
-                        dr = float(dr)
+                        dr = eratiodealer(dr,randomer,weight_index+1,num,lucks)
                         if deepprint :print(dbs,dws,key,dr)
                         current_alpha = dr
+
+            keyratio.append([key,current_alpha, current_beta])
+            #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
 
             if calcmode == "normal":
                 if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
@@ -524,6 +558,17 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
                     theta_0[key] = theta_t
 
+            if any(item in key for item in FINETUNES) and fine:
+                index = FINETUNES.index(key)
+                if 5 > index : 
+                    theta_0[key] =theta_0[key]* fine[index] 
+                else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
+
+            # statistics["sum"][key] = [torch.sum(theta_0[key]).item()] if key not in statistics["sum"].keys() else statistics["sum"][key] + [torch.sum(theta_0[key]).item()]
+            # statistics["mean"][key] = [torch.mean(theta_0[key]).item()] if key not in statistics["mean"].keys() else statistics["mean"][key] + [torch.mean(theta_0[key]).item()]
+            # statistics["max"][key] = [torch.max(theta_0[key]).item()] if key not in statistics["max"].keys() else statistics["max"][key] + [torch.max(theta_0[key]).item()]
+            # statistics["min"][key] = [torch.min(theta_0[key]).item()] if key not in statistics["min"].keys() else statistics["min"][key] + [torch.min(theta_0[key]).item()]
+
     if calcmode == "smoothAdd MT":
         # setting threads to higher than 8 doesn't significantly affect the time for merging
         threads = cpu_count()
@@ -559,6 +604,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         del vae_dict
 
     modelid = rwmergelog(currentmodel,mergedmodel)
+    if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
 
     caster(mergedmodel,False)
 
@@ -610,7 +656,6 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
 
     def thread_callback(keys):
         nonlocal theta_0, theta_1
-        
         if stopmerge:
             return False
 
@@ -622,10 +667,10 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
                 theta_1[key] = torch.tensor(filtered_diff)
             with lock_theta_0:
                 theta_0[key] = theta_0[key] + key_and_alpha[key] * theta_1[key]
-        
+
         with lock_progress:
             progress.update(len(keys))
-        
+
         return True
 
     def extract_and_remove(input_list, count):
@@ -644,12 +689,10 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
     futures = []
     with ThreadPoolExecutor(max_workers=threads) as executor:
         futures = [executor.submit(thread_callback, extract_and_remove(keys, int(tasks_per_thread))) for i in range(total_threads)]
-            
         for future in as_completed(futures):
             if not future.result():
                 executor.shutdown()
                 return theta_0, theta_1, True
-        
         del progress
 
     return theta_0, theta_1, False
@@ -753,6 +796,25 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             out = "ERROR: OUT of ID index"
         return out
 
+def saveekeys(keyratio,modelid):
+    import csv
+    path_root = scripts.basedir()
+    dir_path = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "data")
+
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    
+    filepath = os.path.join(dir_path,f"{modelid}.csv")
+
+    with open(filepath, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(keyratio)
+
+def savestatics(modelid):
+    for key in statistics.keys():
+        result = [[tkey] + list(statistics[key][tkey]) for tkey in statistics[key].keys()]
+        saveekeys(result,f"{modelid}_{key}")
+
 def get_font(fontsize):
     path_root = scripts.basedir()
     fontpath = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "Roboto-Regular.ttf")
@@ -820,6 +882,46 @@ def longhashfromname(name):
         return checkpoint_info.sha256
     checkpoint_info.calculate_shorthash()
     return checkpoint_info.sha256
+
+RANCHA = ["R","U","X"]
+
+def randdealer(w:str,randomer,ab,lucks,deep):
+    up,low = lucks["upp"],lucks["low"]
+    up,low = (up.split(","),low.split(","))
+    out = []
+    outd = {"R":[],"U":[],"X":[]}
+    add = RANDMAP[ab]
+    for i, r in enumerate (w.split(",")):
+        if r.strip() =="R":
+            out.append(str(round(randomer[i+add],lucks["round"])))
+        elif r.strip() == "U":
+            out.append(str(round(-2 * randomer[i+add] + 1.5,lucks["round"])))
+        elif r.strip() == "X":
+            out.append(str(round((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),lucks["round"])))
+        elif "E" in r:
+            key = r.strip().replace("E","")
+            outd[key].append(BLOCKID[i])
+            out.append("0")
+        else:
+            out.append(r)
+    for key in outd.keys():
+        if outd[key] != []:
+            deep = deep + f",{' '.join(outd[key])}::{key}" if deep else f"{' '.join(outd[key])}::{key}"
+    return ",".join(out), deep
+
+def eratiodealer(dr,randomer,block,num,lucks):
+    if  any(element in dr for element in RANCHA):
+        up,low = lucks["upp"],lucks["low"]
+        up,low = (up.split(","),low.split(","))
+        add = RANDMAP[2]
+        if dr.strip() =="R":
+            return round(randomer[num+add],lucks["round"])
+        elif dr.strip() == "U":
+            return round(-2 * randomer[num+add] + 1,lucks["round"])
+        elif dr.strip() == "X":
+            return round((float(low[block])-float(up[block]))* randomer[num+add] + float(up[block]),lucks["round"])
+    else:
+        return float(dr)
 
 def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
@@ -921,3 +1023,24 @@ def blocker(blocks):
         for i in range(26):
             if flagger[i]: output = output + " " + blockid[i] if output else blockid[i]
     return output
+
+def fineman(fine):
+    fine = [
+        1 - fine[0] * 0.01,
+        1+ fine[0] * 0.02,
+        1 - fine[1] * 0.01,
+        1+ fine[1] * 0.02,
+        1 - fine[2] * 0.01,
+        [x*0.02 for x in fine[3:]]
+                ]
+    return fine
+
+FINETUNES = [
+"model.diffusion_model.input_blocks.0.0.weight",
+"model.diffusion_model.input_blocks.0.0.bias",
+"model.diffusion_model.out.0.weight",
+"model.diffusion_model.out.0.bias",
+"model.diffusion_model.out.2.weight",
+"model.diffusion_model.out.2.bias",
+]
+

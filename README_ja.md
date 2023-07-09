@@ -10,6 +10,9 @@ All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerg
 English: [![jp](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
 
 ## Updates
+- [ランダムマージモード](#random-merge)が追加されました
+- モデルの[描き込み・色調調整機能](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_ja.md#adjust)を追加しました
+
 - 機能更新, コサイン類似度を用いた最適値計算機能を強化しました[詳細](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
 - 新機能, 新しいマージ方式tensorを導入しました [詳細](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
 - XYプロットに新しい軸タイプを追加しました : calcmode,prompt
@@ -111,6 +114,36 @@ Reserve XY plotボタンはすぐさまプロットを実行せず、ボタン�
 というふたつの予約に分割され実行されます。これは要素が多すぎてグリッドが大きくなってしまう場合などに有効でしょう。
 
 
+# Random Merge
+ランダムにマージ比率を決定します。一度の複数のランダムマージが行えます。比率は各ブロック、各エレメントごとにランダムにすることが可能です。
+## 使い方
+　Let the Dice rollで使用できます。`Random Mode`を選択し`Run Rand`を押すと`Num of challenge`の回数分ランダムにウェイトが設定されて画像が生成されます。生成はXYZモードで動作するので`STOP`ボタンが有効です。`Seed for Random Ratio`は`-1`に設定して下さい。Num of challengeの回数が2回以上の場合、自動的に-1に設定されます。同じseedを使うと再現性があります。生成数が10を超える場合グリッドは自動的に2次元になります。`Settings`の`alpha`、`beta`はチェックするとランダム化されます。Elementalの場合`beta`は無効化されます。
+
+## 各モード
+### R,U,X
+26ブロックすべてに対してランダムなウェイトが設定されます。`R`、`U`、`X`の違いは乱数の値の範囲です。Xは各層に対して`lower limit` ~ `upper limit`で指定します。
+R : 0 ~ 1  
+U : -0.5 ~ 1.5  
+X : lower limit ~ upper limit
+### ER,EU,EX
+Elementすべてに対してランダムなウェイトが設定されます。`ER`、`EU`、`EX`の違いは乱数の値の範囲です。Xは各層に対して`lower limit` ~ `upper limit`で指定します。
+
+### custom
+ランダム化される階層を指定します。`costom`で指定します。  
+`R`、`U`、`X`、`ER`、`EU`、`EX`が使用できます。
+例：
+```
+U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R
+U,0,0,0,0,0,0,0,0,0,0,0,0,ER,0,0,0,0,0,0,X,0,0,0,0,0
+```
+### XYZモード
+typeに`random`を設定することで使用できます。ランダム化する回数を入力すると、回数分軸の要素が設定されます。
+```
+X type : seed, -1,-1,-1
+Y type : random, 5
+```
+とすると、3×5のgridができ、5回分ランダムにウェイトが設定されたモデルで生成されます。ランダムかの設定はランダムのパネルで設定して下さい。ここが`off`では正常に動作しません。
+
 ### キャッシュについて
 モデルをメモリ上に保存することにより連続マージなどを高速化することができます。
 キャッシュの設定はweb-uiのsettingから行ってください。
@@ -145,6 +178,7 @@ calculate dimentionボタンで各LoRAの次元を計算して表示・ソート
 
 ### 通常マージとsame to Strengthの違い
 same to Strengthオプションを使用しない場合は、kohya-ss氏の作製したスクリプトのマージと同じ結果になります。この場合、下図のようにWeb-ui上でLoRAを適用した場合と異なる結果になります。これはLoRAをU-netに組み込む際の数式が関係しています。kohya-ss氏のスクリプトでは比率をそのまま掛けていますが、適用時の数式では比率が２乗されてしまうため、比率を1以外の数値に設定すると、あるいはマイナスに設定するとStrength（適用時の強度）と異なる結果となります。same to Strengthオプションを使用すると、マージ時には比率の平方根を駆けることで、適用時にはStrengthと比率が同じ意味を持つように計算しています。また、マイナスが効果が出るようにも計算しています。追加学習をしない場合などはsame to Strengthオプションを使用しても問題ないと思いますが、マージしたLoRAに対して追加学習をする場合はだれも使用しない方がいいかもしれません。  
+
 下図は通常適用/same to Strengthオプション/通常マージの各場合の生成画像です。figma化とukiyoE LoRAのマージを使用しています。通常マージの場合はマイナス方向でも２乗されてプラスになっていることが分かります。
 ![xyz_grid-0014-1534704891](https://user-images.githubusercontent.com/122196982/218322034-b7171298-5159-4619-be1d-ac684da92ed9.jpg)
 
