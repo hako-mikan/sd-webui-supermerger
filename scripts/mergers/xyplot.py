@@ -22,6 +22,17 @@ RAND = "random"
 
 numadepth = []
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 def freezetime():
     global state_mergen
     state_mergen = True
@@ -181,7 +192,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     if "seed" in XYZ: gensets_s[5] = 0
 
     #check and adjust format
-    print(f"XY plot start, mode:{mode}, X: {xtype}, Y: {ytype}, Z: {ztype} MBW: {useblocks}")
+    print(f"\n{bcolors.OKGREEN}XY plot start, mode:{mode}, X: {xtype}, Y: {ytype}, Z: {ztype} MBW: {useblocks}{bcolors.ENDC}")
     castall(hear)
     None5 = [None,None,None,None,None]
     if xmen =="": return "ERROR: parameter X is empty",*None5
@@ -246,12 +257,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     #in case beta selected but mode is Weight sum or Add or Diff
     if ("beta" in XYZ) and (not usebeta and "tensor" not in calcmode):
         mode = modes[3]
-        print(f"{modes[3]} mode automatically selected)")
+        print(f"{bcolors.WARNING}{modes[3]} mode automatically selected){bcolors.ENDC}")
 
     #in case mbw or pinpoint selected but useblocks not chekced
     if "mbw" in XYZ and not useblocks:
         useblocks = True
-        print(f"MBW mode enabled")
+        print(f"{bcolors.WARNING}MBW mode enabled{bcolors.ENDC}")
 
     xcount = ycount = zcount = 0
     allcount = len(xs)*len(ys)*len(zs) if not lucks["on"] else lucks["num"]
@@ -370,7 +381,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     fine_in = fine
                 if type(fine_in) == list:fine_in = ",".join([str(x) for x in fine_in])
 
-                print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount})")
+                print(f"{bcolors.OKGREEN}XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount}){bcolors.ENDC}")
                 if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks) 
