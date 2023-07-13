@@ -28,6 +28,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from inspect import currentframe
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 stopmerge = False
 
 def freezemtime():
@@ -160,7 +171,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     caster(mergedmodel,False)
 
     if calcmode == calcmode == "trainDifference" and "Add" not in mode:
-        print("mode changed to add difference")
+        print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
         mode = "Add"
 
     result_is_inpainting_model = False
@@ -345,8 +356,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                                 weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
 
                 if weight_index >= NUM_TOTAL_BLOCKS:
-                    print(f"ERROR: illegal block index: {key}")
-                    return f"ERROR: illegal block index: {key}",*non4
+                    print(f"{bcolors.FAIL}ERROR: illegal block index: {key}{bcolors.ENDC}")
+                    return f"{bcolors.FAIL}ERROR: illegal block index: {key}{bcolors.ENDC}",*non4
                 
                 if weight_index >= 0 and useblocks:
                     current_alpha = weights_a[weight_index]
@@ -938,7 +949,7 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
     try:
         p.sampler_name = sd_samplers.samplers[sampler].name if s_sampler == 0 or s_sampler == None else sd_samplers.samplers[s_sampler-1].name
     except:
-        print(f"error:sampler:{sampler},s_sampler:{s_sampler}")
+        print(f"{bcolors.Fail}Error:sampler:{sampler},s_sampler:{s_sampler}{bcolors.ENDC}")
     p.cfg_scale = cfg  if s_cfg == 0 else s_cfg
     p.seed = seed  if s_seed == 0 else s_seed
     p.width = w  if s_w == 0 else s_w
@@ -1042,4 +1053,3 @@ FINETUNES = [
 "model.diffusion_model.out.2.weight",
 "model.diffusion_model.out.2.bias",
 ]
-
