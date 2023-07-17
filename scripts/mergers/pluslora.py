@@ -190,6 +190,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision):
 
 def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     import lora
+    import json
     loras_on_disk = [lora.available_loras.get(name, None) for name in loranames]
     if any([x is None for x in loras_on_disk]):
         lora.list_available_loras()
@@ -212,6 +213,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     lr = []
     ld = []
     lt = []
+    lm = []
     dmax = 1
 
     for i,n in enumerate(lnames):
@@ -223,6 +225,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         c_lora = lora.available_loras.get(n[0], None) 
         ln.append(c_lora.filename)
         lr.append(ratio)
+        lm.append(c_lora.metadata)
         d,t = dimgetter(c_lora.filename)
         if t == "LoCon":
             d = list(set(d.values()))
@@ -234,9 +237,18 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
 
     if filename =="":filename =loranames.replace(",","+").replace(":","_")
     if not ".safetensors" in filename:filename += ".safetensors"
+    loraname = filename.replace(".safetensors", "")
     filename = os.path.join(shared.cmd_opts.lora_dir,filename)
   
     dim = int(dim) if dim != "no" and dim != "auto" else 0
+    meta = lm[0]
+
+    # metadataで保存できる形式に変換
+    meta["ss_output_name"] = loraname
+    meta["sshs_weight"] = ldict[ lnames[0][2] ]
+    for key in meta:
+        if type(meta[key] ) is not str:
+            meta[key] = json.dumps( meta[key] )
 
     if "LyCORIS" in ld or "LoCon" in lt:
         sd = merge_lora_models(ln, lr, settings, True)
@@ -253,8 +265,13 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         _err_msg = f"Output file ({filename}) existed and was not saved"
         print(_err_msg)
         return _err_msg
+    
+    # データ変更によりhashが変わるので計算
+    model_hash, legacy_hash = precalculate_safetensors_hashes( sd, meta )
+    meta[ "sshs_model_hash" ] = model_hash
+    meta[ "sshs_legacy_hash" ] = legacy_hash
 
-    save_to_file(filename,sd,sd, str_to_dtype(precision))
+    save_to_file(filename,sd,sd, str_to_dtype(precision), meta)
     return "saved : "+filename
 
 def pluslora(lnames,loraratios,settings,output,model,precision):
@@ -368,16 +385,16 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
     gc.collect()
     return result
 
-def save_to_file(file_name, model, state_dict, dtype):
+def save_to_file(file_name, model, state_dict, dtype, meta):
     if dtype is not None:
         for key in list(state_dict.keys()):
             if type(state_dict[key]) == torch.Tensor:
                 state_dict[key] = state_dict[key].to(dtype)
 
     if os.path.splitext(file_name)[1] == '.safetensors':
-        save_file(model, file_name)
+        save_file(model, file_name, metadata=meta)
     else:
-        torch.save(model, file_name)
+        torch.save(model, file_name, metadata=meta)
 
 re_digits = re.compile(r"\d+")
 
