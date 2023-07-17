@@ -241,14 +241,28 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     filename = os.path.join(shared.cmd_opts.lora_dir,filename)
   
     dim = int(dim) if dim != "no" and dim != "auto" else 0
-    meta = lm[0]
 
-    # metadataで保存できる形式に変換
-    meta["ss_output_name"] = loraname
-    meta["sshs_weight"] = ldict[ lnames[0][2] ]
-    for key in meta:
-        if type(meta[key] ) is not str:
-            meta[key] = json.dumps( meta[key] )
+    meta = {}
+    # 単Blockマージの場合、ほぼ全てのメタデータを使いませる
+    if len(lm) == 1:
+        meta = lm[0]
+
+        # 名前の変更と、旧Loraの名前とHash、使用した weight を記録する
+        meta["ss_output_name"] = loraname
+        meta["sshs_original_name"] = lnames[0][0]
+        meta["sshs_original_hash"] = meta["sshs_model_hash"]
+        meta["sshs_original_legacy_hash"] = meta["sshs_legacy_hash"]
+        meta["sshs_weight"] = ldict[ lnames[0][2] ]
+
+        # dimensionとprecision
+        if dim != "no" and "dim" != "auto":
+            meta["ss_network_dim"] = dim
+        meta["ss_mixed_precision"] = precision
+
+        # metadataで保存できる形式に変換
+        for key in meta:
+            if type(meta[key] ) is not str:
+                meta[key] = json.dumps( meta[key] )
 
     if "LyCORIS" in ld or "LoCon" in lt:
         sd = merge_lora_models(ln, lr, settings, True)
@@ -266,10 +280,11 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         print(_err_msg)
         return _err_msg
     
-    # データ変更によりhashが変わるので計算
-    model_hash, legacy_hash = precalculate_safetensors_hashes( sd, meta )
-    meta[ "sshs_model_hash" ] = model_hash
-    meta[ "sshs_legacy_hash" ] = legacy_hash
+    if len(lm) == 1:
+        # データ変更によりhashが変わるので計算
+        model_hash, legacy_hash = precalculate_safetensors_hashes( sd, meta )
+        meta[ "sshs_model_hash" ] = model_hash
+        meta[ "sshs_legacy_hash" ] = legacy_hash
 
     save_to_file(filename,sd,sd, str_to_dtype(precision), meta)
     return "saved : "+filename
