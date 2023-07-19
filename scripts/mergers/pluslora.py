@@ -190,6 +190,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision):
 
 def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     import lora
+    import json
     loras_on_disk = [lora.available_loras.get(name, None) for name in loranames]
     if any([x is None for x in loras_on_disk]):
         lora.list_available_loras()
@@ -212,6 +213,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
     lr = []
     ld = []
     lt = []
+    lm = []     # 各LoRAのマージ用メタデータ
     dmax = 1
 
     for i,n in enumerate(lnames):
@@ -231,9 +233,14 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         ld.append(d)
         if d != "LyCORIS":
           if d > dmax : dmax = d
+        
+        # LoRA毎のメタデータを保存
+        meta = prepare_merge_metadata( n[1], ",".join( [str(n) for n in ratio] ), c_lora )
+        lm.append( meta )
 
     if filename =="":filename =loranames.replace(",","+").replace(":","_")
     if not ".safetensors" in filename:filename += ".safetensors"
+    loraname = filename.replace(".safetensors", "")
     filename = os.path.join(shared.cmd_opts.lora_dir,filename)
   
     dim = int(dim) if dim != "no" and dim != "auto" else 0
@@ -253,8 +260,11 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         _err_msg = f"Output file ({filename}) existed and was not saved"
         print(_err_msg)
         return _err_msg
+    
+    # マージ後のメタデータを取得
+    metadata = create_merge_metadata( sd, lm, loraname, precision )
 
-    save_to_file(filename,sd,sd, str_to_dtype(precision))
+    save_to_file(filename,sd,sd, str_to_dtype(precision), metadata)
     return "saved : "+filename
 
 def pluslora(lnames,loraratios,settings,output,model,precision):
@@ -368,16 +378,16 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
     gc.collect()
     return result
 
-def save_to_file(file_name, model, state_dict, dtype):
+def save_to_file(file_name, model, state_dict, dtype, meta):
     if dtype is not None:
         for key in list(state_dict.keys()):
             if type(state_dict[key]) == torch.Tensor:
                 state_dict[key] = state_dict[key].to(dtype)
 
     if os.path.splitext(file_name)[1] == '.safetensors':
-        save_file(model, file_name)
+        save_file(model, file_name, metadata=meta)
     else:
-        torch.save(model, file_name)
+        torch.save(model, file_name, metadata=meta)
 
 re_digits = re.compile(r"\d+")
 
@@ -1353,3 +1363,114 @@ def addnet_hash_legacy(b):
     b.seek(0x100000)
     m.update(b.read(0x10000))
     return m.hexdigest()[0:8]
+
+def prepare_merge_metadata( ratio, blocks, fromLora ):
+    """
+    メタデータに ratio, blocks などの情報を付加しておく
+
+    Parameters
+    ----
+    ratio : string
+        name:ratio:blocks の ratio 部分
+    blocks : string
+        name:ratio:bloks の blocks 部分(ラベルではなくて実パラメータ)
+    fromLora : NetworkOnDisk
+        マージ対象のLoRA
+    
+    Returns
+    ----
+    dict[str, str]
+        メタデータ
+    """
+    meta = fromLora.metadata
+    meta["sshs_ratio"] = str.strip( ratio )
+    meta["sshs_blocks"] = str.strip( blocks )
+    meta["ss_output_name"] = str.strip( fromLora.name )
+
+    return meta
+
+def create_merge_metadata( sd, lmetas, lname, lprecision, mergeAll = True ):
+    """
+    LoRAマージ後のメタデータを作成する
+
+    Parameters
+    ----
+    sd : NetworkOnDisk
+        マージ後のLoRA
+    lmetas : dict[str, str]
+        マージされるLoRAのメタデータ
+    lname : str
+        マージ後のLoRA名
+    lprecision : str
+        save precision の値
+    mergeAll : bool
+        メタデータの残し方。ただしタグ情報はディレクトリ名が後勝ちでマージします
+        True 全メタデータを残す。単マージの場合はTrue固定
+        False 一部のメタデータのみ残す
+    
+    Returns
+    ----
+    dict[str, str]
+        メタデータ
+    """
+    import json
+    BASE_METADATA = [
+        "sshs_ratio", "sshs_blocks", "ss_output_name",
+        "sshs_model_hash", "sshs_legacy_hash",
+        "ss_network_module",
+        "ss_network_alpha", "ss_network_dim",
+        "ss_mixed_precision", "ss_v2",
+        "ss_training_comment",
+        "ss_sd_model_name", "ss_new_sd_model_hash",
+        "ss_clip_skip",
+    ]
+    metadata = {}
+    networkModule = None
+
+    if len(lmetas) == 1:
+        # 単なるweightマージならそのままコピー
+        metadata = lmetas[0]
+    else:
+        # 複数マージの場合はマージしたタグと主要メタデータを保存
+        tags = {}
+        for i, lmeta in enumerate( lmetas ):
+            meta = {}
+            if mergeAll:
+                # 全データコピー
+                metadata[ f"sshs_cp{i}" ] = json.dumps( lmeta )
+            else:
+                # 基礎メタデータをコピー
+                for key in BASE_METADATA:
+                    if key in lmeta:
+                        meta[key] = lmeta[key]
+                metadata[ f"sshs_cp{i}" ] = json.dumps( meta )
+
+            # 最初の network_module を保持
+            if networkModule is None and "ss_network_module" in lmeta:
+                networkModule = lmeta["ss_network_module"]
+
+            # タグをマージ
+            if "ss_tag_frequency" in lmeta:
+                tags = dict( tags, **lmeta["ss_tag_frequency"] )
+        metadata["ss_tag_frequency"] = tags
+
+    # network_moduleからLoRA種別判定する場合が多いため、最初に見つけたものにする
+    if networkModule is not None:
+        metadata["ss_network_module"] = networkModule
+
+    # output名とprecision、dimは変更された可能性がある
+    metadata["ss_output_name"] = lname
+    metadata["ss_mixed_precision"] = lprecision
+    # dimの出し方が分からない・・・
+
+
+    # metadataで保存できる形式に変換
+    for key in metadata:
+        if type(metadata[key] ) is not str:
+            metadata[key] = json.dumps( metadata[key] )
+    # データ変更によりhashが変わるので計算
+    model_hash, legacy_hash = precalculate_safetensors_hashes( sd, metadata )
+    metadata[ "sshs_model_hash" ] = model_hash
+    metadata[ "sshs_legacy_hash" ] = legacy_hash
+    return metadata
+
