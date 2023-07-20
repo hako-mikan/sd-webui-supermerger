@@ -6,6 +6,9 @@
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
 # Recent Update
+- support XL
+- XLモデル対応
+
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
 update 2023.07.07.2000(JST)
