@@ -1,9 +1,16 @@
 import os
+import gc
 import torch
 from transformers import CLIPTextModel,  CLIPTextConfig
 from safetensors.torch import load_file
 import safetensors.torch
+from modules import shared
 from modules.sd_models import read_state_dict
+try:
+  from modules import sd_models_xl
+  xl = True
+except:
+  xl = False
 
 # DiffUsers版StableDiffusionのモデルパラメータ
 NUM_TRAIN_TIMESTEPS = 1000
@@ -786,66 +793,6 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
   print("loading text encoder:", info)
 
   return text_model, vae, unet, info
-
-def usemodelgen(theta_0,model_a,model_name):
-  from modules import lowvram, devices, sd_hijack,shared, sd_vae
-  sd_hijack.model_hijack.undo_hijack(shared.sd_model)
-
-  model = shared.sd_model
-  model.load_state_dict(theta_0, strict=False)
-  del theta_0
-  if shared.cmd_opts.opt_channelslast:
-      model.to(memory_format=torch.channels_last)
-
-  if not shared.cmd_opts.no_half:
-      vae = model.first_stage_model
-
-      # with --no-half-vae, remove VAE from model when doing half() to prevent its weights from being converted to float16
-      if shared.cmd_opts.no_half_vae:
-          model.first_stage_model = None
-
-      model.half()
-      model.first_stage_model = vae
-
-  devices.dtype = torch.float32 if shared.cmd_opts.no_half else torch.float16
-  devices.dtype_vae = torch.float32 if shared.cmd_opts.no_half or shared.cmd_opts.no_half_vae else torch.float16
-  devices.dtype_unet = model.model.diffusion_model.dtype
-  
-  if hasattr(shared.cmd_opts,"upcast_sampling"):
-      devices.unet_needs_upcast = shared.cmd_opts.upcast_sampling and devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
-  else:
-      devices.unet_needs_upcast = devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
-
-  model.first_stage_model.to(devices.dtype_vae)
-  sd_hijack.model_hijack.hijack(model)
-  
-  model.logvar = shared.sd_model.logvar.to(devices.device) 
-
-  if shared.cmd_opts.lowvram or shared.cmd_opts.medvram:
-      setup_for_low_vram_s(model, shared.cmd_opts.medvram)
-  else:
-      model.to(shared.device)
-
-  model.eval()
-
-  shared.sd_model = model
-  try:
-    sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=True)
-  except:
-    pass
-  #shared.sd_model.sd_checkpoint_info.model_name = model_name
-  
-  def _setvae():
-      sd_vae.delete_base_vae()
-      sd_vae.clear_loaded_vae()
-      vae_file, vae_source = sd_vae.resolve_vae(model_a)
-      sd_vae.load_vae(shared.sd_model, vae_file, vae_source)
-
-  try:
-      _setvae()
-  except:
-      print("ERROR:setting VAE skipped")
-
 
 import torch
 from modules import devices

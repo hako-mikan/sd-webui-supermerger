@@ -1,4 +1,5 @@
 import random
+import gc
 from tracemalloc import Statistic
 import cv2
 import numpy as np
@@ -6,10 +7,10 @@ import os
 import copy
 import csv
 from PIL import Image
-from modules import images
+from modules import images, sd_models, devices
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
-from scripts.mergers.model_util import usemodelgen, savemodel
+from scripts.mergers.model_util import savemodel
 
 hear = True
 hearm = False
@@ -385,13 +386,19 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks) 
-                    usemodelgen(theta_0,model_a,currentmodel)
+                    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+                    sd_models.load_model(checkpoint_info, already_loaded_state_dict=theta_0)
+
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
+                del theta_0
+
 
                 if xcount == 0: statid = modelid
 
                 image_temp = simggen(*gensets,*hr_sets,*gensets_s,batch_size,currentmodel,id_sets,modelid)
+                gc.collect()
+                devices.torch_gc()
                 
                 xyimage.append(image_temp[0][0])
                 xcount+=1
@@ -553,7 +560,7 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
 
         abs_diff = cv2.absdiff(im2 ,  im1)
 
-        abs_diff_t = cv2.threshold(abs_diff, 5, 255, cv2.THRESH_BINARY)[1]        
+        abs_diff_t = cv2.threshold(abs_diff, 20, 255, cv2.THRESH_BINARY)[1]        
         res = abs_diff_t.astype(np.uint8)
         percentage = (np.count_nonzero(res) * 100)/ res.size
         abs_diff = cv2.bitwise_not(abs_diff)
