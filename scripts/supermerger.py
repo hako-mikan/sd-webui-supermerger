@@ -23,7 +23,7 @@ reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen)
+from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen, blockfromkey, numfromblock)
 from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
 from scripts.mergers.model_util import filenamecutter
 
@@ -675,53 +675,7 @@ def find_preset_by_name(presets, preset):
     return None
 
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
-
-def blockfromkey(key,modeltype):
-    if modeltype != "XL":
-        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
-        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
-        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
-
-        weight_index = -1
-
-        NUM_INPUT_BLOCKS = 12
-        NUM_MID_BLOCK = 1
-        NUM_OUTPUT_BLOCKS = 12
-        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
-
-        if 'time_embed' in key:
-            weight_index = -2                # before input blocks
-        elif '.out.' in key:
-            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
-        else:
-            m = re_inp.search(key)
-            if m:
-                inp_idx = int(m.groups()[0])
-                weight_index = inp_idx
-            else:
-                m = re_mid.search(key)
-                if m:
-                    weight_index = NUM_INPUT_BLOCKS
-                else:
-                    m = re_out.search(key)
-                    if m:
-                        out_idx = int(m.groups()[0])
-                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-        return BLOCKID[weight_index+1] 
-
-    else:
-        if "label_emb" in key or "time_embed" in key: return "Not Merge"
-        if "conditioner.embedders" in key : return "BASE"
-        if "first_stage_model" in key : return "VAE"
-        if "model.diffusion_model" in key:
-            if "model.diffusion_model.out." in key: return "OUT8"
-            block = re.findall(r'input|mid|output', key)
-            block = block[0].upper().replace("PUT","") if block else ""
-            nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
-            add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
-            return block + nums + add
-
-    return "Not Merge"
+BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
 
 def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
@@ -767,19 +721,22 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
     blocksim = {}
     blockvals = []
     attn2 = {}
-    mtype = modeltype(a)
-    for bl in BLOCKID:
+    isxl = "XL" == modeltype(a)
+    blockids = BLOCKIDXL if isxl else BLOCKID
+    for bl in blockids:
         blocksim[bl] = []
     blocksim["VAE"] = []
 
     if "ASim" in mode:
-        result = asimilarity(a,b,mtype)
+        result = asimilarity(a,b,isxl)
         if len(settings) > 1: savecalc(result,name,settings,True,"Asim")
+        del a ,b
+        gc.collect()
         return result
     else:
         for key in tqdm(a.keys(), desc="Calculating cosine similarity"):
             block = None
-            if blockfromkey(key,mtype) == "Not Merge": continue
+            if blockfromkey(key,isxl) == "Not Merge": continue
             if "model_ema" in key: continue
             if "model" not in key:continue
             if "first_stage_model" in key and not ("VAE" in inc):
@@ -792,12 +749,13 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
                 a_flat = a[key].view(-1).to(torch.float32)
                 b_flat = b[key].view(-1).to(torch.float32)
                 simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
-                if block is None: block = blockfromkey(key,mtype)
+                if block is None: block = blockfromkey(key,isxl)
+                _, block = numfromblock(block, isxl)
                 cosine_similarities.append([block, key, round(simab.item()*100,3)])
                 blocksim[block].append(round(simab.item()*100,3))
                 if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
 
-        for bl in BLOCKID:
+        for bl in blockids:
             val = None
             if bl == "Not Merge": continue
             if bl not in blocksim.keys():continue
@@ -812,9 +770,13 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
 
         if mode == "Block":
             if len(settings) > 1: savecalc(blockvals,name,settings,True,"Blocks")
+            del a ,b
+            gc.collect()
             return blockvals
         else:
             if len(settings) > 1: savecalc(cosine_similarities,name,settings,False,"Elements",)
+            del a ,b
+            gc.collect()
             return cosine_similarities
 
 def savecalc(data,name,settings,blocks,add):
