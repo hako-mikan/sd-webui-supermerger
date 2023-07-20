@@ -228,13 +228,13 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
     if isxl and useblocks:
-        if len(weights_a) == 26:
+        if len(weights_a) == 25:
             weights_a = weighttoxl(weights_a)
-            print("weight converted for XL")
+            print(f"weight converted for XL{weights_a}")
         if usebeta:
-            if len(weights_b) == 26:
+            if len(weights_b) == 25:
                 weights_b = weighttoxl(weights_b)
-                print("weight converted for XL")
+                print(f"weight converted for XL{weights_b}")
 
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
@@ -356,9 +356,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         blockids = BLOCKIDXL if isxl else BLOCKID
             
-        if weight_index >= 0 and useblocks:
-            current_alpha = weights_a[weight_index]
-            if usebeta: current_beta = weights_b[weight_index]
+        if useblocks:
+            if weight_index > 0: 
+                current_alpha = weights_a[weight_index - 1] 
+                if usebeta: current_beta = weights_b[weight_index - 1] 
 
         if len(deep) > 0:
             skey = key + blockids[weight_index]
@@ -1108,7 +1109,7 @@ def fineman(fine):
     return fine
 
 def weighttoxl(weight):
-    weight = weight[:10] + weight[13:23] +[0]
+    weight = weight[:9] + weight[12:22] +[0]
     return weight
 
 FINETUNES = [
