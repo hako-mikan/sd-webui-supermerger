@@ -9,6 +9,21 @@
 - support XL
 - XLモデル対応
 
+XL capabilities at the moment:XLでいまできること
+Merge/Block merge/マージ/階層マージ
+
+Cannot be done:
+Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ(数日中に対応)
+Creating LoRA from model differences (undecided)/モデル差分からLoRA作成(未定)
+LyCORIS is not supported./LyCORISは対応しません。
+
+**Attention!**
+
+A minimum of 64GB of CPU memory is required for the XL model merge. Even with 64GB of memory, depending on the software you are using in conjunction, there is a risk of system instability. Therefore, please work in a state where it is acceptable for the system to crash. I encountered a blue screen for the first time in a while.
+
+**注意！**
+XLモデルのマージには最低64GBのCPUメモリが必要です。64Gのメモリであっても併用しているソフトによってはシステムが不安定になる恐れがあるのでシステムが落ちてもいい状態で作業して下さい。私は久しぶりにブルースクリーンに遭遇しました。
+
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
 update 2023.07.07.2000(JST)
@@ -90,6 +105,9 @@ Please be careful not to forget to input "0".
 
 Block ID (only upper case letters are valid)
 BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11
+
+for XL model
+BASE,IN0,IN1,IN2,IN3,IN4,IN5,IN6,IN7,IN8,M,OUT0,OUT1,OUT2,OUT3,OUT4,OUT5,OUT6,OUT7,OUT8
 
 #### calcmode
 change calclation mode.  
