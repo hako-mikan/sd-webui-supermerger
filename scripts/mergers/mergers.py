@@ -61,8 +61,8 @@ SAVEMODES=["save model", "overwrite"]
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
 #id sets "image", "PNG info","XY grid"
 
-hear = True
-hearm = True
+hear = False
+hearm = False
 non4 = [None]*4
 
 def caster(news,hear):
