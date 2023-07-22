@@ -212,6 +212,7 @@ def on_ui_tabs():
                         with gr.Row():
                             dd_preset_weight = gr.Dropdown(label="Load preset", choices=preset_name_list(weights_presets), interactive=True, elem_id="refresh_presets")
                             preset_refresh = gr.Button(value='\U0001f504', elem_classes=["tool"])
+                            isxl = gr.Radio(label = "type",choices = ["1.X or 2.X", "XL"], value = "1.X or 2.X", type="index") 
                     with gr.Column():
                         with gr.Row():
                             dd_preset_weight_r = gr.Dropdown(label="Load Romdom preset", choices=preset_name_list(weights_presets,True), interactive=True, elem_id="refresh_presets")
@@ -454,8 +455,8 @@ def on_ui_tabs():
 
         menbers = [base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
 
-        setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight],outputs=[weights_a])
-        setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight],outputs=[weights_b])
+        setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
+        setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
         setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
 
         readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
@@ -470,6 +471,16 @@ def on_ui_tabs():
 
         preset_refresh.click(fn=refresh_presets,inputs=[wpresets,dfalse],outputs=[dd_preset_weight])
         preset_refresh_r.click(fn=refresh_presets,inputs=[wpresets,dtrue],outputs=[weights_a,weights_b])
+
+        def changexl(isxl):
+            out = [True] * 26
+            if isxl:
+                for i,id in enumerate(BLOCKID[:-1]):
+                    if id not in BLOCKIDXLL[:-1]:
+                        out[i] = False
+            return [gr.update(visible = x) for x in out]
+
+        isxl.change(fn=changexl,inputs=[isxl], outputs=menbers)
 
         x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
         y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
@@ -616,11 +627,17 @@ def text2slider(text):
     vals = [0 if v in "RUX" else v for v in vals]
     return [gr.update(value = float(v)) for v in vals]
 
-def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset):
+def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset, isxl):
     az = find_preset_by_name(presets, preset)
     if az is not None:
         if any(element in az for element in RANCHA):return az
     numbers = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z]
+    if isxl:
+        newnums = []
+        for i,id in enumerate(BLOCKID[:-1]):
+            if id in BLOCKIDXLL[:-1]:
+                newnums.append(numbers[i])
+        numbers = newnums
     numbers = [str(x) for x in numbers]
     return gr.update(value = ",".join(numbers) )
 
@@ -676,6 +693,7 @@ def find_preset_by_name(presets, preset):
 
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
 BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
+BLOCKIDXLL=['BASE', 'IN00', 'IN01', 'IN02', 'IN03', 'IN04', 'IN05', 'IN06', 'IN07', 'IN08', 'M00', 'OUT00', 'OUT01', 'OUT02', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'VAE']
 
 def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
