@@ -6,7 +6,6 @@ import numpy as np
 import os
 import copy
 import csv
-import re
 from PIL import Image
 from modules import images, sd_models, devices
 from modules.shared import opts
@@ -49,10 +48,6 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     global numadepth
     grids = []
     sep = "|"
-    if sep == "|":
-        sepre = re.compile(rf'{re.escape(sep)}(?![^\[\]]*\])')
-    else:
-        sepre = re.compile(rf'{re.escape(sep)}')
 
     if RAND in startmode:
         if "off" in lmode:return "Random mode is off",*[None]*5
@@ -74,9 +69,9 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     print(xtype,xmen,ytype,ymen,weights_a,weights_b)
 
     if RAND not in startmode:
-        if sepre.search(xmen): allsets = separator(allsets,1,sepre,xmen,seed,startmode)
-        if sepre.search(ymen): allsets = separator(allsets,3,sepre,ymen,seed,startmode)
-        if sepre.search(zmen): allsets = separator(allsets,5,sepre,zmen,seed,startmode)
+        if sep in xmen: allsets = separator(allsets,1,sep,xmen,seed,startmode)
+        if sep in ymen: allsets = separator(allsets,3,sep,ymen,seed,startmode)
+        if sep in zmen: allsets = separator(allsets,5,sep,zmen,seed,startmode)
 
     if "reserve" in startmode : return numaker(allsets)
 
@@ -112,11 +107,13 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if wcounter == len(numadepth):
             break
 
+    gc.collect()
+
     return result,currentmodel,grids,a,b,c
 
-def separator(allsets,index,sepre,men,seed,startmode):
+def separator(allsets,index,sep,men,seed,startmode):
     if seed =="-1": allsets[30] = str(random.randrange(4294967294))
-    mens = re.split(sepre, men)
+    mens = men.split(sep)
     if "reserve" not in startmode:
         allsets[index] = mens[0]
         for men in mens[1:]:
@@ -404,7 +401,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 image_temp = simggen(*gensets,*hr_sets,*gensets_s,batch_size,currentmodel,id_sets,modelid)
                 gc.collect()
                 devices.torch_gc()
-                
+
                 xyimage.append(image_temp[0][0])
                 xcount+=1
                 deep = deepy
