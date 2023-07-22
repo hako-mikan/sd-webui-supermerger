@@ -9,13 +9,13 @@
 - support XL
 - XLモデル対応
 
-XL capabilities at the moment:XLでいまできること
-Merge/Block merge/マージ/階層マージ
+XL capabilities at the moment:XLでいまできること  
+Merge/Block merge/マージ/階層マージ  
 
-Cannot be done:
-Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ(数日中に対応)
-Creating LoRA from model differences (undecided)/モデル差分からLoRA作成(未定)
-LyCORIS is not supported./LyCORISは対応しません。
+Cannot be done:できないこと
+Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ(数日中に対応)  
+Creating LoRA from model differences (undecided)/モデル差分からLoRA作成(未定)  
+LyCORIS is not supported./LyCORISは対応しません。  
 
 **Attention!**
 
