@@ -235,8 +235,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if len(weights_b) == 25:
                 weights_b = weighttoxl(weights_b)
                 print(f"weight converted for XL{weights_b}")
-        if len(weights_a) == 20: weights_a = weights_a + [0]
-        if len(weights_b) == 20: weights_b = weights_b + [0]
+        if len(weights_a) == 19: weights_a = weights_a + [0]
+        if len(weights_b) == 19: weights_b = weights_b + [0]
 
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
@@ -360,7 +360,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             
         if useblocks:
             if weight_index > 0: 
-                print(len(weights_a),weight_index)
                 current_alpha = weights_a[weight_index - 1] 
                 if usebeta: current_beta = weights_b[weight_index - 1] 
 
