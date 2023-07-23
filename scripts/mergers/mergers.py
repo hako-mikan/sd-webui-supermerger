@@ -20,7 +20,7 @@ from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
-from scripts.mergers.model_util import filenamecutter,savemodel
+from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel
 from math import ceil
 from multiprocessing import cpu_count
 from threading import Lock
@@ -115,6 +115,7 @@ NUM_MID_BLOCK = 1
 NUM_OUTPUT_BLOCKS = 12
 NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
+BLOCKIDXLL=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","VAE"]
 BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
 
 RANDMAP = [0,50,100] #alpha,beta,elements
@@ -356,7 +357,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         if block == "Not Merge": continue
         weight_index, _ = numfromblock(block,isxl)
 
-        blockids = BLOCKIDXL if isxl else BLOCKID
+        blockids = BLOCKIDXLL if isxl else BLOCKID
             
         if useblocks:
             if weight_index > 0: 
@@ -1086,16 +1087,16 @@ def blockfromkey(key,isxl):
 def numfromblock(id,isxl):
     if isxl:
         if "IN" in id:
-            output = id[:3]
+            output = "IN0" + id[2]
         elif "OUT" in id:
-            output = id[:4]
+            output = "OUT0" + id[3]
         elif "MID" in id:
-            output = "M"
+            output = "M00"
         elif "BASE" in id:
             output = "BASE"
         elif "VAE" == id:
             output = id
-        return BLOCKIDXL.index(output), output
+        return BLOCKIDXLL.index(output), output
     else:
         return BLOCKID.index(id), id
 
