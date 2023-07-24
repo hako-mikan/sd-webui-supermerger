@@ -178,6 +178,19 @@ LoRA related functions. It is basically the same as kohya-ss scripts, but it sup
 Note: LyCORIS supports only single merge due to its special structure. Only ratios of 1,0 can be used for single merges. If any other value is used, the result will not match the Block weight LoRA result, even if the value is "SAME TO STRENGTH".
 LoCon will match reasonably well even with non-integers.
 
+LoCon/LyCORIS merge to model is enable in web-ui 1.5 
+|  1.X     | LoRA  | LoCon | LyCORIS |
+|----------|-------|-------|---------|
+| Merge to Model |   Yes   | Yes   | Yes     |
+| Merge LoRAs   |    Yes   | Yes    | No     |
+| Extract From Models   | Yes    | No    | No      |
+
+|  XL     | LoRA  | LoCon | LyCORIS |
+|----------|-------|-------|---------|
+| Merge to Model |   Yes   | Yes   | Yes     |
+| Merge LoRAs   |    Yes   | Yes    | No     |
+| Extract From Models   | No    | No    | No      |
+
 ### merge to checkpoint
 Merge LoRAs into a model. Multiple LoRAs can be merged at the same time.  
 Enter LoRA name1:ratio1:block1,LoRA name2:ratio2:block2,... 
