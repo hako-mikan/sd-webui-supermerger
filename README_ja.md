@@ -172,6 +172,19 @@ LoRA関連の機能です。基本的にはkohya-ssのスクリプトと同じ�
 注意：LyCORISは構造が特殊なため単独マージのみに対応しています。単独マージの比率は1,0のみ使用可能です。他の値を用いるとsame to Strengthでも階層LoRAの結果と一致しません。
 LoConは整数以外でもそれなりに一致します。
 
+LoCon/LyCoris のモデルへのマージにはweb-ui1.5が必要です。
+|  1.X     | LoRA  | LoCon | LyCORIS |
+|----------|-------|-------|---------|
+| Merge to Model |   Yes   | Yes   | Yes     |
+| Merge LoRAs   |    Yes   | Yes    | No     |
+| Extract From Models   | Yes    | No    | No      |
+
+|  XL     | LoRA  | LoCon | LyCORIS |
+|----------|-------|-------|---------|
+| Merge to Model |   Yes   | Yes   | Yes     |
+| Merge LoRAs   |    Yes   | Yes    | No     |
+| Extract From Models   | No    | No    | No      |
+
 ### merge to checkpoint
 モデルにLoRAをマージします。複数のLoRAを同時にマージできます。  
 LoRA名1:マージ比率1:階層,LoRA名2:階層,マージ比率2,LoRA名3:マージ比率3･･･  
