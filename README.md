@@ -11,11 +11,10 @@
 
 XL capabilities at the moment:XLでいまできること  
 Merge/Block merge/マージ/階層マージ  
+Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ
 
 Cannot be done:できないこと
-Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ(数日中に対応)  
-Creating LoRA from model differences (undecided)/モデル差分からLoRA作成(未定)  
-LyCORIS is not supported./LyCORISは対応しません。  
+Creating LoRA from model differences (TBD)/モデル差分からLoRA作成(未定)  
 
 **Attention!**
 
