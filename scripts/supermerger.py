@@ -23,8 +23,8 @@ reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen, blockfromkey, numfromblock)
-from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
+from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen, blockfromkey)
+from scripts.mergers.xyplot import freezetime, nulister, numanager
 from scripts.mergers.model_util import filenamecutter
 
 gensets=argparse.Namespace()
@@ -327,12 +327,18 @@ def on_ui_tabs():
                 history = gr.Dataframe(
                         headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
                 )
+    
+        import lora
 
         with gr.Tab("Elements", elem_id="tab_deep"):
                 with gr.Row():
                     smd_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
                     create_refresh_button(smd_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
                     smd_loadkeys = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    smd_lora = gr.Dropdown(lora.available_loras.keys(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    create_refresh_button(smd_lora, lora.available_loras.keys(),lambda: {"choices": lora.available_loras.keys()},"refresh_checkpoint_Z")    
+                    smd_loadkeys_l = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
 
@@ -350,11 +356,8 @@ def on_ui_tabs():
             outputs=[metadata]
         )                 
 
-        smd_loadkeys.click(
-            fn=loadkeys,
-            inputs=[smd_model_a],
-            outputs=[keys]
-        )
+        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,dfalse],outputs=[keys])
+        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,dtrue],outputs=[keys])
 
         def unload():
             if shared.sd_model == None: return "already unloaded"
@@ -702,13 +705,20 @@ def modeltype(sd):
         modeltype = "1.X or 2.X"
     return modeltype
 
-def loadkeys(model_a):
-    sd = loadmodel(model_a)
+def loadkeys(model_a, lora):
+    if lora:
+        import lora
+        sd = sd_models.read_state_dict(lora.available_loras[model_a].filename,"cpu")
+    else:
+        sd = loadmodel(model_a)
     keys = []
     mtype = modeltype(sd)
-    for i, key in enumerate(sd.keys()):
-        
-        keys.append([i,blockfromkey(key,mtype),key])
+    if lora:
+        for i, key in enumerate(sd.keys()):
+            keys.append([i,"LoRA",key,sd[key].shape])
+    else:    
+        for i, key in enumerate(sd.keys()):
+            keys.append([i,blockfromkey(key,mtype),key,sd[key].shape])
 
     return keys
 
@@ -767,8 +777,7 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
                 a_flat = a[key].view(-1).to(torch.float32)
                 b_flat = b[key].view(-1).to(torch.float32)
                 simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
-                if block is None: block = blockfromkey(key,isxl)
-                _, block = numfromblock(block, isxl)
+                if block is None: block,blocks26 = blockfromkey(key,isxl)
                 cosine_similarities.append([block, key, round(simab.item()*100,3)])
                 blocksim[block].append(round(simab.item()*100,3))
                 if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
