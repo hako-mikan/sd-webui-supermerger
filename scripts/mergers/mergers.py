@@ -353,9 +353,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 assert a.shape[1] == 9 and b.shape[1] == 4, f"Bad dimensions for merged layer {key}: A={a.shape}, B={b.shape}"
                 result_is_inpainting_model = True
 
-        block = blockfromkey(key,isxl)
+        block,blocks26 = blockfromkey(key,isxl)
         if block == "Not Merge": continue
-        weight_index, _ = numfromblock(block,isxl)
+        weight_index, _ = BLOCKIDXLL.index(blocks26)
 
         blockids = BLOCKIDXLL if isxl else BLOCKID
             
@@ -1070,35 +1070,19 @@ def blockfromkey(key,isxl):
         return BLOCKID[weight_index+1] 
 
     else:
-        if not ("weight" in key or "bias" in key):return "Not Merge"
-        if "label_emb" in key or "time_embed" in key: return "Not Merge"
-        if "conditioner.embedders" in key : return "BASE"
-        if "first_stage_model" in key : return "VAE"
+        if not ("weight" in key or "bias" in key):return "Not Merge","Not Merge"
+        if "label_emb" in key or "time_embed" in key: return "Not Merge","Not Merge"
+        if "conditioner.embedders" in key : return "BASE","BASE"
+        if "first_stage_model" in key : return "VAE","BASE"
         if "model.diffusion_model" in key:
-            if "model.diffusion_model.out." in key: return "OUT8"
+            if "model.diffusion_model.out." in key: return "OUT8","OUT08"
             block = re.findall(r'input|mid|output', key)
             block = block[0].upper().replace("PUT","") if block else ""
             nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
             add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
-            return block + nums + add
+            return block + nums + add, block + "0" + nums[0]
 
     return "Not Merge"
-
-def numfromblock(id,isxl):
-    if isxl:
-        if "IN" in id:
-            output = "IN0" + id[2]
-        elif "OUT" in id:
-            output = "OUT0" + id[3]
-        elif "MID" in id:
-            output = "M00"
-        elif "BASE" in id:
-            output = "BASE"
-        elif "VAE" == id:
-            output = id
-        return BLOCKIDXLL.index(output), output
-    else:
-        return BLOCKID.index(id), id
 
 def fineman(fine):
     fine = [
