@@ -393,8 +393,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
+                theta_0 = None
                 del theta_0
-
 
                 if xcount == 0: statid = modelid
 

@@ -355,21 +355,19 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         block,blocks26 = blockfromkey(key,isxl)
         if block == "Not Merge": continue
-        weight_index, _ = BLOCKIDXLL.index(blocks26)
+        weight_index = BLOCKID.index(blocks26)
 
-        blockids = BLOCKIDXLL if isxl else BLOCKID
-            
         if useblocks:
             if weight_index > 0: 
                 current_alpha = weights_a[weight_index - 1] 
                 if usebeta: current_beta = weights_b[weight_index - 1] 
 
         if len(deep) > 0:
-            skey = key + blockids[weight_index]
+            skey = key + BLOCKID[weight_index]
             for d in deep:
                 if d.count(":") != 2 :continue
                 dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
-                dbs = blocker(dbs,blockids)
+                dbs = blocker(dbs,BLOCKID)
                 dbs,dws = dbs.split(" "), dws.split(" ")
                 dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
                 dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
@@ -1067,7 +1065,7 @@ def blockfromkey(key,isxl):
                     if m:
                         out_idx = int(m.groups()[0])
                         weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-        return BLOCKID[weight_index+1] 
+        return BLOCKID[weight_index+1] ,BLOCKID[weight_index+1] 
 
     else:
         if not ("weight" in key or "bias" in key):return "Not Merge","Not Merge"
@@ -1080,9 +1078,9 @@ def blockfromkey(key,isxl):
             block = block[0].upper().replace("PUT","") if block else ""
             nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
             add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
-            return block + nums + add, block + "0" + nums[0]
+            return block + nums + add, block + "0" + nums[0] if "MID" not in block else "M00"
 
-    return "Not Merge"
+    return "Not Merge", "Not Merge"
 
 def fineman(fine):
     fine = [
