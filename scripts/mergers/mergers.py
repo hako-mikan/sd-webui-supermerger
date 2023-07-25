@@ -355,7 +355,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         block,blocks26 = blockfromkey(key,isxl)
         if block == "Not Merge": continue
-        weight_index = BLOCKID.index(blocks26)
+        weight_index = BLOCKIDXLL.index(blocks26) if isxl else BLOCKID.index(blocks26)
 
         if useblocks:
             if weight_index > 0: 
