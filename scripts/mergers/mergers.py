@@ -679,7 +679,7 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
                 theta_0[key] = theta_0[key] + key_and_alpha[key] * theta_1[key]
 
         with lock_progress:
-            progress.update(len(keys))
+            theta_0[key] = theta_0[key].clone() * current_alpha
 
         return True
 
