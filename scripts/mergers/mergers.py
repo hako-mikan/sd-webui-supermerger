@@ -563,6 +563,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
                 theta_0[key] = theta_t
 
+        elif calcmode == "self":
+            theta_0[key] = theta_0[key] * current_alpha
+
         if any(item in key for item in FINETUNES) and fine:
             index = FINETUNES.index(key)
             if 5 > index : 
