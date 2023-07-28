@@ -750,7 +750,7 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
     blockvals = []
     attn2 = {}
     isxl = "XL" == modeltype(a)
-    blockids = BLOCKIDXL if isxl else BLOCKID
+    blockids = BLOCKIDXLL if isxl else BLOCKID
     for bl in blockids:
         blocksim[bl] = []
     blocksim["VAE"] = []
@@ -778,14 +778,16 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
                 b_flat = b[key].view(-1).to(torch.float32)
                 simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
                 if block is None: block,blocks26 = blockfromkey(key,isxl)
+                if block =="Not Merge" :continue
                 cosine_similarities.append([block, key, round(simab.item()*100,3)])
-                blocksim[block].append(round(simab.item()*100,3))
+                blocksim[blocks26].append(round(simab.item()*100,3))
                 if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
 
         for bl in blockids:
             val = None
             if bl == "Not Merge": continue
             if bl not in blocksim.keys():continue
+            if blocksim[bl] == []: continue
             if "Mean" in calc:
                 val = mean(blocksim[bl])
             elif "Min" in calc:
