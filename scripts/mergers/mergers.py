@@ -20,7 +20,7 @@ from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
-from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel,load_model
+from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel,usemodel
 from math import ceil
 from multiprocessing import cpu_count
 from threading import Lock
@@ -95,7 +95,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return result,"not loaded",*non4
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-    load_model(checkpoint_info, already_loaded_state_dict=theta_0)
+    usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
 
     save = True if SAVEMODES[0] in save_sets else False
 

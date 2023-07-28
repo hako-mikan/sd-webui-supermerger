@@ -10,7 +10,7 @@ from PIL import Image
 from modules import images, sd_models, devices
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
-from scripts.mergers.model_util import savemodel,load_model
+from scripts.mergers.model_util import savemodel,usemodel
 
 hear = True
 hearm = False

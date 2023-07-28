@@ -890,7 +890,7 @@ def setup_for_low_vram_s(sd_model, use_medvram):
 
 import modules.sd_models as msd
 
-def load_model(checkpoint_info=None, already_loaded_state_dict=None):
+def usemodel(checkpoint_info=None, already_loaded_state_dict=None):
     from modules import lowvram, sd_hijack
     checkpoint_info = checkpoint_info or msd.select_checkpoint()
 
