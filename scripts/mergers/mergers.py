@@ -20,7 +20,7 @@ from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
-from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel
+from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel,load_model
 from math import ceil
 from multiprocessing import cpu_count
 from threading import Lock
@@ -95,7 +95,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return result,"not loaded",*non4
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-    sd_models.load_model(checkpoint_info, already_loaded_state_dict=theta_0)
+    load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
     save = True if SAVEMODES[0] in save_sets else False
 
@@ -257,7 +257,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if stopmerge: return "STOPPED", *non4
     
     if  "tensor" in calcmode or "self" in calcmode:
-        theta_t = load_model_weights_m(model_a,True,False,save)
+        theta_t = load_model_weights_m(model_a,True,False,save).copy()
         theta_0 ={}
         for key in theta_t:
             theta_0[key] = theta_t[key].clone()
@@ -564,7 +564,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 theta_0[key] = theta_t
 
         elif calcmode == "self":
-            theta_0[key] = theta_0[key] * current_alpha
+            theta_0[key] = theta_0[key].clone() * current_alpha
 
         if any(item in key for item in FINETUNES) and fine:
             index = FINETUNES.index(key)
@@ -679,7 +679,7 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
                 theta_0[key] = theta_0[key] + key_and_alpha[key] * theta_1[key]
 
         with lock_progress:
-            theta_0[key] = theta_0[key].clone() * current_alpha
+            progress.update(len(keys))
 
         return True
 
