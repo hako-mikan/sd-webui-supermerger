@@ -336,7 +336,7 @@ def on_ui_tabs():
                     create_refresh_button(smd_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
                     smd_loadkeys = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
-                    smd_lora = gr.Dropdown(lora.available_loras.keys(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    smd_lora = gr.Dropdown(list(lora.available_loras.keys()),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
                     create_refresh_button(smd_lora, lora.available_loras.keys(),lambda: {"choices": lora.available_loras.keys()},"refresh_checkpoint_Z")    
                     smd_loadkeys_l = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
