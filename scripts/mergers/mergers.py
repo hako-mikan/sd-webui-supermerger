@@ -256,7 +256,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if stopmerge: return "STOPPED", *non4
     
-    if  "tensor" in calcmode:
+    if  "tensor" in calcmode or "self" in calcmode:
         theta_t = load_model_weights_m(model_a,True,False,save)
         theta_0 ={}
         for key in theta_t:
