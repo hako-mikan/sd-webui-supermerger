@@ -299,20 +299,28 @@ def on_ui_tabs():
 
                     
         with gr.Tab("Analysis", elem_id="tab_analysis"):
-            with gr.Row():
-                an_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
-                create_refresh_button(an_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
-                an_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
-                create_refresh_button(an_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
-            with gr.Row():
-                an_mode  = gr.Radio(label = "Analysis Mode",choices = ["ASimilarity","Block","Element","Both"], value = "ASimilarity",type  = "value") 
-                an_calc  = gr.Radio(label = "Block method",choices = ["Mean","Min","attn2"], value = "Mean",type  = "value") 
-                an_include  = gr.CheckboxGroup(label = "Include",choices = ["Textencoder(BASE)","U-Net","VAE"], value = ["Textencoder(BASE)","U-Net"],type  = "value") 
-                an_settings = gr.CheckboxGroup(label = "Settings",choices=["save as txt", "save as csv"],type="value",interactive=True)
-            with gr.Row():
-                run_analysis = gr.Button(value="Run Analysis",variant='primary')
-            with gr.Row():
-                analysis_cosdif = gr.Dataframe(headers=["block","key","similarity[%]"],)
+            with gr.Tab("Models"):
+                with gr.Row():
+                    an_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    create_refresh_button(an_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                    an_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
+                    create_refresh_button(an_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                with gr.Row():
+                    an_mode  = gr.Radio(label = "Analysis Mode",choices = ["ASimilarity","Block","Element","Both"], value = "ASimilarity",type  = "value") 
+                    an_calc  = gr.Radio(label = "Block method",choices = ["Mean","Min","attn2"], value = "Mean",type  = "value") 
+                    an_include  = gr.CheckboxGroup(label = "Include",choices = ["Textencoder(BASE)","U-Net","VAE"], value = ["Textencoder(BASE)","U-Net"],type  = "value") 
+                    an_settings = gr.CheckboxGroup(label = "Settings",choices=["save as txt", "save as csv"],type="value",interactive=True)
+                with gr.Row():
+                    run_analysis = gr.Button(value="Run Analysis",variant='primary')
+                with gr.Row():
+                    analysis_cosdif = gr.Dataframe(headers=["block","key","similarity[%]"],)
+            with gr.Tab("Text Encoder"):
+                    with gr.Row():
+                        te_smd_loadkeys = gr.Button(value="Calculate Textencoer",variant='primary')
+                        te_smd_searchkeys = gr.Button(value="Search Word(red,blue,girl,...)",variant='primary')
+                        exclude = gr.Checkbox(label="exclude non numeric,alphabet,symbol word")
+                    pickupword = gr.TextArea()
+                    encoded = gr.Dataframe()
 
         run_analysis.click(fn=calccosinedif,inputs=[an_model_a,an_model_b,an_mode,an_settings,an_include,an_calc],outputs=[analysis_cosdif])    
 
@@ -337,7 +345,7 @@ def on_ui_tabs():
                     smd_loadkeys = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
                     smd_lora = gr.Dropdown(list(lora.available_loras.keys()),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
-                    create_refresh_button(smd_lora, lora.available_loras.keys(),lambda: {"choices": lora.available_loras.keys()},"refresh_checkpoint_Z")    
+                    create_refresh_button(smd_lora, list(lora.available_loras.keys()),lambda: {"choices": list(lora.available_loras.keys())},"refresh_checkpoint_Z")    
                     smd_loadkeys_l = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
@@ -358,6 +366,10 @@ def on_ui_tabs():
 
         smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,dfalse],outputs=[keys])
         smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,dtrue],outputs=[keys])
+
+        te_smd_loadkeys.click(fn=encodetexts,inputs=[exclude],outputs=[encoded])
+        te_smd_searchkeys.click(fn=pickupencode,inputs=[pickupword],outputs=[encoded])
+        
 
         def unload():
             if shared.sd_model == None: return "already unloaded"
@@ -899,6 +911,63 @@ def configdealer(prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_siz
 
     with open(jsonpath, 'w') as file:
         json.dump(json_data, file, indent=4)
+
+sorted_output = []
+
+def encodetexts(exclude):
+    isxl = hasattr(shared.sd_model,"conditioner")
+    model = shared.sd_model.conditioner.embedders[0] if isxl else shared.sd_model.cond_stage_model
+    encoder = model.encode_with_transformers
+    tokenizer = model.tokenizer
+    vocab = tokenizer.get_vocab()
+
+    batch = 500
+
+    b_texts = [list(vocab.items())[i:i + batch] for i in range(0, len(vocab), batch)]
+
+    output = []
+
+    for texts in tqdm(b_texts):    
+        batch = []
+        words = []
+        for word, idx in texts:
+            tokens = [model.id_start, idx, model.id_end] + [model.id_end] * 74
+            batch.append(tokens)
+            words.append((idx, word))
+        
+        embedding = encoder(torch.IntTensor(batch).to("cuda"))[:,1,:] # (bs,768)
+        embedding = embedding.to('cuda')
+        emb_norms = torch.linalg.vector_norm(embedding, dim=-1) # (bs,)
+        
+        for i, (word, token) in enumerate(texts):
+            if exclude:
+                if has_alphanumeric(word) : output.append([word,token,emb_norms[i].item()])
+            else:
+                output.append([word,token,emb_norms[i].item()])
+
+    output = sorted(output, key=lambda x: x[2], reverse=True)
+    for i in range(len(output)):
+        output[i].insert(0,i)
+
+    global sorted_output
+    sorted_output = output
+
+    return output[:1000]
+
+def pickupencode(texts):
+    wordlist = [x[1] for x in sorted_output]
+    texts = texts.split(",")
+    output = []
+    for text in texts:
+        if text in wordlist:
+            output.append(sorted_output[wordlist.index(text)])
+        if text+"</w>" in wordlist:
+            output.append(sorted_output[wordlist.index(text+"</w>")])
+    return output
+
+def has_alphanumeric(text):
+    pattern = re.compile(r'[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;"\'<>,.?/\|\\]')
+    return bool(pattern.search(text.replace("</w>","")))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
