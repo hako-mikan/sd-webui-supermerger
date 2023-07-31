@@ -32,15 +32,25 @@ class GenParamGetter(modules_scripts.Script):
     txt2img_gen_button = None
     img2img_gen_button = None
 
-    txt2img_params = None
-    img2img_params = None
+    txt2img_params = []
+    img2img_params = []
+
+    def __init__(self) -> None:
+        super().__init__()
+        script_callbacks.on_app_started(lambda demo, app: self.get_params_components(demo))
+
+    def title(self):
+        return "Super Marger Generation Parameter Getter"
+    
+    def show(self, is_img2img):
+        return False
 
     def after_component(self, component: gr.components.Component, **_kwargs):
         """Find generate button"""
         if component.elem_id == "txt2img_generate":
-            self.txt2img_gen_button = component
+            GenParamGetter.txt2img_gen_button = component
         elif  component.elem_id == "img2img_generate":
-            self.img2img_gen_button = component
+            GenParamGetter.img2img_gen_button = component
 
     def get_components_by_ids(self, root: gr.Blocks, ids: list[int]):
         components: list[gr.Blocks] = []
@@ -49,17 +59,17 @@ class GenParamGetter(modules_scripts.Script):
             components.append(root)
             ids = [_id for _id in ids if _id != root._id]
 
-        if isinstance(root, gr.BlockContext):
+        if isinstance(root, gr.components.BlockContext):
             for block in root.children:
                 components.extend(self.get_components_by_ids(block, ids))
 
         return components
     
-    def compare_components_with_ids(components: list[gr.Blocks], ids: list[int]):
+    def compare_components_with_ids(self, components: list[gr.Blocks], ids: list[int]):
         return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
 
-    def get_params_components(self, demo: gr.Blocks, app):
-        dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and (self.txt2img_gen_button._id if self.is_txt2img else self.img2img_gen_button) in x["targets"]]
+    def get_params_components(self, demo: gr.Blocks):
+        dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and (GenParamGetter.txt2img_gen_button._id if self.is_txt2img else GenParamGetter.img2img_gen_button._id) in x["targets"]]
         dependency: dict = None
         cnet_dependency: dict = None
         UiControlNetUnit = None
@@ -77,10 +87,12 @@ class GenParamGetter(modules_scripts.Script):
             elif len(d["outputs"]) == 4:
                 dependency = d
 
+        params = [params for params in demo.fns if self.compare_components_with_ids(params.inputs, dependency["inputs"])]
+
         if self.is_txt2img:
-            self.txt2img_params = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
+            GenParamGetter.txt2img_params = params[0].inputs
         elif self.is_img2img:
-            self.img2img_params = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
+            GenParamGetter.txt2img_params = params[0].inputs
 
 path_root = basedir()
 
@@ -1018,4 +1030,3 @@ def has_alphanumeric(text):
     return bool(pattern.search(text.replace("</w>","")))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
-script_callbacks.on_after_component(GenParamGetter.get_params_components)
