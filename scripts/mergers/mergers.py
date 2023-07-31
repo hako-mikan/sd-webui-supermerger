@@ -932,8 +932,7 @@ def eratiodealer(dr,randomer,block,num,lucks):
     else:
         return float(dr)
 
-def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-            id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
+def simggen(id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
             mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
     override_settings = create_override_settings_dict(override_settings_texts)
@@ -974,22 +973,6 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
 
     p.scripts = scripts.scripts_txt2img
     p.script_args = args
-
-    p.batch_size = int(s_batch_size)
-    p.prompt = prompt if s_prompt == "" else s_prompt
-    p.negative_prompt = negative_prompt if s_nprompt == "" else s_nprompt
-    p.steps = steps if s_steps == 0 else s_steps
-    try:
-        p.sampler_name = sd_samplers.samplers[sampler_index].name if s_sampler == 0 or s_sampler == None else sd_samplers.samplers[s_sampler-1].name
-    except:
-        print(f"{bcolors.Fail}Error:sampler:{sampler_index},s_sampler:{s_sampler}{bcolors.ENDC}")
-    p.cfg_scale = cfg_scale  if s_cfg == 0 else s_cfg
-    p.seed = seed  if s_seed == 0 else s_seed
-    p.width = width  if s_w == 0 else s_w
-    p.height = height  if s_h == 0 else s_h
-    p.seed_resize_from_w=0
-    p.seed_resize_from_h=0
-    p.denoising_strength=None
 
     p.cached_c = [None,None]
     p.cached_uc = [None,None]

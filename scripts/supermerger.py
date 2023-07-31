@@ -414,7 +414,7 @@ def on_ui_tabs():
 
         gen.click(
             fn=simggen,
-            inputs=[*genparams,*GenParamGetter.txt2img_params,currentmodel,id_sets],
+            inputs=[*GenParamGetter.txt2img_params,currentmodel,id_sets],
             outputs=[*imagegal],
         )
 
