@@ -32,8 +32,8 @@ class GenParamGetter(modules_scripts.Script):
     txt2img_gen_button = None
     img2img_gen_button = None
 
-    txt2img_args = None
-    img2img_args = None
+    txt2img_params = None
+    img2img_params = None
 
     def after_component(self, component: gr.components.Component, **_kwargs):
         """Find generate button"""
@@ -78,16 +78,9 @@ class GenParamGetter(modules_scripts.Script):
                 dependency = d
 
         if self.is_txt2img:
-            self.txt2img_args = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
+            self.txt2img_params = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
         elif self.is_img2img:
-            self.img2img_args = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
-
-gensets=argparse.Namespace()
-
-def on_ui_train_tabs(params):
-    txt2img_preview_params=params.txt2img_preview_params
-    gensets.txt2img_preview_params=txt2img_preview_params
-    return None
+            self.img2img_params = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
 
 path_root = basedir()
 
@@ -462,49 +455,49 @@ def on_ui_tabs():
 
         merge.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks,currentmodel,dfalse],
+            inputs=[*msettings,esettings1,*GenParamGetter.txt2img_params,*genparams,*lucks,currentmodel,dfalse],
             outputs=[submit_result,currentmodel]
         )
 
         mergeandgen.click(
             fn=smergegen,
-            inputs=[*msettings,esettings1,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks,currentmodel,dtrue],
+            inputs=[*msettings,esettings1,*GenParamGetter.txt2img_params,*genparams,*lucks,currentmodel,dtrue],
             outputs=[submit_result,currentmodel,*imagegal]
         )
 
         gen.click(
             fn=simggen,
-            inputs=[*gensets.txt2img_preview_params,*hiresfix,*genparams,currentmodel,id_sets],
+            inputs=[*GenParamGetter.txt2img_params,*genparams,currentmodel,id_sets],
             outputs=[*imagegal],
         )
 
         s_reserve.click(
             fn=numanager,
-            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*GenParamGetter.txt2img_params,*genparams,*lucks],
             outputs=[numaframe]
         )
 
         s_reserve1.click(
             fn=numanager,
-            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*GenParamGetter.txt2img_params,*genparams,*lucks],
             outputs=[numaframe]
         )
 
         gengrid.click(
             fn=numanager,
-            inputs=[gr.Textbox(value="normal",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value="normal",visible=False),*xysettings,*msettings,*GenParamGetter.txt2img_params,*genparams,*lucks],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         s_startreserve.click(
             fn=numanager,
-            inputs=[gr.Textbox(value=" ",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value=" ",visible=False),*xysettings,*msettings,*GenParamGetter.txt2img_params,*genparams,*lucks],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
         rand_merge.click(
             fn=numanager,
-            inputs=[gr.Textbox(value="random",visible=False),*xysettings,*msettings,*gensets.txt2img_preview_params,*hiresfix,*genparams,*lucks],
+            inputs=[gr.Textbox(value="random",visible=False),*xysettings,*msettings,*GenParamGetter.txt2img_params,*genparams,*lucks],
             outputs=[submit_result,currentmodel,*imagegal],
         )
 
@@ -1025,5 +1018,4 @@ def has_alphanumeric(text):
     return bool(pattern.search(text.replace("</w>","")))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
-script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
 script_callbacks.on_after_component(GenParamGetter.get_params_components)
