@@ -702,12 +702,15 @@ def lbw(lora,lwei):
 LORAANDSOON = {
     "LoraHadaModule" : "w1a",
     "LycoHadaModule" : "w1a",
+    "NetworkModuleHada": "w1a",
     "FullModule" : "weight",
+    "NetworkModuleFull": "weight",
     "IA3Module" : "w",
+    "NetworkModuleIa3" : "w",
     "LoraKronModule" : "w1",
     "LycoKronModule" : "w1",
+    "NetworkModuleLokr": "w1",
 }
-
 
 def save_to_file(file_name, model, state_dict, dtype, meta):
     if dtype is not None:
