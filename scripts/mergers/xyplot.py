@@ -11,6 +11,7 @@ from modules import images, sd_models, devices
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
 from scripts.mergers.model_util import savemodel,usemodel
+from scripts.GenParamGetter import GenParamGetter
 
 hear = True
 hearm = False
@@ -41,9 +42,9 @@ def freezetime():
 def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                     useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,
-                    id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
                     prompt_s,nprompt_s,steps_s,sampler_s,cfg_s,seed_s,w_s,h_s,batch_size_s,
-                    lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround):
+                    lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
+                    id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args):
     global numadepth
     grids = []
     sep = "|"
@@ -396,7 +397,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 if xcount == 0: statid = modelid
 
-                image_temp = simggen(*gensets,*hr_sets,*gensets_s,batch_size,currentmodel,id_sets,modelid)
+                image_temp = simggen(*gensets_s,batch_size,*GenParamGetter.txt2img_params,currentmodel,id_sets,modelid)
                 gc.collect()
                 devices.torch_gc()
 

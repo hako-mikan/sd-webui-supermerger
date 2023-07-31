@@ -78,10 +78,10 @@ def casterr(*args,hear=hear):
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
                        calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                        esettings,
-                       id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                        lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
-                       currentmodel,imggen):
+                       currentmodel,imggen,
+                       id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args):
 
     lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
     deepprint  = True if "print change" in esettings else False
@@ -104,8 +104,9 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     devices.torch_gc()
 
     if imggen :
-        images = simggen(id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
-                                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,currentmodel,id_sets,modelid)
+        images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
+                         id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
+                         mergeinfo=currentmodel,id_sets=id_sets,modelid=modelid)
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -931,8 +932,9 @@ def eratiodealer(dr,randomer,block,num,lucks):
     else:
         return float(dr)
 
-def simggen(id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
-                   s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
+def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
+            id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
+            mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
     override_settings = create_override_settings_dict(override_settings_texts)
     p = processing.StableDiffusionProcessingTxt2Img(
