@@ -8,7 +8,8 @@ import shutil
 from importlib import reload
 from pprint import pprint
 import gradio as gr
-from modules import (devices, script_callbacks, scripts, sd_hijack, sd_models,sd_vae, shared)
+from modules import (devices, script_callbacks, sd_hijack, sd_models,sd_vae, shared)
+import modules.scripts as modules_scripts
 from modules.scripts import basedir
 from modules.sd_models import checkpoints_loaded
 from modules.shared import opts
@@ -27,7 +28,7 @@ from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,s
 from scripts.mergers.xyplot import freezetime, nulister, numanager
 from scripts.mergers.model_util import filenamecutter
 
-class GenParamGetter(scripts.Script):
+class GenParamGetter(modules_scripts.Script):
     txt2img_gen_button = None
     img2img_gen_button = None
 
@@ -77,9 +78,9 @@ class GenParamGetter(scripts.Script):
                 dependency = d
 
         if self.is_txt2img:
-            self.txt2img_args = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"]))
+            self.txt2img_args = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
         elif self.is_img2img:
-            self.img2img_args = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"]))
+            self.img2img_args = next(args for args in demo.fns if self.compare_components_with_ids(demo.inputs, dependency["inputs"])).inputs
 
 gensets=argparse.Namespace()
 
@@ -1025,3 +1026,4 @@ def has_alphanumeric(text):
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)
+script_callbacks.on_after_component(GenParamGetter.get_params_components)
