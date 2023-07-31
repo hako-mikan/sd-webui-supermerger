@@ -15,12 +15,12 @@ import scipy.ndimage
 from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
-from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts
+from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
-from modules.sd_models import  load_model,checkpoints_loaded
-from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
+from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
+from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel,usemodel
 from math import ceil
 from multiprocessing import cpu_count
 from threading import Lock
@@ -28,10 +28,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from inspect import currentframe
 
-from math import ceil
-from multiprocessing import cpu_count
-from threading import Lock
-from concurrent.futures import ThreadPoolExecutor, as_completed
+def tryit(func):
+    try:
+        func() 
+    except:
+        pass 
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 stopmerge = False
 
@@ -82,13 +94,14 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     if "ERROR" in result or "STOPPED" in result: 
         return result,"not loaded",*non4
 
-    usemodelgen(theta_0,model_a,currentmodel)
+    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+    usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
 
     save = True if SAVEMODES[0] in save_sets else False
 
     result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
     del theta_0
-    gc.collect()
+    devices.torch_gc()
 
     if imggen :
         images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
@@ -102,6 +115,8 @@ NUM_MID_BLOCK = 1
 NUM_OUTPUT_BLOCKS = 12
 NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
+BLOCKIDXLL=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","VAE"]
+BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
 
 RANDMAP = [0,50,100] #alpha,beta,elements
 
@@ -112,8 +127,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
-
-    gc.collect()
 
     # for from file
     if type(useblocks) is str:
@@ -165,7 +178,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     caster(mergedmodel,False)
 
     if calcmode == calcmode == "trainDifference" and "Add" not in mode:
-        print("mode changed to add difference")
+        print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
         mode = "Add"
 
     result_is_inpainting_model = False
@@ -188,12 +201,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         base_alpha  = float(weights_a_t[0])    
         weights_a = [float(w) for w in weights_a_t[1].split(',')]
         caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
-        if len(weights_a) != 25:return f"ERROR: weights alpha value must be {26}.",*non4
+        if not (len(weights_a) == 25 or len(weights_a) == 19):return f"ERROR: weights alpha value must be 20 or 26.",*non4
         if usebeta:
             base_beta = float(weights_b_t[0]) 
             weights_b = [float(w) for w in weights_b_t[1].split(',')]
             caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
-            if len(weights_b) != 25: return f"ERROR: weights beta value must be {26}.",*non4
+            if not(len(weights_b) == 25 or len(weights_b) == 19): return f"ERROR: weights beta value must be 20 or 26.",*non4
         
     caster("model load start",hearm)
 
@@ -210,14 +223,28 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  Weights Seed\t: {lucks['ceed']}")
     print(f"  Adjust \t: {fine}")
 
-    theta_1=load_model_weights_m(model_b,False,True,save).copy()
+    tryit(unload_model_weights)
+
+    theta_1=load_model_weights_m(model_b,False,True,save)
+    isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
+
+    if isxl and useblocks:
+        if len(weights_a) == 25:
+            weights_a = weighttoxl(weights_a)
+            print(f"weight converted for XL{weights_a}")
+        if usebeta:
+            if len(weights_b) == 25:
+                weights_b = weighttoxl(weights_b)
+                print(f"weight converted for XL{weights_b}")
+        if len(weights_a) == 19: weights_a = weights_a + [0]
+        if len(weights_b) == 19: weights_b = weights_b + [0]
 
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
         if calcmode == "trainDifference":
-            theta_2 = load_model_weights_m(model_c,True,False,save).copy()
+            theta_2 = load_model_weights_m(model_c,True,False,save)
         else:
-            theta_2 = load_model_weights_m(model_c,False,False,save).copy()
+            theta_2 = load_model_weights_m(model_c,False,False,save)
             for key in tqdm(theta_1.keys()):
                 if 'model' in key:
                     if key in theta_2:
@@ -229,17 +256,17 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if stopmerge: return "STOPPED", *non4
     
-    if  "tensor" in calcmode:
+    if  "tensor" in calcmode or "self" in calcmode:
         theta_t = load_model_weights_m(model_a,True,False,save).copy()
         theta_0 ={}
         for key in theta_t:
             theta_0[key] = theta_t[key].clone()
         del theta_t
     else:
-        theta_0=load_model_weights_m(model_a,True,False,save).copy()
+        theta_0=load_model_weights_m(model_a,True,False,save)
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
-        theta_2 = load_model_weights_m(model_c,False,False,save).copy()
+        theta_2 = load_model_weights_m(model_c,False,False,save)
     else:
         if calcmode != "trainDifference":
             theta_2 = {}
@@ -292,282 +319,263 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
         if stopmerge: return "STOPPED", *non4
-        if "model" in key and key in theta_1:
-            if calcmode == "trainDifference":
-                if key not in theta_2:
-                    continue
-            else:
-               if usebeta and (not key in theta_2) and (not theta_2 == {}) :
-                    continue
-
-            weight_index = -1
-            current_alpha = alpha
-            current_beta = beta
-
-            if key in chckpoint_dict_skip_on_merge:
+        if not ("model" in key and key in theta_1): continue
+        if not ("weight" in key or "bias" in key): continue
+        if calcmode == "trainDifference":
+            if key not in theta_2:
+                continue
+        else:
+            if usebeta and (not key in theta_2) and (not theta_2 == {}) :
                 continue
 
-            a = theta_0[key]
-            b = theta_1[key]
+        weight_index = -1
+        current_alpha = alpha
+        current_beta = beta
 
-            # this enables merging an inpainting model (A) with another one (B);
-            # where normal model would have 4 channels, for latenst space, inpainting model would
-            # have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9
-            if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
-                if a.shape[1] == 4 and b.shape[1] == 9:
-                    raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
-                if a.shape[1] == 4 and b.shape[1] == 8:
-                    raise RuntimeError("When merging instruct-pix2pix model with a normal one, A must be the instruct-pix2pix model.")
+        if key in chckpoint_dict_skip_on_merge:
+            continue
 
-                if a.shape[1] == 8 and b.shape[1] == 4:#If we have an Instruct-Pix2Pix model...
-                    result_is_instruct_pix2pix_model = True
-                else:
-                    assert a.shape[1] == 9 and b.shape[1] == 4, f"Bad dimensions for merged layer {key}: A={a.shape}, B={b.shape}"
-                    result_is_inpainting_model = True
+        a = list(theta_0[key].shape)
+        b = list(theta_1[key].shape)
 
-            # check weighted and U-Net or not
-            if weights_a is not None and 'model.diffusion_model.' in key:
-                # check block index
-                weight_index = -1
+        # this enables merging an inpainting model (A) with another one (B);
+        # where normal model would have 4 channels, for latenst space, inpainting model would
+        # have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9
+        if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+            if a[1] == 4 and b[1] == 9:
+                raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
+            if a[1] == 4 and b[1] == 8:
+                raise RuntimeError("When merging instruct-pix2pix model with a normal one, A must be the instruct-pix2pix model.")
 
-                if 'time_embed' in key:
-                    weight_index = 0                # before input blocks
-                elif '.out.' in key:
-                    weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
-                else:
-                    m = re_inp.search(key)
-                    if m:
-                        inp_idx = int(m.groups()[0])
-                        weight_index = inp_idx
-                    else:
-                        m = re_mid.search(key)
-                        if m:
-                            weight_index = NUM_INPUT_BLOCKS
-                        else:
-                            m = re_out.search(key)
-                            if m:
-                                out_idx = int(m.groups()[0])
-                                weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-
-                if weight_index >= NUM_TOTAL_BLOCKS:
-                    print(f"ERROR: illegal block index: {key}")
-                    return f"ERROR: illegal block index: {key}",*non4
-                
-                if weight_index >= 0 and useblocks:
-                    current_alpha = weights_a[weight_index]
-                    if usebeta: current_beta = weights_b[weight_index]
+            if a[1] == 8 and b[1] == 4:#If we have an Instruct-Pix2Pix model...
+                result_is_instruct_pix2pix_model = True
             else:
-                count_target_of_basealpha = count_target_of_basealpha + 1
+                assert a.shape[1] == 9 and b.shape[1] == 4, f"Bad dimensions for merged layer {key}: A={a.shape}, B={b.shape}"
+                result_is_inpainting_model = True
 
-            if len(deep) > 0:
-                skey = key + BLOCKID[weight_index+1]
-                for d in deep:
-                    if d.count(":") != 2 :continue
-                    dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
-                    dbs = blocker(dbs)
-                    dbs,dws = dbs.split(" "), dws.split(" ")
-                    dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
-                    dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
-                    flag = dbn
-                    for db in dbs:
-                        if db in skey:
-                            flag = not dbn
-                    if flag:flag = dwn
-                    else:continue
-                    for dw in dws:
-                        if dw in skey:
-                            flag = not dwn
-                    if flag:
-                        dr = eratiodealer(dr,randomer,weight_index+1,num,lucks)
-                        if deepprint :print(dbs,dws,key,dr)
-                        current_alpha = dr
+        block,blocks26 = blockfromkey(key,isxl)
+        if block == "Not Merge": continue
+        weight_index = BLOCKIDXLL.index(blocks26) if isxl else BLOCKID.index(blocks26)
 
-            keyratio.append([key,current_alpha, current_beta])
-            #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
+        if useblocks:
+            if weight_index > 0: 
+                current_alpha = weights_a[weight_index - 1] 
+                if usebeta: current_beta = weights_b[weight_index - 1] 
 
-            if calcmode == "normal":
-                if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
-                    # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
-                    theta_0_a = theta_0[key][:, 0:4, :, :]
-                else:
-                    theta_0_a = theta_0[key]
+        if len(deep) > 0:
+            skey = key + BLOCKID[weight_index]
+            for d in deep:
+                if d.count(":") != 2 :continue
+                dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
+                dbs = blocker(dbs,BLOCKID)
+                dbs,dws = dbs.split(" "), dws.split(" ")
+                dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
+                dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
+                flag = dbn
+                for db in dbs:
+                    if db in skey:
+                        flag = not dbn
+                if flag:flag = dwn
+                else:continue
+                for dw in dws:
+                    if dw in skey:
+                        flag = not dwn
+                if flag:
+                    dr = eratiodealer(dr,randomer,weight_index+1,num,lucks)
+                    if deepprint :print(dbs,dws,key,dr)
+                    current_alpha = dr
 
-                if MODES[1] in mode:#Add
-                    caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]",hear)
-                    theta_0_a = theta_0_a + current_alpha * theta_1[key]
-                elif MODES[2] in mode:#Triple
-                    caster(f"model A[{key}] +  {1-current_alpha-current_beta} +  model B[{key}]*{current_alpha} + model C[{key}]*{current_beta}",hear)
-                    theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key]
-                elif MODES[3] in mode:#Twice
-                    caster(f"model A[{key}] +  {1-current_alpha} + * model B[{key}]*{alpha}",hear)
-                    caster(f"model A+B[{key}] +  {1-current_beta} + * model C[{key}]*{beta}",hear)
+        keyratio.append([key,current_alpha, current_beta])
+        #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
+
+        if calcmode == "normal":
+            if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+                # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
+                theta_0_a = theta_0[key][:, 0:4, :, :]
+            else:
+                theta_0_a = theta_0[key]
+
+            if MODES[1] in mode:#Add
+                caster(f"{num}, {block}, {model_a}+{current_alpha}+*({model_b}-{model_c}),{key}",hear)
+                theta_0_a = theta_0_a + current_alpha * theta_1[key]
+            elif MODES[2] in mode:#Triple
+                caster(f"{num}, {block}, {model_a}+{1-current_alpha-current_beta}+{model_b}*{current_alpha}+ {model_c}*{current_beta}",hear)
+                theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key]
+            elif MODES[3] in mode:#Twice
+                caster(f"{num}, {block}, {key},{model_a} +  {1-current_alpha} + {model_b}*{current_alpha}",hear)
+                caster(f"{num}, {block}, {key}({model_a}+{model_b}) +{1-current_beta}+{model_c}*{current_beta}",hear)
+                theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
+                theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
+            else:#Weight
+                if current_alpha == 1:
+                    caster(f"{num}, {block}, {key} alpha = 1,{model_a}={model_b}",hear)
+                    theta_0_a = theta_1[key]
+                elif current_alpha !=0:
+                    caster(f"{num}, {block}, {key}, {model_a}*{1-current_alpha}+{model_b}*{current_alpha}",hear)
                     theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
-                    theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
-                else:#Weight
-                    if current_alpha == 1:
-                        caster(f"alpha = 1,model A[{key}=model B[{key}",hear)
-                        theta_0_a = theta_1[key]
-                    elif current_alpha !=0:
-                        caster(f"model A[{key}] +  {1-current_alpha} + * (model B)[{key}]*{alpha}",hear)
-                        theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
 
-                if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
-                    theta_0[key][:, 0:4, :, :] = theta_0_a
-                else:
-                    theta_0[key] = theta_0_a
+            if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+                theta_0[key][:, 0:4, :, :] = theta_0_a
+            else:
+                theta_0[key] = theta_0_a
+            
+            del theta_0_a, a, b
 
-            elif calcmode == "cosineA": #favors modelA's structure with details from B
-                # skip VAE model parameters to get better results
-                if "first_stage_model" in key: continue
-                if "model" in key and key in theta_0:
-                    # Normalize the vectors before merging
-                    theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
-                    theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
-                    simab = sim(theta_0_norm, theta_1_norm)
-                    dot_product = torch.dot(theta_0_norm.view(-1), theta_1_norm.view(-1))
-                    magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
-                    combined_similarity = (simab + magnitude_similarity) / 2.0
-                    k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-                    k = k - abs(current_alpha)
-                    k = k.clip(min=0,max=1.0)
-                    caster(f"model A[{key}] {1-k} +  (model B)[{key}]*{k}",hear)
-                    theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+        elif calcmode == "cosineA": #favors modelA's structure with details from B
+            # skip VAE model parameters to get better results
+            if "first_stage_model" in key: continue
+            if "model" in key and key in theta_0:
+                # Normalize the vectors before merging
+                theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
+                theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
+                simab = sim(theta_0_norm, theta_1_norm)
+                dot_product = torch.dot(theta_0_norm.view(-1), theta_1_norm.view(-1))
+                magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
+                combined_similarity = (simab + magnitude_similarity) / 2.0
+                k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
+                k = k - abs(current_alpha)
+                k = k.clip(min=0,max=1.0)
+                caster(f"{num}, {block}, model A[{key}] {1-k} +  (model B)[{key}]*{k}",hear)
+                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
 
-            elif calcmode == "cosineB": #favors modelB's structure with details from A
-                # skip VAE model parameters to get better results
-                if "first_stage_model" in key: continue
-                if "model" in key and key in theta_0:
-                    simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
-                    dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
-                    magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
-                    combined_similarity = (simab + magnitude_similarity) / 2.0
-                    k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-                    k = k - current_alpha
-                    k = k.clip(min=0,max=1.0)
-                    caster(f"model A[{key}] *{1-k} + (model B)[{key}]*{k}",hear)
-                    theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+        elif calcmode == "cosineB": #favors modelB's structure with details from A
+            # skip VAE model parameters to get better results
+            if "first_stage_model" in key: continue
+            if "model" in key and key in theta_0:
+                simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
+                dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
+                magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
+                combined_similarity = (simab + magnitude_similarity) / 2.0
+                k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
+                k = k - current_alpha
+                k = k.clip(min=0,max=1.0)
+                caster(f"{num}, {block}, model A[{key}] *{1-k} + (model B)[{key}]*{k}",hear)
+                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
 
-            elif calcmode == "trainDifference":
-                # Check if theta_1[key] is equal to theta_2[key]
-                if torch.allclose(theta_1[key].float(), theta_2[key].float(), rtol=0, atol=0):
-                    theta_2[key] = theta_0[key]
-                    continue
+        elif calcmode == "trainDifference":
+            # Check if theta_1[key] is equal to theta_2[key]
+            if torch.allclose(theta_1[key].float(), theta_2[key].float(), rtol=0, atol=0):
+                theta_2[key] = theta_0[key]
+                continue
 
-                diff_AB = theta_1[key].float() - theta_2[key].float()
+            diff_AB = theta_1[key].float() - theta_2[key].float()
 
-                distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
-                distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
+            distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
+            distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
 
-                sum_distances = distance_A0 + distance_A1
+            sum_distances = distance_A0 + distance_A1
 
-                scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
-                sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
-                scale = sign_scale * torch.abs(scale)
+            scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
+            sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
+            scale = sign_scale * torch.abs(scale)
 
-                new_diff = scale * torch.abs(diff_AB)
-                theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
+            new_diff = scale * torch.abs(diff_AB)
+            theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
 
-            elif calcmode == "smoothAdd":
-                caster(f"model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
-                # Apply median filter to the weight differences
-                filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
-                # Apply Gaussian filter to the filtered differences
-                filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
-                theta_1[key] = torch.tensor(filtered_diff)
-                # Add the filtered differences to the original weights
-                theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
+        elif calcmode == "smoothAdd":
+            caster(f"{num}, {block}, model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
+            # Apply median filter to the weight differences
+            filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
+            # Apply Gaussian filter to the filtered differences
+            filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
+            theta_1[key] = torch.tensor(filtered_diff)
+            # Add the filtered differences to the original weights
+            theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
 
-            elif calcmode == "smoothAdd MT":
-                key_and_alpha[key] = current_alpha
+        elif calcmode == "smoothAdd MT":
+            key_and_alpha[key] = current_alpha
 
-            elif calcmode == "tensor":
-                dim = theta_0[key].dim()
-                if dim == 0 : continue
-                if current_alpha+current_beta <= 1 :
-                    talphas = int(theta_0[key].shape[0]*(current_beta))
-                    talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
-                    if dim == 1:
-                        theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+        elif calcmode == "tensor":
+            dim = theta_0[key].dim()
+            if dim == 0 : continue
+            if current_alpha+current_beta <= 1 :
+                talphas = int(theta_0[key].shape[0]*(current_beta))
+                talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
+                if dim == 1:
+                    theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
 
-                    elif dim == 2:
-                        theta_0[key][talphas:talphae,:] = theta_1[key][talphas:talphae,:].clone()
+                elif dim == 2:
+                    theta_0[key][talphas:talphae,:] = theta_1[key][talphas:talphae,:].clone()
 
-                    elif dim == 3:
-                        theta_0[key][talphas:talphae,:,:] = theta_1[key][talphas:talphae,:,:].clone()
+                elif dim == 3:
+                    theta_0[key][talphas:talphae,:,:] = theta_1[key][talphas:talphae,:,:].clone()
 
-                    elif dim == 4:
-                        theta_0[key][talphas:talphae,:,:,:] = theta_1[key][talphas:talphae,:,:,:].clone()
+                elif dim == 4:
+                    theta_0[key][talphas:talphae,:,:,:] = theta_1[key][talphas:talphae,:,:,:].clone()
 
-                else:
-                    talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
-                    talphae = int(theta_0[key].shape[0]*(current_beta))
-                    theta_t = theta_1[key].clone()
-                    if dim == 1:
-                        theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+            else:
+                talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
+                talphae = int(theta_0[key].shape[0]*(current_beta))
+                theta_t = theta_1[key].clone()
+                if dim == 1:
+                    theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
 
-                    elif dim == 2:
-                        theta_t[talphas:talphae,:] = theta_0[key][talphas:talphae,:].clone()
+                elif dim == 2:
+                    theta_t[talphas:talphae,:] = theta_0[key][talphas:talphae,:].clone()
 
-                    elif dim == 3:
-                        theta_t[talphas:talphae,:,:] = theta_0[key][talphas:talphae,:,:].clone()
+                elif dim == 3:
+                    theta_t[talphas:talphae,:,:] = theta_0[key][talphas:talphae,:,:].clone()
 
-                    elif dim == 4:
-                        theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
-                    theta_0[key] = theta_t
+                elif dim == 4:
+                    theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
+                theta_0[key] = theta_t
 
-            elif calcmode == "tensor2":
-                dim = theta_0[key].dim()
-                if dim == 0 : continue
-                if current_alpha+current_beta <= 1 :
-                    talphas = int(theta_0[key].shape[0]*(current_beta))
-                    talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
-                    if dim > 1:
-                        if theta_0[key].shape[1] > 100:
-                            talphas = int(theta_0[key].shape[1]*(current_beta))
-                            talphae = int(theta_0[key].shape[1]*(current_alpha+current_beta))
-                    if dim == 1:
-                        theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+        elif calcmode == "tensor2":
+            dim = theta_0[key].dim()
+            if dim == 0 : continue
+            if current_alpha+current_beta <= 1 :
+                talphas = int(theta_0[key].shape[0]*(current_beta))
+                talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
+                if dim > 1:
+                    if theta_0[key].shape[1] > 100:
+                        talphas = int(theta_0[key].shape[1]*(current_beta))
+                        talphae = int(theta_0[key].shape[1]*(current_alpha+current_beta))
+                if dim == 1:
+                    theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
 
-                    elif dim == 2:
-                        theta_0[key][:,talphas:talphae] = theta_1[key][:,talphas:talphae].clone()
+                elif dim == 2:
+                    theta_0[key][:,talphas:talphae] = theta_1[key][:,talphas:talphae].clone()
 
-                    elif dim == 3:
-                        theta_0[key][:,talphas:talphae,:] = theta_1[key][:,talphas:talphae,:].clone()
+                elif dim == 3:
+                    theta_0[key][:,talphas:talphae,:] = theta_1[key][:,talphas:talphae,:].clone()
 
-                    elif dim == 4:
-                        theta_0[key][:,talphas:talphae,:,:] = theta_1[key][:,talphas:talphae,:,:].clone()
+                elif dim == 4:
+                    theta_0[key][:,talphas:talphae,:,:] = theta_1[key][:,talphas:talphae,:,:].clone()
 
-                else:
-                    talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
-                    talphae = int(theta_0[key].shape[0]*(current_beta))
-                    theta_t = theta_1[key].clone()
-                    if dim > 1:
-                        if theta_0[key].shape[1] > 100:
-                            talphas = int(theta_0[key].shape[1]*(current_alpha+current_beta-1))
-                            talphae = int(theta_0[key].shape[1]*(current_beta))
-                    if dim == 1:
-                        theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+            else:
+                talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
+                talphae = int(theta_0[key].shape[0]*(current_beta))
+                theta_t = theta_1[key].clone()
+                if dim > 1:
+                    if theta_0[key].shape[1] > 100:
+                        talphas = int(theta_0[key].shape[1]*(current_alpha+current_beta-1))
+                        talphae = int(theta_0[key].shape[1]*(current_beta))
+                if dim == 1:
+                    theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
 
-                    elif dim == 2:
-                        theta_t[:,talphas:talphae] = theta_0[key][:,talphas:talphae].clone()
+                elif dim == 2:
+                    theta_t[:,talphas:talphae] = theta_0[key][:,talphas:talphae].clone()
 
-                    elif dim == 3:
-                        theta_t[:,talphas:talphae,:] = theta_0[key][:,talphas:talphae,:].clone()
+                elif dim == 3:
+                    theta_t[:,talphas:talphae,:] = theta_0[key][:,talphas:talphae,:].clone()
 
-                    elif dim == 4:
-                        theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
-                    theta_0[key] = theta_t
+                elif dim == 4:
+                    theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
+                theta_0[key] = theta_t
 
-            if any(item in key for item in FINETUNES) and fine:
-                index = FINETUNES.index(key)
-                if 5 > index : 
-                    theta_0[key] =theta_0[key]* fine[index] 
-                else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
+        elif calcmode == "self":
+            theta_0[key] = theta_0[key].clone() * current_alpha
 
-            # statistics["sum"][key] = [torch.sum(theta_0[key]).item()] if key not in statistics["sum"].keys() else statistics["sum"][key] + [torch.sum(theta_0[key]).item()]
-            # statistics["mean"][key] = [torch.mean(theta_0[key]).item()] if key not in statistics["mean"].keys() else statistics["mean"][key] + [torch.mean(theta_0[key]).item()]
-            # statistics["max"][key] = [torch.max(theta_0[key]).item()] if key not in statistics["max"].keys() else statistics["max"][key] + [torch.max(theta_0[key]).item()]
-            # statistics["min"][key] = [torch.min(theta_0[key]).item()] if key not in statistics["min"].keys() else statistics["min"][key] + [torch.min(theta_0[key]).item()]
+        if any(item in key for item in FINETUNES) and fine:
+            index = FINETUNES.index(key)
+            if 5 > index : 
+                theta_0[key] =theta_0[key]* fine[index] 
+            else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
+
+        # statistics["sum"][key] = [torch.sum(theta_0[key]).item()] if key not in statistics["sum"].keys() else statistics["sum"][key] + [torch.sum(theta_0[key]).item()]
+        # statistics["mean"][key] = [torch.mean(theta_0[key]).item()] if key not in statistics["mean"].keys() else statistics["mean"][key] + [torch.mean(theta_0[key]).item()]
+        # statistics["max"][key] = [torch.max(theta_0[key]).item()] if key not in statistics["max"].keys() else statistics["max"][key] + [torch.max(theta_0[key]).item()]
+        # statistics["min"][key] = [torch.min(theta_0[key]).item()] if key not in statistics["min"].keys() else statistics["min"][key] + [torch.min(theta_0[key]).item()]
 
     if calcmode == "smoothAdd MT":
         # setting threads to higher than 8 doesn't significantly affect the time for merging
@@ -699,7 +707,7 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
 
 def forkforker(filename):
     try:
-        return sd_models.read_state_dict(filename,"cuda")
+        return sd_models.read_state_dict(filename,map_location = "cpu")
     except:
         return sd_models.read_state_dict(filename)
 
@@ -939,7 +947,7 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
     try:
         p.sampler_name = sd_samplers.samplers[sampler].name if s_sampler == 0 or s_sampler == None else sd_samplers.samplers[s_sampler-1].name
     except:
-        print(f"error:sampler:{sampler},s_sampler:{s_sampler}")
+        print(f"{bcolors.Fail}Error:sampler:{sampler},s_sampler:{s_sampler}{bcolors.ENDC}")
     p.cfg_scale = cfg  if s_cfg == 0 else s_cfg
     p.seed = seed  if s_seed == 0 else s_seed
     p.width = w  if s_w == 0 else s_w
@@ -1006,23 +1014,72 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
     shared.state.end()
     return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),p
 
-def blocker(blocks):
+def blocker(blocks,blockids):
     blocks = blocks.split(" ")
     output = ""
     for w in blocks:
-        flagger=[False]*26
+        flagger=[False]*len(blockids)
         changer = True
         if "-" in w:
             wt = [wt.strip() for wt in w.split('-')]
-            if  blockid.index(wt[1]) > blockid.index(wt[0]):
-                flagger[blockid.index(wt[0]):blockid.index(wt[1])+1] = [changer]*(blockid.index(wt[1])-blockid.index(wt[0])+1)
+            if  blockids.index(wt[1]) > blockids.index(wt[0]):
+                flagger[blockids.index(wt[0]):blockids.index(wt[1])+1] = [changer]*(blockids.index(wt[1])-blockids.index(wt[0])+1)
             else:
-                flagger[blockid.index(wt[1]):blockid.index(wt[0])+1] = [changer]*(blockid.index(wt[0])-blockid.index(wt[1])+1)
+                flagger[blockids.index(wt[1]):blockids.index(wt[0])+1] = [changer]*(blockids.index(wt[0])-blockids.index(wt[1])+1)
         else:
             output = output + " " + w if output else w
-        for i in range(26):
-            if flagger[i]: output = output + " " + blockid[i] if output else blockid[i]
+        for i in range(len(blockids)):
+            if flagger[i]: output = output + " " + blockids[i] if output else blockids[i]
     return output
+
+
+def blockfromkey(key,isxl):
+    if not isxl:
+        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
+        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
+        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
+
+        weight_index = -1
+
+        NUM_INPUT_BLOCKS = 12
+        NUM_MID_BLOCK = 1
+        NUM_OUTPUT_BLOCKS = 12
+        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
+
+        if 'time_embed' in key:
+            weight_index = -2                # before input blocks
+        elif '.out.' in key:
+            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
+        else:
+            m = re_inp.search(key)
+            if m:
+                inp_idx = int(m.groups()[0])
+                weight_index = inp_idx
+            else:
+                m = re_mid.search(key)
+                if m:
+                    weight_index = NUM_INPUT_BLOCKS
+                else:
+                    m = re_out.search(key)
+                    if m:
+                        out_idx = int(m.groups()[0])
+                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
+        return BLOCKID[weight_index+1] ,BLOCKID[weight_index+1] 
+
+    else:
+        if not ("weight" in key or "bias" in key):return "Not Merge","Not Merge"
+        if "label_emb" in key or "time_embed" in key: return "Not Merge","Not Merge"
+        if "conditioner.embedders" in key : return "BASE","BASE"
+        if "first_stage_model" in key : return "VAE","BASE"
+        if "model.diffusion_model" in key:
+            if "model.diffusion_model.out." in key: return "OUT8","OUT08"
+            block = re.findall(r'input|mid|output', key)
+            block = block[0].upper().replace("PUT","") if block else ""
+            nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
+            add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
+            return block + nums + add, block + "0" + nums[0] if "MID" not in block else "M00"
+
+    return "Not Merge", "Not Merge"
 
 def fineman(fine):
     fine = [
@@ -1035,6 +1092,10 @@ def fineman(fine):
                 ]
     return fine
 
+def weighttoxl(weight):
+    weight = weight[:9] + weight[12:22] +[0]
+    return weight
+
 FINETUNES = [
 "model.diffusion_model.input_blocks.0.0.weight",
 "model.diffusion_model.input_blocks.0.0.bias",
@@ -1043,4 +1104,3 @@ FINETUNES = [
 "model.diffusion_model.out.2.weight",
 "model.diffusion_model.out.2.bias",
 ]
-

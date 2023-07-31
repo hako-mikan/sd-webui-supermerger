@@ -23,8 +23,8 @@ reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen)
-from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
+from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen, blockfromkey)
+from scripts.mergers.xyplot import freezetime, nulister, numanager
 from scripts.mergers.model_util import filenamecutter
 
 gensets=argparse.Namespace()
@@ -81,7 +81,7 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2"], value = "normal") 
+                    calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -191,7 +191,7 @@ def on_ui_tabs():
             with gr.Row(visible = False) as row_blockids:
                 blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
             with gr.Row(visible = False) as row_calcmode:
-                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","smoothAdd MT","tensor","tensor2"],type="value",interactive=True)
+                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","smoothAdd MT","tensor","tensor2","self"],type="value",interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
@@ -212,6 +212,7 @@ def on_ui_tabs():
                         with gr.Row():
                             dd_preset_weight = gr.Dropdown(label="Load preset", choices=preset_name_list(weights_presets), interactive=True, elem_id="refresh_presets")
                             preset_refresh = gr.Button(value='\U0001f504', elem_classes=["tool"])
+                            isxl = gr.Radio(label = "type",choices = ["1.X or 2.X", "XL"], value = "1.X or 2.X", type="index") 
                     with gr.Column():
                         with gr.Row():
                             dd_preset_weight_r = gr.Dropdown(label="Load Romdom preset", choices=preset_name_list(weights_presets,True), interactive=True, elem_id="refresh_presets")
@@ -298,20 +299,28 @@ def on_ui_tabs():
 
                     
         with gr.Tab("Analysis", elem_id="tab_analysis"):
-            with gr.Row():
-                an_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
-                create_refresh_button(an_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
-                an_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
-                create_refresh_button(an_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
-            with gr.Row():
-                an_mode  = gr.Radio(label = "Analysis Mode",choices = ["ASimilarity","Block","Element","Both"], value = "ASimilarity",type  = "value") 
-                an_calc  = gr.Radio(label = "Block method",choices = ["Mean","Min","attn2"], value = "Mean",type  = "value") 
-                an_include  = gr.CheckboxGroup(label = "Include",choices = ["Textencoder(BASE)","U-Net","VAE"], value = ["Textencoder(BASE)","U-Net"],type  = "value") 
-                an_settings = gr.CheckboxGroup(label = "Settings",choices=["save as txt", "save as csv"],type="value",interactive=True)
-            with gr.Row():
-                run_analysis = gr.Button(value="Run Analysis",variant='primary')
-            with gr.Row():
-                analysis_cosdif = gr.Dataframe(headers=["block","key","similarity[%]"],)
+            with gr.Tab("Models"):
+                with gr.Row():
+                    an_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    create_refresh_button(an_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                    an_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
+                    create_refresh_button(an_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                with gr.Row():
+                    an_mode  = gr.Radio(label = "Analysis Mode",choices = ["ASimilarity","Block","Element","Both"], value = "ASimilarity",type  = "value") 
+                    an_calc  = gr.Radio(label = "Block method",choices = ["Mean","Min","attn2"], value = "Mean",type  = "value") 
+                    an_include  = gr.CheckboxGroup(label = "Include",choices = ["Textencoder(BASE)","U-Net","VAE"], value = ["Textencoder(BASE)","U-Net"],type  = "value") 
+                    an_settings = gr.CheckboxGroup(label = "Settings",choices=["save as txt", "save as csv"],type="value",interactive=True)
+                with gr.Row():
+                    run_analysis = gr.Button(value="Run Analysis",variant='primary')
+                with gr.Row():
+                    analysis_cosdif = gr.Dataframe(headers=["block","key","similarity[%]"],)
+            with gr.Tab("Text Encoder"):
+                    with gr.Row():
+                        te_smd_loadkeys = gr.Button(value="Calculate Textencoer",variant='primary')
+                        te_smd_searchkeys = gr.Button(value="Search Word(red,blue,girl,...)",variant='primary')
+                        exclude = gr.Checkbox(label="exclude non numeric,alphabet,symbol word")
+                    pickupword = gr.TextArea()
+                    encoded = gr.Dataframe()
 
         run_analysis.click(fn=calccosinedif,inputs=[an_model_a,an_model_b,an_mode,an_settings,an_include,an_calc],outputs=[analysis_cosdif])    
 
@@ -326,12 +335,18 @@ def on_ui_tabs():
                 history = gr.Dataframe(
                         headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
                 )
+    
+        import lora
 
         with gr.Tab("Elements", elem_id="tab_deep"):
                 with gr.Row():
                     smd_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
                     create_refresh_button(smd_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
                     smd_loadkeys = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    smd_lora = gr.Dropdown(list(lora.available_loras.keys()),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    create_refresh_button(smd_lora, list(lora.available_loras.keys()),lambda: {"choices": list(lora.available_loras.keys())},"refresh_checkpoint_Z")    
+                    smd_loadkeys_l = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
 
@@ -349,11 +364,12 @@ def on_ui_tabs():
             outputs=[metadata]
         )                 
 
-        smd_loadkeys.click(
-            fn=loadkeys,
-            inputs=[smd_model_a],
-            outputs=[keys]
-        )
+        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,dfalse],outputs=[keys])
+        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,dtrue],outputs=[keys])
+
+        te_smd_loadkeys.click(fn=encodetexts,inputs=[exclude],outputs=[encoded])
+        te_smd_searchkeys.click(fn=pickupencode,inputs=[pickupword],outputs=[encoded])
+        
 
         def unload():
             if shared.sd_model == None: return "already unloaded"
@@ -454,8 +470,8 @@ def on_ui_tabs():
 
         menbers = [base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
 
-        setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight],outputs=[weights_a])
-        setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight],outputs=[weights_b])
+        setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
+        setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
         setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
 
         readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
@@ -470,6 +486,16 @@ def on_ui_tabs():
 
         preset_refresh.click(fn=refresh_presets,inputs=[wpresets,dfalse],outputs=[dd_preset_weight])
         preset_refresh_r.click(fn=refresh_presets,inputs=[wpresets,dtrue],outputs=[weights_a,weights_b])
+
+        def changexl(isxl):
+            out = [True] * 26
+            if isxl:
+                for i,id in enumerate(BLOCKID[:-1]):
+                    if id not in BLOCKIDXLL[:-1]:
+                        out[i] = False
+            return [gr.update(visible = x) for x in out]
+
+        isxl.change(fn=changexl,inputs=[isxl], outputs=menbers)
 
         x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
         y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
@@ -616,11 +642,17 @@ def text2slider(text):
     vals = [0 if v in "RUX" else v for v in vals]
     return [gr.update(value = float(v)) for v in vals]
 
-def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset):
+def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset, isxl):
     az = find_preset_by_name(presets, preset)
     if az is not None:
         if any(element in az for element in RANCHA):return az
     numbers = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z]
+    if isxl:
+        newnums = []
+        for i,id in enumerate(BLOCKID[:-1]):
+            if id in BLOCKIDXLL[:-1]:
+                newnums.append(numbers[i])
+        numbers = newnums
     numbers = [str(x) for x in numbers]
     return gr.update(value = ",".join(numbers) )
 
@@ -675,53 +707,8 @@ def find_preset_by_name(presets, preset):
     return None
 
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
-
-def blockfromkey(key,modeltype):
-    if modeltype != "XL":
-        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
-        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
-        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
-
-        weight_index = -1
-
-        NUM_INPUT_BLOCKS = 12
-        NUM_MID_BLOCK = 1
-        NUM_OUTPUT_BLOCKS = 12
-        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
-
-        if 'time_embed' in key:
-            weight_index = -2                # before input blocks
-        elif '.out.' in key:
-            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
-        else:
-            m = re_inp.search(key)
-            if m:
-                inp_idx = int(m.groups()[0])
-                weight_index = inp_idx
-            else:
-                m = re_mid.search(key)
-                if m:
-                    weight_index = NUM_INPUT_BLOCKS
-                else:
-                    m = re_out.search(key)
-                    if m:
-                        out_idx = int(m.groups()[0])
-                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-        return BLOCKID[weight_index+1] 
-
-    else:
-        if "label_emb" in key or "time_embed" in key: return "Not Merge"
-        if "conditioner.embedders" in key : return "BASE"
-        if "first_stage_model" in key : return "VAE"
-        if "model.diffusion_model" in key:
-            if "model.diffusion_model.out." in key: return "OUT8"
-            block = re.findall(r'input|mid|output', key)
-            block = block[0].upper().replace("PUT","") if block else ""
-            nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
-            add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
-            return block + nums + add
-
-    return "Not Merge"
+BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
+BLOCKIDXLL=['BASE', 'IN00', 'IN01', 'IN02', 'IN03', 'IN04', 'IN05', 'IN06', 'IN07', 'IN08', 'M00', 'OUT00', 'OUT01', 'OUT02', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'VAE']
 
 def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
@@ -730,13 +717,20 @@ def modeltype(sd):
         modeltype = "1.X or 2.X"
     return modeltype
 
-def loadkeys(model_a):
-    sd = loadmodel(model_a)
+def loadkeys(model_a, lora):
+    if lora:
+        import lora
+        sd = sd_models.read_state_dict(lora.available_loras[model_a].filename,"cpu")
+    else:
+        sd = loadmodel(model_a)
     keys = []
     mtype = modeltype(sd)
-    for i, key in enumerate(sd.keys()):
-        
-        keys.append([i,blockfromkey(key,mtype),key])
+    if lora:
+        for i, key in enumerate(sd.keys()):
+            keys.append([i,"LoRA",key,sd[key].shape])
+    else:    
+        for i, key in enumerate(sd.keys()):
+            keys.append([i,blockfromkey(key,mtype),key,sd[key].shape])
 
     return keys
 
@@ -767,19 +761,22 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
     blocksim = {}
     blockvals = []
     attn2 = {}
-    mtype = modeltype(a)
-    for bl in BLOCKID:
+    isxl = "XL" == modeltype(a)
+    blockids = BLOCKIDXLL if isxl else BLOCKID
+    for bl in blockids:
         blocksim[bl] = []
     blocksim["VAE"] = []
 
     if "ASim" in mode:
-        result = asimilarity(a,b,mtype)
+        result = asimilarity(a,b,isxl)
         if len(settings) > 1: savecalc(result,name,settings,True,"Asim")
+        del a ,b
+        gc.collect()
         return result
     else:
         for key in tqdm(a.keys(), desc="Calculating cosine similarity"):
             block = None
-            if blockfromkey(key,mtype) == "Not Merge": continue
+            if blockfromkey(key,isxl) == "Not Merge": continue
             if "model_ema" in key: continue
             if "model" not in key:continue
             if "first_stage_model" in key and not ("VAE" in inc):
@@ -792,15 +789,17 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
                 a_flat = a[key].view(-1).to(torch.float32)
                 b_flat = b[key].view(-1).to(torch.float32)
                 simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
-                if block is None: block = blockfromkey(key,mtype)
+                if block is None: block,blocks26 = blockfromkey(key,isxl)
+                if block =="Not Merge" :continue
                 cosine_similarities.append([block, key, round(simab.item()*100,3)])
-                blocksim[block].append(round(simab.item()*100,3))
+                blocksim[blocks26].append(round(simab.item()*100,3))
                 if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
 
-        for bl in BLOCKID:
+        for bl in blockids:
             val = None
             if bl == "Not Merge": continue
             if bl not in blocksim.keys():continue
+            if blocksim[bl] == []: continue
             if "Mean" in calc:
                 val = mean(blocksim[bl])
             elif "Min" in calc:
@@ -812,9 +811,13 @@ def calccosinedif(model_a,model_b,mode,settings,include,calc):
 
         if mode == "Block":
             if len(settings) > 1: savecalc(blockvals,name,settings,True,"Blocks")
+            del a ,b
+            gc.collect()
             return blockvals
         else:
             if len(settings) > 1: savecalc(cosine_similarities,name,settings,False,"Elements",)
+            del a ,b
+            gc.collect()
             return cosine_similarities
 
 def savecalc(data,name,settings,blocks,add):
@@ -908,6 +911,63 @@ def configdealer(prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_siz
 
     with open(jsonpath, 'w') as file:
         json.dump(json_data, file, indent=4)
+
+sorted_output = []
+
+def encodetexts(exclude):
+    isxl = hasattr(shared.sd_model,"conditioner")
+    model = shared.sd_model.conditioner.embedders[0] if isxl else shared.sd_model.cond_stage_model
+    encoder = model.encode_with_transformers
+    tokenizer = model.tokenizer
+    vocab = tokenizer.get_vocab()
+
+    batch = 500
+
+    b_texts = [list(vocab.items())[i:i + batch] for i in range(0, len(vocab), batch)]
+
+    output = []
+
+    for texts in tqdm(b_texts):    
+        batch = []
+        words = []
+        for word, idx in texts:
+            tokens = [model.id_start, idx, model.id_end] + [model.id_end] * 74
+            batch.append(tokens)
+            words.append((idx, word))
+        
+        embedding = encoder(torch.IntTensor(batch).to("cuda"))[:,1,:] # (bs,768)
+        embedding = embedding.to('cuda')
+        emb_norms = torch.linalg.vector_norm(embedding, dim=-1) # (bs,)
+        
+        for i, (word, token) in enumerate(texts):
+            if exclude:
+                if has_alphanumeric(word) : output.append([word,token,emb_norms[i].item()])
+            else:
+                output.append([word,token,emb_norms[i].item()])
+
+    output = sorted(output, key=lambda x: x[2], reverse=True)
+    for i in range(len(output)):
+        output[i].insert(0,i)
+
+    global sorted_output
+    sorted_output = output
+
+    return output[:1000]
+
+def pickupencode(texts):
+    wordlist = [x[1] for x in sorted_output]
+    texts = texts.split(",")
+    output = []
+    for text in texts:
+        if text in wordlist:
+            output.append(sorted_output[wordlist.index(text)])
+        if text+"</w>" in wordlist:
+            output.append(sorted_output[wordlist.index(text+"</w>")])
+    return output
+
+def has_alphanumeric(text):
+    pattern = re.compile(r'[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;"\'<>,.?/\|\\]')
+    return bool(pattern.search(text.replace("</w>","")))
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_train_tabs(on_ui_train_tabs)

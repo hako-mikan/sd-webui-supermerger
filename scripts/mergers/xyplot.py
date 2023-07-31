@@ -1,4 +1,5 @@
 import random
+import gc
 from tracemalloc import Statistic
 import cv2
 import numpy as np
@@ -6,10 +7,10 @@ import os
 import copy
 import csv
 from PIL import Image
-from modules import images
+from modules import images, sd_models, devices
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
-from scripts.mergers.model_util import usemodelgen, savemodel
+from scripts.mergers.model_util import savemodel,usemodel
 
 hear = True
 hearm = False
@@ -21,6 +22,17 @@ NUM = "num"
 RAND = "random"
 
 numadepth = []
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 def freezetime():
     global state_mergen
@@ -94,6 +106,8 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 wcounter += 1
         if wcounter == len(numadepth):
             break
+
+    gc.collect()
 
     return result,currentmodel,grids,a,b,c
 
@@ -181,7 +195,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     if "seed" in XYZ: gensets_s[5] = 0
 
     #check and adjust format
-    print(f"XY plot start, mode:{mode}, X: {xtype}, Y: {ytype}, Z: {ztype} MBW: {useblocks}")
+    print(f"\n{bcolors.OKGREEN}XY plot start, mode:{mode}, X: {xtype}, Y: {ytype}, Z: {ztype} MBW: {useblocks}{bcolors.ENDC}")
     castall(hear)
     None5 = [None,None,None,None,None]
     if xmen =="": return "ERROR: parameter X is empty",*None5
@@ -246,12 +260,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     #in case beta selected but mode is Weight sum or Add or Diff
     if ("beta" in XYZ) and (not usebeta and "tensor" not in calcmode):
         mode = modes[3]
-        print(f"{modes[3]} mode automatically selected)")
+        print(f"{bcolors.WARNING}{modes[3]} mode automatically selected){bcolors.ENDC}")
 
     #in case mbw or pinpoint selected but useblocks not chekced
     if "mbw" in XYZ and not useblocks:
         useblocks = True
-        print(f"MBW mode enabled")
+        print(f"{bcolors.WARNING}MBW mode enabled{bcolors.ENDC}")
 
     xcount = ycount = zcount = 0
     allcount = len(xs)*len(ys)*len(zs) if not lucks["on"] else lucks["num"]
@@ -370,18 +384,24 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     fine_in = fine
                 if type(fine_in) == list:fine_in = ",".join([str(x) for x in fine_in])
 
-                print(f"XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount})")
+                print(f"{bcolors.OKGREEN}XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount}){bcolors.ENDC}")
                 if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks) 
-                    usemodelgen(theta_0,model_a,currentmodel)
+                    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+                    usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
+
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
+                theta_0 = {}
+                del theta_0
 
                 if xcount == 0: statid = modelid
 
                 image_temp = simggen(*gensets,*hr_sets,*gensets_s,batch_size,currentmodel,id_sets,modelid)
-                
+                gc.collect()
+                devices.torch_gc()
+
                 xyimage.append(image_temp[0][0])
                 xcount+=1
                 deep = deepy
@@ -542,7 +562,7 @@ def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
 
         abs_diff = cv2.absdiff(im2 ,  im1)
 
-        abs_diff_t = cv2.threshold(abs_diff, 5, 255, cv2.THRESH_BINARY)[1]        
+        abs_diff_t = cv2.threshold(abs_diff, 20, 255, cv2.THRESH_BINARY)[1]        
         res = abs_diff_t.astype(np.uint8)
         percentage = (np.count_nonzero(res) * 100)/ res.size
         abs_diff = cv2.bitwise_not(abs_diff)

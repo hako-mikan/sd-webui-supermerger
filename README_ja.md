@@ -10,6 +10,18 @@ All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerg
 English: [![jp](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
 
 ## Updates
+- XLに対応(Web-ui 1.5が必要です)
+XLでいまできること Merge/Block merge/マージ/階層マージ
+
+できないこと
+モデルへのLoRAのマージ(数日中に対応) 
+モデル差分からLoRA作成(未定) 
+LyCORISは対応しません。
+
+**注意！** 
+XLモデルのマージには最低64GBのCPUメモリが必要です。64Gのメモリであっても併用しているソフトによってはシステムが不安定になる恐れがあるのでシステムが落ちてもいい状態で作業して下さい。私は久しぶりにブルースクリーンに遭遇しました。
+
+
 - [ランダムマージモード](#random-merge)が追加されました
 - モデルの[描き込み・色調調整機能](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_ja.md#adjust)を追加しました
 
@@ -97,6 +109,9 @@ IN01,OUT10 OUT11, OUT03-OUT06,OUT07-OUT11,NOT M00 OUT03-OUT06
 ブロックID(大文字のみ有効)
 BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11
 
+XL モデル  
+BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08
+
 ### calcmode
 計算方式を変更します。適用できるマージモードとの対応に注意して下さい。カンマで区切ります
 
@@ -156,6 +171,19 @@ LoRA関連の機能です。基本的にはkohya-ssのスクリプトと同じ�
 
 注意：LyCORISは構造が特殊なため単独マージのみに対応しています。単独マージの比率は1,0のみ使用可能です。他の値を用いるとsame to Strengthでも階層LoRAの結果と一致しません。
 LoConは整数以外でもそれなりに一致します。
+
+LoCon/LyCoris のモデルへのマージにはweb-ui1.5が必要です。
+|  1.X     | LoRA  | LoCon | LyCORIS |
+|----------|-------|-------|---------|
+| Merge to Model |   Yes   | Yes   | Yes     |
+| Merge LoRAs   |    Yes   | Yes    | No     |
+| Extract From Models   | Yes    | No    | No      |
+
+|  XL     | LoRA  | LoCon | LyCORIS |
+|----------|-------|-------|---------|
+| Merge to Model |   Yes   | Yes   | Yes     |
+| Merge LoRAs   |    Yes   | Yes    | No     |
+| Extract From Models   | No    | No    | No      |
 
 ### merge to checkpoint
 モデルにLoRAをマージします。複数のLoRAを同時にマージできます。  
