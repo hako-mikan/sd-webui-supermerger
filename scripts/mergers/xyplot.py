@@ -287,7 +287,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 if xcount == 0: statid = modelid
 
-                image_temp = simggen(*gensets_s,batch_size,*GenParams.txt2img_params,currentmodel,id_sets,modelid)
+                from scripts.GenParamGetter import GenParamGetter
+                image_temp = simggen(*GenParamGetter.txt2img_params,mergeinfo=currentmodel,id_sets=id_sets,modelid=modelid)
                 gc.collect()
                 devices.torch_gc()
 
