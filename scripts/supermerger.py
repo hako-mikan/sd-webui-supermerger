@@ -30,57 +30,31 @@ from scripts.mergers.model_util import filenamecutter
 
 path_root = basedir()
 
-supermergerui = None
+class Components:
+    merge = None
+    mergeandgen = None
+    gen = None
+    s_reserve = None
+    s_reserve1 = None
+    gengrid = None
+    s_startreserve = None
+    rand_merge = None
 
-merge = None
-mergeandgen = None
-gen = None
-s_reserve = None
-s_reserve1 = None
-gengrid = None
-s_startreserve = None
-rand_merge = None
+    msettings = None
+    esettings1 = None
+    genparams = None
+    lucks = None
+    currentmodel = None
+    dfalse = None
+    dtrue = None
+    id_sets = None
+    xysettings = None
 
-msettings = None
-esettings1 = None
-genparams = None
-lucks = None
-currentmodel = None
-dfalse = None
-dtrue = None
-id_sets = None
-xysettings = None
-
-submit_result = None
-imagegal = None
-numaframe = None
+    submit_result = None
+    imagegal = None
+    numaframe = None
 
 def on_ui_tabs():
-    global supermergerui
-
-    global merge
-    global mergeandgen
-    global gen
-    global s_reserve
-    global s_reserve1
-    global gengrid
-    global s_startreserve
-    global rand_merge
-
-    global msettings
-    global esettings1
-    global genparams
-    global lucks
-    global currentmodel
-    global dfalse
-    global dtrue
-    global id_sets
-    global xysettings
-
-    global submit_result
-    global imagegal
-    global numaframe
-
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     if os.path.isfile(userfilepath):
@@ -150,9 +124,9 @@ def on_ui_tabs():
 
 
                     with gr.Row():
-                        merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
-                        mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
-                        gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
+                        Components.merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
+                        Components.mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
+                        Components.gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
                         stopmerge = gr.Button(elem_id="stopmerge", value="Stop")
 
                     with gr.Accordion("Generation Parameters",open = False):
@@ -181,7 +155,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Elemental Merge, Adjust",open = False):
                         with gr.Row():
-                            esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                            Components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
                         with gr.Row():    
@@ -197,16 +171,16 @@ def on_ui_tabs():
                     zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
                     esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
                     with gr.Row():
-                        gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
+                        Components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
                         stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
-                        s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
+                        Components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
                     dtrue =  gr.Checkbox(value = True, visible = False)                
                     dfalse =  gr.Checkbox(value = False,visible = False)     
                     dummy_t =  gr.Textbox(value = "",visible = False)    
                 blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
         
                 with gr.Column(scale = 2):
-                    currentmodel = gr.Textbox(label="Current Model",lines=1,value="")  
+                    Components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")  
                     submit_result = gr.Textbox(label="Message")
                     mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
                     with gr.Accordion("Let the Dice roll",open = False,visible=True):    
@@ -320,9 +294,9 @@ def on_ui_tabs():
 
             with gr.Tab("Reservation"):
                 with gr.Row():
-                    s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
+                    Components.s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
                     s_reloadreserve = gr.Button(value="Reloat List",variant='primary')
-                    s_startreserve = gr.Button(value="Start XY plot",variant='primary')
+                    Components.s_startreserve = gr.Button(value="Start XY plot",variant='primary')
                     s_delreserve = gr.Button(value="Delete list(-1 for all)",variant='primary')
                     s_delnum = gr.Number(value=1, label="Delete num : ", interactive=True, visible = True,precision =0)
                 with gr.Row():
@@ -428,11 +402,11 @@ def on_ui_tabs():
         load_history.click(fn=load_historyf,outputs=[history ])
 
         msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae]
-        imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
-        xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
+        Components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
+        Components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
         hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
-        lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom,luckround]
+        Components.lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom,luckround]
 
         setdefault.click(fn = configdealer,
             inputs =[*genparams,*hiresfix[1:],dfalse],
@@ -447,54 +421,6 @@ def on_ui_tabs():
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
             outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode,luckseed,tensor]
-        )
-
-        merge.click(
-            fn=smergegen,
-            inputs=[*msettings,esettings1,*genparams,*lucks,currentmodel,dfalse,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel]
-        )
-
-        mergeandgen.click(
-            fn=smergegen,
-            inputs=[*msettings,esettings1,*genparams,*lucks,currentmodel,dtrue,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal]
-        )
-
-        gen.click(
-            fn=simggen,
-            inputs=[*genparams,*GenParamGetter.txt2img_params,currentmodel,id_sets],
-            outputs=[*imagegal],
-        )
-
-        s_reserve.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[numaframe]
-        )
-
-        s_reserve1.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[numaframe]
-        )
-
-        gengrid.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="normal",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal],
-        )
-
-        s_startreserve.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value=" ",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal],
-        )
-
-        rand_merge.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="random",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal],
         )
 
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
@@ -1013,4 +939,5 @@ def has_alphanumeric(text):
     pattern = re.compile(r'[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;"\'<>,.?/\|\\]')
     return bool(pattern.search(text.replace("</w>","")))
 
-script_callbacks.on_ui_tabs(on_ui_tabs)
+if __package__ == "supermerger":
+    script_callbacks.on_ui_tabs(on_ui_tabs)
