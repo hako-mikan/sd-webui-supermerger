@@ -1007,8 +1007,9 @@ def load_model_weights(model, checkpoint_info: msd.CheckpointInfo, state_dict, t
         if shared.cmd_opts.no_half_vae:
             model.first_stage_model = None
         # with --upcast-sampling, don't convert the depth model weights to float16
-        if shared.cmd_opts.upcast_sampling and depth_model:
-            model.depth_model = None
+        if hasattr(shared.cmd_opts,"upcast_sampling"):
+          if shared.cmd_opts.upcast_sampling and depth_model:
+              model.depth_model = None
 
         model.half()
         model.first_stage_model = vae
@@ -1031,8 +1032,14 @@ def load_model_weights(model, checkpoint_info: msd.CheckpointInfo, state_dict, t
     if hasattr(model, 'logvar'):
         model.logvar = model.logvar.to(devices.device)  # fix for training
 
-    msd.sd_vae.delete_base_vae()
-    msd.sd_vae.clear_loaded_vae()
-    vae_file, vae_source = msd.sd_vae.resolve_vae(checkpoint_info.filename)
-    msd.sd_vae.load_vae(model, vae_file, vae_source)
-    timer.record("load VAE")
+    def setvae():
+        msd.sd_vae.delete_base_vae()
+        msd.sd_vae.clear_loaded_vae()
+        vae_file, vae_source = msd.sd_vae.resolve_vae(checkpoint_info.filename)
+        msd.sd_vae.load_vae(model, vae_file, vae_source)
+        timer.record("load VAE")
+    
+    try:
+      setvae()
+    except:
+      pass
