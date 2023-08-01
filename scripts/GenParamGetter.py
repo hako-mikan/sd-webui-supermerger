@@ -82,7 +82,7 @@ class GenParamGetter(scripts.Script):
 
             components.gen.click(
                 fn=simggen,
-                inputs=[*GenParamGetter.txt2img_params,components.currentmodel,components.id_sets],
+                inputs=[*components.genparams,*GenParamGetter.txt2img_params,components.currentmodel,components.id_sets],
                 outputs=[*components.imagegal],
             )
 
@@ -116,4 +116,5 @@ class GenParamGetter(scripts.Script):
                 outputs=[components.submit_result,components.currentmodel,*components.imagegal],
             )
 
-script_callbacks.on_app_started(GenParamGetter.get_params_components)
+if __package__ == "GenParamGetter":
+    script_callbacks.on_app_started(GenParamGetter.get_params_components)
