@@ -20,3 +20,6 @@ xysettings = None
 submit_result = None
 imagegal = None
 numaframe = None
+
+txt2img_params = []
+img2img_params = []

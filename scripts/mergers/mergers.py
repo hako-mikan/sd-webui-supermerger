@@ -970,6 +970,9 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         hr_prompt=hr_prompt,
         hr_negative_prompt=hr_negative_prompt,
         override_settings=override_settings,
+        do_not_save_grid=True,
+        do_not_save_samples=True,
+        do_not_reload_embeddings=True,
     )
 
     p.scripts = scripts.scripts_txt2img
