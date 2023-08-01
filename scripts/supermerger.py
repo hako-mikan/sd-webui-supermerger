@@ -449,6 +449,54 @@ def on_ui_tabs():
             outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode,luckseed,tensor]
         )
 
+        merge.click(
+            fn=smergegen,
+            inputs=[*msettings,esettings1,*genparams,*lucks,currentmodel,dfalse,*GenParamGetter.txt2img_params],
+            outputs=[submit_result,currentmodel]
+        )
+
+        mergeandgen.click(
+            fn=smergegen,
+            inputs=[*msettings,esettings1,*genparams,*lucks,currentmodel,dtrue,*GenParamGetter.txt2img_params],
+            outputs=[submit_result,currentmodel,*imagegal]
+        )
+
+        gen.click(
+            fn=simggen,
+            inputs=[*genparams,*GenParamGetter.txt2img_params,currentmodel,id_sets],
+            outputs=[*imagegal],
+        )
+
+        s_reserve.click(
+            fn=numanager,
+            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
+            outputs=[numaframe]
+        )
+
+        s_reserve1.click(
+            fn=numanager,
+            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
+            outputs=[numaframe]
+        )
+
+        gengrid.click(
+            fn=numanager,
+            inputs=[gr.Textbox(value="normal",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
+            outputs=[submit_result,currentmodel,*imagegal],
+        )
+
+        s_startreserve.click(
+            fn=numanager,
+            inputs=[gr.Textbox(value=" ",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
+            outputs=[submit_result,currentmodel,*imagegal],
+        )
+
+        rand_merge.click(
+            fn=numanager,
+            inputs=[gr.Textbox(value="random",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
+            outputs=[submit_result,currentmodel,*imagegal],
+        )
+
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
 
         s_reloadreserve.click(fn=nulister,inputs=[dfalse],outputs=[numaframe])
