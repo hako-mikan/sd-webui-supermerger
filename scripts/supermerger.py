@@ -81,7 +81,7 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
+                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -920,6 +920,7 @@ def encodetexts(exclude):
     encoder = model.encode_with_transformers
     tokenizer = model.tokenizer
     vocab = tokenizer.get_vocab()
+    byte_decoder = tokenizer.byte_decoder
 
     batch = 500
 
@@ -940,6 +941,10 @@ def encodetexts(exclude):
         emb_norms = torch.linalg.vector_norm(embedding, dim=-1) # (bs,)
         
         for i, (word, token) in enumerate(texts):
+            try:
+                word = bytearray([byte_decoder[x] for x in word]).decode("utf-8")
+            except UnicodeDecodeError:
+                pass
             if exclude:
                 if has_alphanumeric(word) : output.append([word,token,emb_norms[i].item()])
             else:
