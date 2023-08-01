@@ -1,4 +1,7 @@
 import gradio as gr
+from scripts import supermerger
+from scripts.mergers.mergers import smergegen, simggen
+from scripts.mergers.xyplot import numanager
 from modules import scripts, script_callbacks
 
 class GenParamGetter(scripts.Script):
@@ -42,27 +45,77 @@ class GenParamGetter(scripts.Script):
         return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
 
     def get_params_components(self, demo: gr.Blocks):
-        dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and (GenParamGetter.txt2img_gen_button._id if self.is_txt2img else GenParamGetter.img2img_gen_button._id) in x["targets"]]
-        dependency: dict = None
-        cnet_dependency: dict = None
-        UiControlNetUnit = None
-        for d in dependencies:
-            if len(d["outputs"]) == 1:
-                outputs = outputs = self.get_components_by_ids(demo, d["outputs"])
-                output = outputs[0]
-                if (
-                    isinstance(output, gr.State)
-                    and type(output.value).__name__ == "UiControlNetUnit"
-                ):
-                    cnet_dependency = d
-                    UiControlNetUnit = type(output.value)
+        for _id in [GenParamGetter.txt2img_gen_button._id, GenParamGetter.img2img_gen_button._id]:
+            dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and _id in x["targets"]]
+            dependency: dict = None
+            cnet_dependency: dict = None
+            UiControlNetUnit = None
+            for d in dependencies:
+                if len(d["outputs"]) == 1:
+                    outputs = outputs = self.get_components_by_ids(demo, d["outputs"])
+                    output = outputs[0]
+                    if (
+                        isinstance(output, gr.State)
+                        and type(output.value).__name__ == "UiControlNetUnit"
+                    ):
+                        cnet_dependency = d
+                        UiControlNetUnit = type(output.value)
 
-            elif len(d["outputs"]) == 4:
-                dependency = d
+                elif len(d["outputs"]) == 4:
+                    dependency = d
 
-        params = [params for params in demo.fns if self.compare_components_with_ids(params.inputs, dependency["inputs"])]
+            params = [params for params in demo.fns if self.compare_components_with_ids(params.inputs, dependency["inputs"])]
 
-        if self.is_txt2img:
-            GenParamGetter.txt2img_params = params[0].inputs
-        elif self.is_img2img:
-            GenParamGetter.txt2img_params = params[0].inputs
+            if self.is_txt2img:
+                GenParamGetter.txt2img_params = params[0].inputs
+            elif self.is_img2img:
+                GenParamGetter.txt2img_params = params[0].inputs
+        
+        with supermerger.supermergerui:
+            supermerger.merge.click(
+                fn=smergegen,
+                inputs=[*supermerger.msettings,supermerger.esettings1,*supermerger.genparams,*supermerger.lucks,supermerger.currentmodel,supermerger.dfalse,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.submit_result,supermerger.currentmodel]
+            )
+
+            supermerger.mergeandgen.click(
+                fn=smergegen,
+                inputs=[*supermerger.msettings,supermerger.esettings1,*supermerger.genparams,*supermerger.lucks,supermerger.currentmodel,supermerger.dtrue,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.submit_result,supermerger.currentmodel,*supermerger.imagegal]
+            )
+
+            supermerger.gen.click(
+                fn=simggen,
+                inputs=[*GenParamGetter.txt2img_params,supermerger.currentmodel,supermerger.id_sets],
+                outputs=[*supermerger.imagegal],
+            )
+
+            supermerger.s_reserve.click(
+                fn=numanager,
+                inputs=[gr.Textbox(value="reserve",visible=False),*supermerger.xysettings,*supermerger.msettings,*supermerger.genparams,*supermerger.lucks,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.numaframe]
+            )
+
+            supermerger.s_reserve1.click(
+                fn=numanager,
+                inputs=[gr.Textbox(value="reserve",visible=False),*supermerger.xysettings,*supermerger.msettings,*supermerger.genparams,*supermerger.lucks,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.numaframe]
+            )
+
+            supermerger.gengrid.click(
+                fn=numanager,
+                inputs=[gr.Textbox(value="normal",visible=False),*supermerger.xysettings,*supermerger.msettings,*supermerger.genparams,*supermerger.lucks,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.submit_result,supermerger.currentmodel,*supermerger.imagegal],
+            )
+
+            supermerger.s_startreserve.click(
+                fn=numanager,
+                inputs=[gr.Textbox(value=" ",visible=False),*supermerger.xysettings,*supermerger.msettings,*supermerger.genparams,*supermerger.lucks,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.submit_result,supermerger.currentmodel,*supermerger.imagegal],
+            )
+
+            supermerger.rand_merge.click(
+                fn=numanager,
+                inputs=[gr.Textbox(value="random",visible=False),*supermerger.xysettings,*supermerger.msettings,*supermerger.genparams,*supermerger.lucks,*GenParamGetter.txt2img_params],
+                outputs=[supermerger.submit_result,supermerger.currentmodel,*supermerger.imagegal],
+            )

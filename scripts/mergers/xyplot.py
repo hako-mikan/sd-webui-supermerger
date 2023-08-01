@@ -11,7 +11,6 @@ from modules import images, sd_models, devices
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
 from scripts.mergers.model_util import savemodel,usemodel
-from scripts.GenParamGetter import GenParamGetter
 
 hear = True
 hearm = False
@@ -397,6 +396,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 if xcount == 0: statid = modelid
 
+                from scripts.GenParamGetter import GenParamGetter
                 image_temp = simggen(*GenParamGetter.txt2img_params,mergeinfo=currentmodel,id_sets=id_sets,modelid=modelid)
                 gc.collect()
                 devices.torch_gc()

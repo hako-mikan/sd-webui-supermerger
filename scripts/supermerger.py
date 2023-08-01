@@ -27,11 +27,60 @@ import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen, blockfromkey)
 from scripts.mergers.xyplot import freezetime, nulister, numanager
 from scripts.mergers.model_util import filenamecutter
-from scripts.GenParamGetter import GenParamGetter
 
 path_root = basedir()
 
+supermergerui = None
+
+merge = None
+mergeandgen = None
+gen = None
+s_reserve = None
+s_reserve1 = None
+gengrid = None
+s_startreserve = None
+rand_merge = None
+
+msettings = None
+esettings1 = None
+genparams = None
+lucks = None
+currentmodel = None
+dfalse = None
+dtrue = None
+id_sets = None
+xysettings = None
+
+submit_result = None
+imagegal = None
+numaframe = None
+
 def on_ui_tabs():
+    global supermergerui
+
+    global merge
+    global mergeandgen
+    global gen
+    global s_reserve
+    global s_reserve1
+    global gengrid
+    global s_startreserve
+    global rand_merge
+
+    global msettings
+    global esettings1
+    global genparams
+    global lucks
+    global currentmodel
+    global dfalse
+    global dtrue
+    global id_sets
+    global xysettings
+
+    global submit_result
+    global imagegal
+    global numaframe
+
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     if os.path.isfile(userfilepath):
@@ -398,54 +447,6 @@ def on_ui_tabs():
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
             outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode,luckseed,tensor]
-        )
-
-        merge.click(
-            fn=smergegen,
-            inputs=[*msettings,esettings1,*genparams,*lucks,currentmodel,dfalse,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel]
-        )
-
-        mergeandgen.click(
-            fn=smergegen,
-            inputs=[*msettings,esettings1,*genparams,*lucks,currentmodel,dtrue,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal]
-        )
-
-        gen.click(
-            fn=simggen,
-            inputs=[*GenParamGetter.txt2img_params,currentmodel,id_sets],
-            outputs=[*imagegal],
-        )
-
-        s_reserve.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[numaframe]
-        )
-
-        s_reserve1.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="reserve",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[numaframe]
-        )
-
-        gengrid.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="normal",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal],
-        )
-
-        s_startreserve.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value=" ",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal],
-        )
-
-        rand_merge.click(
-            fn=numanager,
-            inputs=[gr.Textbox(value="random",visible=False),*xysettings,*msettings,*genparams,*lucks,*GenParamGetter.txt2img_params],
-            outputs=[submit_result,currentmodel,*imagegal],
         )
 
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
