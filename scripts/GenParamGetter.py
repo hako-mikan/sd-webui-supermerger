@@ -1,5 +1,5 @@
 import gradio as gr
-from scripts.supermerger import Components
+import scripts.utils.components as components
 from scripts.mergers.mergers import smergegen, simggen
 from scripts.mergers.xyplot import numanager
 from modules import scripts, script_callbacks
@@ -68,52 +68,52 @@ class GenParamGetter(scripts.Script):
                 GenParamGetter.img2img_params = params[0].inputs
         
         with demo:
-            Components.merge.click(
+            components.merge.click(
                 fn=smergegen,
-                inputs=[*Components.msettings,Components.esettings1,*Components.genparams,*Components.lucks,Components.currentmodel,Components.dfalse,*GenParamGetter.txt2img_params],
-                outputs=[Components.submit_result,Components.currentmodel]
+                inputs=[*components.msettings,components.esettings1,*components.genparams,*components.lucks,components.currentmodel,components.dfalse,*GenParamGetter.txt2img_params],
+                outputs=[components.submit_result,components.currentmodel]
             )
 
-            Components.mergeandgen.click(
+            components.mergeandgen.click(
                 fn=smergegen,
-                inputs=[*Components.msettings,Components.esettings1,*Components.genparams,*Components.lucks,Components.currentmodel,Components.dtrue,*GenParamGetter.txt2img_params],
-                outputs=[Components.submit_result,Components.currentmodel,*Components.imagegal]
+                inputs=[*components.msettings,components.esettings1,*components.genparams,*components.lucks,components.currentmodel,components.dtrue,*GenParamGetter.txt2img_params],
+                outputs=[components.submit_result,components.currentmodel,*components.imagegal]
             )
 
-            Components.gen.click(
+            components.gen.click(
                 fn=simggen,
-                inputs=[*GenParamGetter.txt2img_params,Components.currentmodel,Components.id_sets],
-                outputs=[*Components.imagegal],
+                inputs=[*GenParamGetter.txt2img_params,components.currentmodel,components.id_sets],
+                outputs=[*components.imagegal],
             )
 
-            Components.s_reserve.click(
+            components.s_reserve.click(
                 fn=numanager,
-                inputs=[gr.Textbox(value="reserve",visible=False),*Components.xysettings,*Components.msettings,*Components.genparams,*Components.lucks,*GenParamGetter.txt2img_params],
-                outputs=[Components.numaframe]
+                inputs=[gr.Textbox(value="reserve",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.lucks,*GenParamGetter.txt2img_params],
+                outputs=[components.numaframe]
             )
 
-            Components.s_reserve1.click(
+            components.s_reserve1.click(
                 fn=numanager,
-                inputs=[gr.Textbox(value="reserve",visible=False),*Components.xysettings,*Components.msettings,*Components.genparams,*Components.lucks,*GenParamGetter.txt2img_params],
-                outputs=[Components.numaframe]
+                inputs=[gr.Textbox(value="reserve",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.lucks,*GenParamGetter.txt2img_params],
+                outputs=[components.numaframe]
             )
 
-            Components.gengrid.click(
+            components.gengrid.click(
                 fn=numanager,
-                inputs=[gr.Textbox(value="normal",visible=False),*Components.xysettings,*Components.msettings,*Components.genparams,*Components.lucks,*GenParamGetter.txt2img_params],
-                outputs=[Components.submit_result,Components.currentmodel,*Components.imagegal],
+                inputs=[gr.Textbox(value="normal",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.lucks,*GenParamGetter.txt2img_params],
+                outputs=[components.submit_result,components.currentmodel,*components.imagegal],
             )
 
-            Components.s_startreserve.click(
+            components.s_startreserve.click(
                 fn=numanager,
-                inputs=[gr.Textbox(value=" ",visible=False),*Components.xysettings,*Components.msettings,*Components.genparams,*Components.lucks,*GenParamGetter.txt2img_params],
-                outputs=[Components.submit_result,Components.currentmodel,*Components.imagegal],
+                inputs=[gr.Textbox(value=" ",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.lucks,*GenParamGetter.txt2img_params],
+                outputs=[components.submit_result,components.currentmodel,*components.imagegal],
             )
 
-            Components.rand_merge.click(
+            components.rand_merge.click(
                 fn=numanager,
-                inputs=[gr.Textbox(value="random",visible=False),*Components.xysettings,*Components.msettings,*Components.genparams,*Components.lucks,*GenParamGetter.txt2img_params],
-                outputs=[Components.submit_result,Components.currentmodel,*Components.imagegal],
+                inputs=[gr.Textbox(value="random",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.lucks,*GenParamGetter.txt2img_params],
+                outputs=[components.submit_result,components.currentmodel,*components.imagegal],
             )
 
 script_callbacks.on_app_started(GenParamGetter.get_params_components)

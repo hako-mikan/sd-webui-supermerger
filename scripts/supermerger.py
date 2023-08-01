@@ -18,6 +18,7 @@ from modules.ui import create_output_panel, create_refresh_button
 import scripts.mergers.mergers
 import scripts.mergers.pluslora
 import scripts.mergers.xyplot
+import scripts.utils.components as components
 from importlib import reload
 reload(scripts.mergers.mergers)
 reload(scripts.mergers.xyplot)
@@ -29,30 +30,6 @@ from scripts.mergers.xyplot import freezetime, nulister, numanager
 from scripts.mergers.model_util import filenamecutter
 
 path_root = basedir()
-
-class Components:
-    merge = None
-    mergeandgen = None
-    gen = None
-    s_reserve = None
-    s_reserve1 = None
-    gengrid = None
-    s_startreserve = None
-    rand_merge = None
-
-    msettings = None
-    esettings1 = None
-    genparams = None
-    lucks = None
-    currentmodel = None
-    dfalse = None
-    dtrue = None
-    id_sets = None
-    xysettings = None
-
-    submit_result = None
-    imagegal = None
-    numaframe = None
 
 def on_ui_tabs():
     weights_presets=""
@@ -110,7 +87,7 @@ def on_ui_tabs():
                         with gr.Column(scale = 3):
                             save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
                         with gr.Column(min_width = 50, scale = 1):
-                            id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
 
                     with gr.Row():
                         with gr.Column(min_width = 50):
@@ -124,9 +101,9 @@ def on_ui_tabs():
 
 
                     with gr.Row():
-                        Components.merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
-                        Components.mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
-                        Components.gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
+                        components.merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
+                        components.mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
+                        components.gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
                         stopmerge = gr.Button(elem_id="stopmerge", value="Stop")
 
                     with gr.Accordion("Generation Parameters",open = False):
@@ -155,7 +132,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Elemental Merge, Adjust",open = False):
                         with gr.Row():
-                            Components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                            components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
                         with gr.Row():    
@@ -171,17 +148,17 @@ def on_ui_tabs():
                     zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
                     esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
                     with gr.Row():
-                        Components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
+                        components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
                         stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
-                        Components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
-                    dtrue =  gr.Checkbox(value = True, visible = False)                
-                    dfalse =  gr.Checkbox(value = False,visible = False)     
+                        components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
+                    components.dtrue =  gr.Checkbox(value = True, visible = False)                
+                    components.dfalse =  gr.Checkbox(value = False,visible = False)     
                     dummy_t =  gr.Textbox(value = "",visible = False)    
                 blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
         
                 with gr.Column(scale = 2):
-                    Components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")  
-                    submit_result = gr.Textbox(label="Message")
+                    components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")  
+                    components.submit_result = gr.Textbox(label="Message")
                     mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
                     with gr.Accordion("Let the Dice roll",open = False,visible=True):    
                         with gr.Row():
@@ -200,7 +177,7 @@ def on_ui_tabs():
                             lucklimits_u = gr.Textbox(label="Upper limit for X",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
                         with gr.Row(): 
                             lucklimits_l = gr.Textbox(label="Lower limit for X",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
-                        rand_merge = gr.Button(elem_id="runrandmerge", value="Run Rand",variant='primary')
+                        components.rand_merge = gr.Button(elem_id="runrandmerge", value="Run Rand",variant='primary')
 
             with gr.Row(visible = False) as row_inputers:
                 inputer = gr.Textbox(label="",lines=1,value="")
@@ -294,13 +271,13 @@ def on_ui_tabs():
 
             with gr.Tab("Reservation"):
                 with gr.Row():
-                    Components.s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
+                    components.s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
                     s_reloadreserve = gr.Button(value="Reloat List",variant='primary')
-                    Components.s_startreserve = gr.Button(value="Start XY plot",variant='primary')
+                    components.s_startreserve = gr.Button(value="Start XY plot",variant='primary')
                     s_delreserve = gr.Button(value="Delete list(-1 for all)",variant='primary')
                     s_delnum = gr.Number(value=1, label="Delete num : ", interactive=True, visible = True,precision =0)
                 with gr.Row():
-                    numaframe = gr.Dataframe(
+                    components.numaframe = gr.Dataframe(
                         headers=["No.","status","xtype","xmenber","ytype","ymenber","ztype","zmenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
                         row_count=5,)
 
@@ -382,8 +359,8 @@ def on_ui_tabs():
             outputs=[metadata]
         )                 
 
-        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,dfalse],outputs=[keys])
-        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,dtrue],outputs=[keys])
+        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,components.dfalse],outputs=[keys])
+        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,components.dtrue],outputs=[keys])
 
         te_smd_loadkeys.click(fn=encodetexts,inputs=[exclude],outputs=[encoded])
         te_smd_searchkeys.click(fn=pickupencode,inputs=[pickupword],outputs=[encoded])
@@ -397,36 +374,36 @@ def on_ui_tabs():
             devices.torch_gc()
             return "model unloaded"
 
-        unloadmodel.click(fn=unload,outputs=[submit_result])
+        unloadmodel.click(fn=unload,outputs=[components.submit_result])
 
-        load_history.click(fn=load_historyf,outputs=[history ])
+        load_history.click(fn=load_historyf,outputs=[history])
 
-        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae]
-        Components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
-        Components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
-        genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
-        hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
-        Components.lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom,luckround]
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,tensor,bake_in_vae]
+        components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
+        components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
+        components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
+        components.hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
+        components.lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom,luckround]
 
         setdefault.click(fn = configdealer,
-            inputs =[*genparams,*hiresfix[1:],dfalse],
+            inputs =[*components.genparams,*components.hiresfix[1:],components.dfalse],
         )
 
         resetdefault.click(fn = configdealer,
-            inputs =[*genparams,*hiresfix[1:],dtrue],
+            inputs =[*components.genparams,*components.hiresfix[1:],components.dtrue],
         )
 
-        resetcurrent.click(fn = lambda x : [gr.update(value = x) for x in RESETVALS] ,outputs =[*genparams,*hiresfix[1:]],)
+        resetcurrent.click(fn = lambda x : [gr.update(value = x) for x in RESETVALS] ,outputs =[*components.genparams,*components.hiresfix[1:]],)
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [submit_result,*msettings[0:8],*msettings[9:13],deep,calcmode,luckseed,tensor]
+            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,tensor]
         )
 
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
 
-        s_reloadreserve.click(fn=nulister,inputs=[dfalse],outputs=[numaframe])
-        s_delreserve.click(fn=nulister,inputs=[s_delnum],outputs=[numaframe])
+        s_reloadreserve.click(fn=nulister,inputs=[components.dfalse],outputs=[components.numaframe])
+        s_delreserve.click(fn=nulister,inputs=[s_delnum],outputs=[components.numaframe])
         loadcachelist.click(fn=load_cachelist,inputs=[],outputs=[currentcache])
         addtox.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[xgrid])
         addtoy.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[ygrid])
@@ -454,8 +431,8 @@ def on_ui_tabs():
             choices = preset_name_list(presets,rand)
             return gr.update(choices = choices)
 
-        preset_refresh.click(fn=refresh_presets,inputs=[wpresets,dfalse],outputs=[dd_preset_weight])
-        preset_refresh_r.click(fn=refresh_presets,inputs=[wpresets,dtrue],outputs=[weights_a,weights_b])
+        preset_refresh.click(fn=refresh_presets,inputs=[wpresets,components.dfalse],outputs=[dd_preset_weight])
+        preset_refresh_r.click(fn=refresh_presets,inputs=[wpresets,components.dtrue],outputs=[weights_a,weights_b])
 
         def changexl(isxl):
             out = [True] * 26
