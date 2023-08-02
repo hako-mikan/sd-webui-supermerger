@@ -967,7 +967,7 @@ def usemodel(checkpoint_info=None, already_loaded_state_dict=None):
     timer.record("scripts callbacks")
 
     with devices.autocast(), torch.no_grad():
-        sd_model.cond_stage_model_empty_prompt = msd.get_empty_cond(sd_model)
+        sd_model.cond_stage_model_empty_prompt = get_empty_cond(sd_model)
 
     timer.record("calculate empty prompt")
 
@@ -1019,7 +1019,8 @@ def load_model_weights(model, checkpoint_info: msd.CheckpointInfo, state_dict, t
         timer.record("apply half()")
 
     devices.dtype_unet = torch.float16 if model.is_sdxl and not shared.cmd_opts.no_half else model.model.diffusion_model.dtype
-    devices.unet_needs_upcast = shared.cmd_opts.upcast_sampling and devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
+    if hasattr(shared.cmd_opts,"upcast_sampling"):
+      devices.unet_needs_upcast = shared.cmd_opts.upcast_sampling and devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
 
     model.first_stage_model.to(devices.dtype_vae)
     timer.record("apply dtype to VAE")
@@ -1043,3 +1044,10 @@ def load_model_weights(model, checkpoint_info: msd.CheckpointInfo, state_dict, t
       setvae()
     except:
       pass
+
+def get_empty_cond(sd_model):
+    if hasattr(sd_model, 'conditioner'):
+        d = sd_model.get_learned_conditioning([""])
+        return d['crossattn']
+    else:
+        return sd_model.cond_stage_model([""])
