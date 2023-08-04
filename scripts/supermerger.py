@@ -212,6 +212,22 @@ def on_ui_tabs():
                             dd_preset_weight_r = gr.Dropdown(label="Load Romdom preset", choices=preset_name_list(weights_presets,True), interactive=True, elem_id="refresh_presets")
                             preset_refresh_r = gr.Button(value='\U0001f504', elem_classes=["tool"])
                             luckab = gr.Radio(label = "for",choices = ["none", "alpha", "beta"], value = "none", type="value") 
+
+                with gr.Row():
+                    gr.HTML(value="<p>Set block weights</p>")
+
+                with gr.Row():
+                    with gr.Column():
+                        resetval = gr.Slider(label="Value", show_label=False, info="Value to set/add/mul", minimum=0, maximum=2, step=0.0001, value=0)
+                        resetopt = gr.Radio(label="Pre defined", show_label=False, choices = ["0", "0.25", "0.5", "0.75", "1"], value = "0", type="value") 
+                    with gr.Column():
+                        resetblockopt = gr.CheckboxGroup(["BASE","INP*","MID","OUT*"], value=["INP*","OUT*"], label="Blocks", show_label=False, info="Select blocks to change")
+                    with gr.Column():
+                        with gr.Row():
+                            resetweight = gr.Button(elem_classes=["reset"], value="Set")
+                            addweight = gr.Button(elem_classes=["reset"], value="Add")
+                            mulweight = gr.Button(elem_classes=["reset"], value="Mul")
+
                 with gr.Row():
                     with gr.Column():
                         base = gr.Slider(label="Base", minimum=0, maximum=1, step=0.0001, value=0.5)
@@ -419,6 +435,113 @@ def on_ui_tabs():
         setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
         setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
         setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
+
+        def addblockweights(val, blockopt, *blocks):
+            if val == "none":
+                val = 0
+
+            value = float(val)
+
+            if "BASE" in blockopt:
+                vals = [blocks[0] + value]
+            else:
+                vals = [blocks[0]]
+
+            if "INP*" in blockopt:
+                inp = [blocks[i + 1] + value for i in range(12)]
+            else:
+                inp = [blocks[i + 1] for i in range(12)]
+            vals = vals + inp
+
+            if "MID" in blockopt:
+                mid = [blocks[13] + value]
+            else:
+                mid = [blocks[13]]
+            vals = vals + mid
+
+            if "OUT*" in blockopt:
+                out = [blocks[i + 14] + value for i in range(12)]
+            else:
+                out = [blocks[i + 14] for i in range(12)]
+            vals = vals + out
+
+            return setblockweights(vals, blockopt)
+
+        def mulblockweights(val, blockopt, *blocks):
+            if val == "none":
+                val = 0
+
+            value = float(val)
+
+            if "BASE" in blockopt:
+                vals = [blocks[0] * value]
+            else:
+                vals = [blocks[0]]
+
+            if "INP*" in blockopt:
+                inp = [blocks[i + 1] * value for i in range(12)]
+            else:
+                inp = [blocks[i + 1] for i in range(12)]
+            vals = vals + inp
+
+            if "MID" in blockopt:
+                mid = [blocks[13] * value]
+            else:
+                mid = [blocks[13]]
+            vals = vals + mid
+
+            if "OUT*" in blockopt:
+                out = [blocks[i + 14] * value for i in range(12)]
+            else:
+                out = [blocks[i + 14] for i in range(12)]
+            vals = vals + out
+
+            return setblockweights(vals, blockopt)
+
+        def resetblockweights(val, blockopt):
+            if val == "none":
+                val = 0
+            vals = [float(val)] * 26
+            return setblockweights(vals, blockopt)
+
+        def setblockweights(vals, blockopt):
+            if "BASE" in blockopt:
+                ret = [gr.update(value = vals[0])]
+            else:
+                ret = [gr.update()]
+
+            if "INP*" in blockopt:
+                inp = [gr.update(value = vals[i + 1]) for i in range(12)]
+            else:
+                inp = [gr.update() for _ in range(12)]
+            ret = ret + inp
+
+            if "MID" in blockopt:
+                mid = [gr.update(value = vals[13])]
+            else:
+                mid = [gr.update()]
+            ret = ret + mid
+
+            if "OUT*" in blockopt:
+                out = [gr.update(value = vals[i + 14]) for i in range(12)]
+            else:
+                out = [gr.update() for _ in range(12)]
+            ret = ret + out
+
+            return ret
+
+        def resetvalopt(opt):
+            if opt == "none":
+                value = 0.0
+            else:
+                value = float(opt)
+
+            return gr.update(value = value)
+
+        resetopt.change(fn=resetvalopt,inputs=[resetopt],outputs=[resetval])
+        resetweight.click(fn=resetblockweights,inputs=[resetval,resetblockopt],outputs=menbers)
+        addweight.click(fn=addblockweights,inputs=[resetval,resetblockopt,*menbers],outputs=menbers)
+        mulweight.click(fn=mulblockweights,inputs=[resetval,resetblockopt,*menbers],outputs=menbers)
 
         readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
         readbeta.click(fn=text2slider,inputs=weights_b,outputs=menbers)

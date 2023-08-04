@@ -3,3 +3,6 @@
     position:absolute;
 }
 
+button.reset {
+    min-width: min(100px,100%);
+}
