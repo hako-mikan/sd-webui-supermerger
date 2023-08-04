@@ -20,18 +20,13 @@ from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
-from modules.generation_parameters_copypaste import create_override_settings_dict
 from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel,usemodel
 from math import ceil
-import sys
 from multiprocessing import cpu_count
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from inspect import currentframe
-
-module_path = os.path.dirname(os.path.abspath(sys.modules[__name__].__file__))
-scriptpath = os.path.dirname(module_path)
 
 def tryit(func):
     try:
@@ -82,11 +77,11 @@ def casterr(*args,hear=hear):
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
                        calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                        esettings,
-                       s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-                       genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
+                       prompt,nprompt,steps,sampler,cfg,seed,w,h,
+                       hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                       s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,
                        lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
-                       currentmodel,imggen,
-                       id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args):
+                       currentmodel,imggen):
 
     lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
     deepprint  = True if "print change" in esettings else False
@@ -109,10 +104,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     devices.torch_gc()
 
     if imggen :
-        images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-                        genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-                        id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
-                        mergeinfo=currentmodel,id_sets=id_sets,modelid=modelid)
+        images = simggen(prompt,nprompt,steps,sampler,cfg,seed,w,h,hireson,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                                    s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,currentmodel,id_sets,modelid)
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -230,7 +223,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  Weights Seed\t: {lucks['ceed']}")
     print(f"  Adjust \t: {fine}")
 
-    theta_1=load_model_weights_m(model_b,False,True,save)
+    tryit(unload_model_weights)
+
+    theta_1=load_model_weights_m(model_b,False,True,save).copy()
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
     if isxl and useblocks:
@@ -247,9 +242,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
         if calcmode == "trainDifference":
-            theta_2 = load_model_weights_m(model_c,True,False,save)
+            theta_2 = load_model_weights_m(model_c,True,False,save).copy()
         else:
-            theta_2 = load_model_weights_m(model_c,False,False,save)
+            theta_2 = load_model_weights_m(model_c,False,False,save).copy()
             for key in tqdm(theta_1.keys()):
                 if 'model' in key:
                     if key in theta_2:
@@ -268,10 +263,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_0[key] = theta_t[key].clone()
         del theta_t
     else:
-        theta_0=load_model_weights_m(model_a,True,False,save)
+        theta_0=load_model_weights_m(model_a,True,False,save).copy()
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
-        theta_2 = load_model_weights_m(model_c,False,False,save)
+        theta_2 = load_model_weights_m(model_c,False,False,save).copy()
     else:
         if calcmode != "trainDifference":
             theta_2 = {}
@@ -662,6 +657,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     return "",currentmodel,modelid,theta_0,metadata
 
+
 def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear):  
     lock_theta_0 = Lock()
     lock_theta_1 = Lock()
@@ -669,6 +665,7 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
 
     def thread_callback(keys):
         nonlocal theta_0, theta_1
+
         if stopmerge:
             return False
 
@@ -702,10 +699,12 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
     futures = []
     with ThreadPoolExecutor(max_workers=threads) as executor:
         futures = [executor.submit(thread_callback, extract_and_remove(keys, int(tasks_per_thread))) for i in range(total_threads)]
+
         for future in as_completed(futures):
             if not future.result():
                 executor.shutdown()
                 return theta_0, theta_1, True
+
         del progress
 
     return theta_0, theta_1, False
@@ -829,7 +828,8 @@ def savestatics(modelid):
         saveekeys(result,f"{modelid}_{key}")
 
 def get_font(fontsize):
-    fontpath = os.path.join(scriptpath, "Roboto-Regular.ttf")
+    path_root = scripts.basedir()
+    fontpath = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "Roboto-Regular.ttf")
     try:
         return ImageFont.truetype(opts.font or fontpath, fontsize)
     except Exception:
@@ -935,96 +935,51 @@ def eratiodealer(dr,randomer,block,num,lucks):
     else:
         return float(dr)
 
-def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-            genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-            id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
-            mergeinfo="",id_sets=[],modelid = "no id"):
+def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscaler,hr2ndsteps,denoise_str,hr_scale,
+                   s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,batch_size,mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
-
-    #params = [s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale]
-    #paramsname = ["s_prompt","s_nprompt","s_steps","s_sampler","s_cfg","s_seed","s_w","s_h","s_batch_size","genoptions","s_hrupscaler","s_hr2ndsteps","s_denois_str","s_hr_scale"]
-    #params = [prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts]
-    #paramsname = ["prompt"," negative_prompt"," prompt_styles"," steps"," sampler_index"," restore_faces"," tiling"," n_iter"," batch_size"," cfg_scale"," seed"," subseed"," subseed_strength"," seed_resize_from_h"," seed_resize_from_w"," seed_enable_extras"," height"," width"," enable_hr"," denoising_strength"," hr_scale"," hr_upscaler"," hr_second_pass_steps"," hr_resize_x"," hr_resize_y"," hr_sampler_index"," hr_prompt"," hr_negative_prompt"," override_settings_texts"]
-
-    #from pprint import pprint
-    #pprint([f"{n}={v}"for v,n in zip(params,paramsname)])
-
-    override_settings = create_override_settings_dict(override_settings_texts)
-
-    if sampler_index is None:sampler_index = 0
-    if hr_sampler_index is None:hr_sampler_index = 0
-    if s_sampler is None: s_sampler = 0
-
     p = processing.StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
-        outpath_samples=opts.outdir_samples or opts.outdir_txt2img_samples,
-        outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
-        prompt=prompt,
-        styles=prompt_styles,
-        negative_prompt=negative_prompt,
-        seed=seed,
-        subseed=subseed,
-        subseed_strength=subseed_strength,
-        seed_resize_from_h=seed_resize_from_h,
-        seed_resize_from_w=seed_resize_from_w,
-        seed_enable_extras=seed_enable_extras,
-        sampler_name=sd_samplers.samplers[sampler_index].name,
-        batch_size=batch_size,
-        n_iter=n_iter,
-        steps=steps,
-        cfg_scale=cfg_scale,
-        width=width,
-        height=height,
-        restore_faces=restore_faces,
-        tiling=tiling,
-        enable_hr=enable_hr,
-        denoising_strength=denoising_strength if enable_hr else None,
-        hr_scale=hr_scale,
-        hr_upscaler=hr_upscaler,
-        hr_second_pass_steps=hr_second_pass_steps,
-        hr_resize_x=hr_resize_x,
-        hr_resize_y=hr_resize_y,
-        override_settings=override_settings,
         do_not_save_grid=True,
         do_not_save_samples=True,
         do_not_reload_embeddings=True,
     )
-
-    p.scripts = scripts.scripts_txt2img
-    p.script_args = args
-    p.all_seeds = [p.seed]
-
-    if s_batch_size != 1 :p.batch_size = int(s_batch_size)
-    if s_prompt: p.prompt = s_prompt
-    if s_nprompt: p.negative_prompt = s_nprompt
-    if s_steps: p.steps = s_steps
-    if s_sampler: p.sampler_name = sd_samplers.samplers[sampler_index].name
-    if s_cfg: p.cfg_scale = s_cfg
-    if s_seed: p.seed = s_seed
-    if s_w: p.width = s_w
-    if s_h: p.height = s_h
-
-    p.hr_prompt=hr_prompt
-    p.hr_negative_prompt=hr_negative_prompt
-    p.hr_sampler_name=sd_samplers.samplers_for_img2img[hr_sampler_index - 1].name if hr_sampler_index != 0 else None
-
-    if "Hires. fix" in genoptions:
-        if s_hrupscaler: p.hr_upscaler = s_hrupscaler
-        if s_hr2ndsteps:p.hr_second_pass_steps = s_hr2ndsteps
-        if s_denois_str:p.denoising_strength = s_denois_str
-        if s_hr_scale:p.hr_scale = s_hr_scale
-
-    if "Restore faces" in genoptions:
-        p.restore_faces = True
-
-    if "Tiling" in genoptions:
-        p.tiling = True
+    p.batch_size = int(batch_size)
+    p.prompt = prompt if s_prompt == "" else s_prompt
+    p.negative_prompt = nprompt if s_nprompt == "" else s_nprompt
+    p.steps = steps if s_steps == 0 else s_steps
+    try:
+        p.sampler_name = sd_samplers.samplers[sampler].name if s_sampler == 0 or s_sampler == None else sd_samplers.samplers[s_sampler-1].name
+    except:
+        print(f"{bcolors.Fail}Error:sampler:{sampler},s_sampler:{s_sampler}{bcolors.ENDC}")
+    p.cfg_scale = cfg  if s_cfg == 0 else s_cfg
+    p.seed = seed  if s_seed == 0 else s_seed
+    p.width = w  if s_w == 0 else s_w
+    p.height = h  if s_h == 0 else s_h
+    p.seed_resize_from_w=0
+    p.seed_resize_from_h=0
+    p.denoising_strength=None
 
     p.cached_c = [None,None]
     p.cached_uc = [None,None]
 
     p.cached_hr_c = [None, None]
     p.cached_hr_uc = [None, None]
+
+    #"Restore faces", "Tiling", "Hires. fix"
+
+    if "Hires. fix" in genoptions:
+        p.enable_hr = True
+        p.denoising_strength = denoise_str
+        p.hr_upscaler = hrupscaler
+        p.hr_second_pass_steps = hr2ndsteps
+        p.hr_scale = hr_scale
+    
+    if "Tiling" in genoptions:
+        p.tiling = True
+
+    if "Restore faces" in genoptions:
+        p.restore_faces = True
 
     if type(p.prompt) == list:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
@@ -1039,7 +994,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     processed:Processed = processing.process_images(p)
     if "image" in id_sets:
         for i, image in enumerate(processed.images):
-            processed.images[i] = draw_origin(image, str(modelid),p.width,p.height,p.width)
+            processed.images[i] = draw_origin(image, str(modelid),w,h,w)
 
     if "PNG info" in id_sets:mergeinfo = mergeinfo + " ID " + str(modelid)
 
@@ -1056,7 +1011,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     for i, image in enumerate(processed.images):
         images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, p=p,info=infotext)
 
-    if s_batch_size > 1:
+    if batch_size > 1:
         grid = images.image_grid(processed.images, p.batch_size)
         processed.images.insert(0, grid)
         images.save_image(grid, opts.outdir_txt2img_grids, "grid", p.seed, p.prompt, opts.grid_format, info=infotext, short_filename=not opts.grid_extended_filename, p=p, grid=True)
