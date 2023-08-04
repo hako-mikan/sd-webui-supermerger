@@ -6,6 +6,11 @@
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
 # Recent Update
+
+- ほぼすべてのtxt2imgタブの設定を使えるようになりました
+- Almost all txt2img tab settings are now available in generation    
+Thanks! [Filexor](https://github.com/Filexor)  
+  
 - support XL
 - XLモデル対応
 
