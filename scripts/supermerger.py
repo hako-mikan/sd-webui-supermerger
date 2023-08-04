@@ -9,7 +9,6 @@ from importlib import reload
 from pprint import pprint
 import gradio as gr
 from modules import (devices, script_callbacks, sd_hijack, sd_models,sd_vae, shared)
-import modules.scripts as modules_scripts
 from modules.scripts import basedir
 from modules.sd_models import checkpoints_loaded
 from modules.shared import opts
@@ -18,7 +17,7 @@ from modules.ui import create_output_panel, create_refresh_button
 import scripts.mergers.mergers
 import scripts.mergers.pluslora
 import scripts.mergers.xyplot
-import scripts.utils.components as components
+import scripts.components.components as components
 from importlib import reload
 reload(scripts.mergers.mergers)
 reload(scripts.mergers.xyplot)
@@ -867,6 +866,7 @@ def encodetexts(exclude):
     encoder = model.encode_with_transformers
     tokenizer = model.tokenizer
     vocab = tokenizer.get_vocab()
+    byte_decoder = tokenizer.byte_decoder
 
     batch = 500
 
@@ -887,6 +887,10 @@ def encodetexts(exclude):
         emb_norms = torch.linalg.vector_norm(embedding, dim=-1) # (bs,)
         
         for i, (word, token) in enumerate(texts):
+            try:
+                word = bytearray([byte_decoder[x] for x in word]).decode("utf-8")
+            except UnicodeDecodeError:
+                pass
             if exclude:
                 if has_alphanumeric(word) : output.append([word,token,emb_norms[i].item()])
             else:
