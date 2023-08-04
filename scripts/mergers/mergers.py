@@ -225,7 +225,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     tryit(unload_model_weights)
 
-    theta_1=load_model_weights_m(model_b,False,True,save)
+    theta_1=load_model_weights_m(model_b,False,True,save).copy()
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
     if isxl and useblocks:
@@ -242,9 +242,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
         if calcmode == "trainDifference":
-            theta_2 = load_model_weights_m(model_c,True,False,save)
+            theta_2 = load_model_weights_m(model_c,True,False,save).copy()
         else:
-            theta_2 = load_model_weights_m(model_c,False,False,save)
+            theta_2 = load_model_weights_m(model_c,False,False,save).copy()
             for key in tqdm(theta_1.keys()):
                 if 'model' in key:
                     if key in theta_2:
@@ -263,10 +263,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_0[key] = theta_t[key].clone()
         del theta_t
     else:
-        theta_0=load_model_weights_m(model_a,True,False,save)
+        theta_0=load_model_weights_m(model_a,True,False,save).copy()
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
-        theta_2 = load_model_weights_m(model_c,False,False,save)
+        theta_2 = load_model_weights_m(model_c,False,False,save).copy()
     else:
         if calcmode != "trainDifference":
             theta_2 = {}
