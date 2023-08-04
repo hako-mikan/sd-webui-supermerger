@@ -1,5 +1,5 @@
 import gradio as gr
-import scripts.components.components as components
+import scripts.mergers.components as components
 from scripts.mergers.mergers import smergegen, simggen
 from scripts.mergers.xyplot import numanager
 from modules import scripts, script_callbacks
