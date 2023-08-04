@@ -17,7 +17,7 @@ from modules.ui import create_output_panel, create_refresh_button
 import scripts.mergers.mergers
 import scripts.mergers.pluslora
 import scripts.mergers.xyplot
-import scripts.components.components as components
+import scripts.mergers.components as components
 from importlib import reload
 reload(scripts.mergers.mergers)
 reload(scripts.mergers.xyplot)
