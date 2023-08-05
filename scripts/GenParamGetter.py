@@ -33,10 +33,12 @@ class GenParamGetter(scripts.Script):
         if root._id in ids:
             components.append(root)
             ids = [_id for _id in ids if _id != root._id]
-
-        if isinstance(root, gr.components.BlockContext):
-            for block in root.children:
-                components.extend(GenParamGetter.get_components_by_ids(block, ids))
+        try:
+            if isinstance(root, gr.components.BlockContext):
+                for block in root.children:
+                    components.extend(GenParamGetter.get_components_by_ids(block, ids))
+        except:
+            pass
 
         return components
     
