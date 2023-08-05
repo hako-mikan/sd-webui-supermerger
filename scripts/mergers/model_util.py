@@ -4,6 +4,7 @@ import torch
 from transformers import CLIPTextModel,  CLIPTextConfig
 from safetensors.torch import load_file
 import safetensors.torch
+import threading
 from modules import shared
 from modules.sd_models import read_state_dict
 try:
@@ -896,6 +897,11 @@ sdxl_clip_weight = 'conditioner.embedders.1.model.ln_final.weight'
 sdxl_refiner_clip_weight = 'conditioner.embedders.0.model.ln_final.weight'
 
 def usemodel(checkpoint_info=None, already_loaded_state_dict=None):
+  with threading.Lock():
+    usemodel_in(checkpoint_info,already_loaded_state_dict)
+  torch.cuda.empty_cache()
+
+def usemodel_in(checkpoint_info=None, already_loaded_state_dict=None):
     from modules import lowvram, sd_hijack
     checkpoint_info = checkpoint_info or msd.select_checkpoint()
 
@@ -905,8 +911,10 @@ def usemodel(checkpoint_info=None, already_loaded_state_dict=None):
         gc.collect()
         devices.torch_gc()
 
-    msd.do_inpainting_hijack()
-
+    try:
+      msd.do_inpainting_hijack()
+    except:
+      pass
     timer = msd.Timer()
 
     if already_loaded_state_dict is not None:
