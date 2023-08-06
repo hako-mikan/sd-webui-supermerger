@@ -210,7 +210,10 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         weights_b_in=wpreseter(weights_b,wpresets)
 
     #for X only plot, use same seed
-    if gensets[5] == -1: gensets[5] = int(random.randrange(4294967294))
+    if gensets[11] == -1: gensets[11] = int(random.randrange(4294967294))
+    
+    #gensets :prompt:1,seed:11
+    #gensets_s :prompt:0, seed:5
 
     #for XY plot, use same seed
     def dicedealer(zs):
@@ -313,7 +316,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         wta = awt + bwt
         nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,fine
         if "prompt" in wt:
-            gensets[0] = w
+            gensets[1] = w
             return
         if "pinpoint blocks" in wt or "pinpoint element" in wt or "effective" in wt:return
         if "mbw" in wt:
@@ -331,7 +334,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             return
         if "alpha" in wt and not ("pinpoint element" in wta or "effective" in wta or "pinpoint adjust" in wta):alpha = w
         if "beta" in wt: beta = w
-        if "seed" in wt:gensets[5] = int(w)
+        if "seed" in wt:gensets[11] = int(w)
         if "model_A" in wt:model_a = w
         if "model_B" in wt:model_b = w
         if "model_C" in wt:model_c = w
