@@ -1031,6 +1031,7 @@ def load_model_weights(model, checkpoint_info: msd.CheckpointInfo, state_dict, t
       devices.unet_needs_upcast = shared.cmd_opts.upcast_sampling and devices.dtype == torch.float16 and devices.dtype_unet == torch.float16
 
     model.first_stage_model.to(devices.dtype_vae)
+    model.has_accelerate = False
     timer.record("apply dtype to VAE")
 
     model.sd_model_hash = sd_model_hash
