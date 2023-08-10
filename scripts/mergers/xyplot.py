@@ -11,6 +11,7 @@ from modules import images, sd_models, devices
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
 from scripts.mergers.model_util import savemodel,usemodel
+from scripts.mergers.bcolors import bcolors
 
 hear = True
 hearm = False
@@ -22,17 +23,6 @@ NUM = "num"
 RAND = "random"
 
 numadepth = []
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 def freezetime():
     global state_mergen
