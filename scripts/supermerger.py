@@ -391,7 +391,7 @@ def on_ui_tabs():
 
         unloadmodel.click(fn=unload,outputs=[components.submit_result])
 
-        load_history.click(fn=load_historyf,outputs=[history])
+        load_history.click(fn=load_historyf,inputs=[history],outputs=[history])
 
         components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,tensor,bake_in_vae]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
@@ -606,7 +606,7 @@ def loadmetadata(model):
     if sdict == {}: return "no metadata"
     return json.dumps(sdict,indent=4)
 
-def load_historyf():
+def load_historyf(data, count=20):
     filepath = os.path.join(path_root,"mergehistory.csv")
     global mlist,msearch
     msearch = []
@@ -614,8 +614,19 @@ def load_historyf():
     try:
         with  open(filepath, 'r') as f:
             reader = csv.reader(f)
-            mlist =  [raw for raw in reader]
-            mlist = mlist[1:]
+            next(reader) # skip header
+            row_count = sum(1 for row in reader)
+
+            if data is not None and len(data) > 1:
+                old = data.loc[len(data)-1, 'ID']
+                nth = int(old) - count
+            else:
+                nth = row_count - count
+
+            f.seek(0)
+            next(reader)
+            mlist = [raw for n,raw in enumerate(reader) if n >= nth]
+            mlist.reverse()
             for m in mlist:
                 msearch.append(" ".join(m))
             maxlen = len(mlist[-1][0])
