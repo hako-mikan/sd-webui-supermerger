@@ -337,10 +337,16 @@ def on_ui_tabs():
         with gr.Tab("History", elem_id="tab_history"):
             
             with gr.Row():
-                load_history = gr.Button(value="load_history",variant='primary')
-                searchwrods = gr.Textbox(label="",lines=1,value="")
-                search = gr.Button(value="search")
-                searchmode = gr.Radio(label = "Search Mode",choices = ["or","and"], value = "or",type  = "value") 
+                with gr.Column(scale = 2):
+                    with gr.Row():
+                        count = gr.Dropdown(choices=["20", "30", "40", "50", "100"], value="20", label="Load count")
+                        load_history = gr.Button(value="Load history",variant='primary', elem_classes=["reset"])
+                        reload_history = gr.Button(value="Reload history", elem_classes=["reset"])
+                with gr.Column(scale = 2):
+                    with gr.Row():
+                        searchwrods = gr.Textbox(label="",lines=1,value="")
+                        search = gr.Button(value="search", elem_classes=["reset"])
+                        searchmode = gr.Radio(label = "Search Mode",choices = ["or","and"], value = "or",type  = "value") 
             with gr.Row():
                 history = gr.Dataframe(
                         headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
@@ -391,7 +397,8 @@ def on_ui_tabs():
 
         unloadmodel.click(fn=unload,outputs=[components.submit_result])
 
-        load_history.click(fn=load_historyf,inputs=[history],outputs=[history])
+        load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
+        reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
 
         components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,tensor,bake_in_vae]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
@@ -606,32 +613,37 @@ def loadmetadata(model):
     if sdict == {}: return "no metadata"
     return json.dumps(sdict,indent=4)
 
-def load_historyf(data, count=20):
+def load_historyf(data, count=20, reload=False):
     filepath = os.path.join(path_root,"mergehistory.csv")
     global mlist,msearch
-    msearch = []
-    mlist=[]
     try:
         with  open(filepath, 'r') as f:
             reader = csv.reader(f)
             next(reader) # skip header
             row_count = sum(1 for row in reader)
+            count = int(count)
 
-            if data is not None and len(data) > 1:
+            nth = None
+            if not reload and data is not None and len(data) > 1:
                 old = data.loc[len(data)-1, 'ID']
-                nth = int(old) - count
-            else:
+                if old != '':
+                    nth = int(old) - count - 1
+
+            if nth is None:
+                msearch = []
+                mlist = []
                 nth = row_count - count
 
             f.seek(0)
             next(reader)
-            mlist = [raw for n,raw in enumerate(reader) if n >= nth]
-            mlist.reverse()
-            for m in mlist:
+            nlist = [raw for n,raw in enumerate(reader, start=1) if n > nth and n <= (nth + count)]
+            nlist.reverse()
+            for m in nlist:
                 msearch.append(" ".join(m))
-            maxlen = len(mlist[-1][0])
-            for i,m in enumerate(mlist):
-                mlist[i][0] = mlist[i][0].zfill(maxlen)
+            maxlen = len(nlist[-1][0])
+            for i,m in enumerate(nlist):
+                nlist[i][0] = nlist[i][0].zfill(maxlen)
+            mlist += nlist
             return mlist
     except:
         return [["no data","",""],]
