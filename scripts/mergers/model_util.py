@@ -802,92 +802,92 @@ module_in_gpu = None
 cpu = torch.device("cpu")
 
 
-def send_everything_to_cpu():
-    global module_in_gpu
+# def send_everything_to_cpu():
+#     global module_in_gpu
 
-    if module_in_gpu is not None:
-        module_in_gpu.to(cpu)
+#     if module_in_gpu is not None:
+#         module_in_gpu.to(cpu)
 
-    module_in_gpu = None
+#     module_in_gpu = None
 
-def setup_for_low_vram_s(sd_model, use_medvram):
-    parents = {}
+# def setup_for_low_vram_s(sd_model, use_medvram):
+#     parents = {}
 
-    def send_me_to_gpu(module, _):
-        """send this module to GPU; send whatever tracked module was previous in GPU to CPU;
-        we add this as forward_pre_hook to a lot of modules and this way all but one of them will
-        be in CPU
-        """
-        global module_in_gpu
+#     def send_me_to_gpu(module, _):
+#         """send this module to GPU; send whatever tracked module was previous in GPU to CPU;
+#         we add this as forward_pre_hook to a lot of modules and this way all but one of them will
+#         be in CPU
+#         """
+#         global module_in_gpu
 
-        module = parents.get(module, module)
+#         module = parents.get(module, module)
 
-        if module_in_gpu == module:
-            return
+#         if module_in_gpu == module:
+#             return
 
-        if module_in_gpu is not None:
-            module_in_gpu.to(cpu)
+#         if module_in_gpu is not None:
+#             module_in_gpu.to(cpu)
 
-        module.to(devices.device)
-        module_in_gpu = module
+#         module.to(devices.device)
+#         module_in_gpu = module
 
-    # see below for register_forward_pre_hook;
-    # first_stage_model does not use forward(), it uses encode/decode, so register_forward_pre_hook is
-    # useless here, and we just replace those methods
+#     # see below for register_forward_pre_hook;
+#     # first_stage_model does not use forward(), it uses encode/decode, so register_forward_pre_hook is
+#     # useless here, and we just replace those methods
 
-    first_stage_model = sd_model.first_stage_model
-    first_stage_model_encode = sd_model.first_stage_model.encode
-    first_stage_model_decode = sd_model.first_stage_model.decode
+#     first_stage_model = sd_model.first_stage_model
+#     first_stage_model_encode = sd_model.first_stage_model.encode
+#     first_stage_model_decode = sd_model.first_stage_model.decode
 
-    def first_stage_model_encode_wrap(x):
-        send_me_to_gpu(first_stage_model, None)
-        return first_stage_model_encode(x)
+#     def first_stage_model_encode_wrap(x):
+#         send_me_to_gpu(first_stage_model, None)
+#         return first_stage_model_encode(x)
 
-    def first_stage_model_decode_wrap(z):
-        send_me_to_gpu(first_stage_model, None)
-        return first_stage_model_decode(z)
+#     def first_stage_model_decode_wrap(z):
+#         send_me_to_gpu(first_stage_model, None)
+#         return first_stage_model_decode(z)
 
-    # for SD1, cond_stage_model is CLIP and its NN is in the tranformer frield, but for SD2, it's open clip, and it's in model field
-    if hasattr(sd_model.cond_stage_model, 'model'):
-        sd_model.cond_stage_model.transformer = sd_model.cond_stage_model.model
+#     # for SD1, cond_stage_model is CLIP and its NN is in the tranformer frield, but for SD2, it's open clip, and it's in model field
+#     if hasattr(sd_model.cond_stage_model, 'model'):
+#         sd_model.cond_stage_model.transformer = sd_model.cond_stage_model.model
 
-    # remove four big modules, cond, first_stage, depth (if applicable), and unet from the model and then
-    # send the model to GPU. Then put modules back. the modules will be in CPU.
-    stored = sd_model.first_stage_model, getattr(sd_model, 'depth_model', None), sd_model.model
-    sd_model.first_stage_model, sd_model.depth_model, sd_model.model = None, None, None
-    sd_model.to(devices.device)
-    sd_model.first_stage_model, sd_model.depth_model, sd_model.model = stored
+#     # remove four big modules, cond, first_stage, depth (if applicable), and unet from the model and then
+#     # send the model to GPU. Then put modules back. the modules will be in CPU.
+#     stored = sd_model.first_stage_model, getattr(sd_model, 'depth_model', None), sd_model.model
+#     sd_model.first_stage_model, sd_model.depth_model, sd_model.model = None, None, None
+#     sd_model.to(devices.device)
+#     sd_model.first_stage_model, sd_model.depth_model, sd_model.model = stored
 
-    # register hooks for those the first three models
-    sd_model.first_stage_model.register_forward_pre_hook(send_me_to_gpu)
-    sd_model.first_stage_model.encode = first_stage_model_encode_wrap
-    sd_model.first_stage_model.decode = first_stage_model_decode_wrap
-    if sd_model.depth_model:
-        sd_model.depth_model.register_forward_pre_hook(send_me_to_gpu)
+#     # register hooks for those the first three models
+#     sd_model.first_stage_model.register_forward_pre_hook(send_me_to_gpu)
+#     sd_model.first_stage_model.encode = first_stage_model_encode_wrap
+#     sd_model.first_stage_model.decode = first_stage_model_decode_wrap
+#     if sd_model.depth_model:
+#         sd_model.depth_model.register_forward_pre_hook(send_me_to_gpu)
 
-    if hasattr(sd_model.cond_stage_model, 'model'):
-        sd_model.cond_stage_model.model = sd_model.cond_stage_model.transformer
-        del sd_model.cond_stage_model.transformer
+#     if hasattr(sd_model.cond_stage_model, 'model'):
+#         sd_model.cond_stage_model.model = sd_model.cond_stage_model.transformer
+#         del sd_model.cond_stage_model.transformer
 
-    if use_medvram:
-        sd_model.model.register_forward_pre_hook(send_me_to_gpu)
-    else:
-        diff_model = sd_model.model.diffusion_model
+#     if use_medvram:
+#         sd_model.model.register_forward_pre_hook(send_me_to_gpu)
+#     else:
+#         diff_model = sd_model.model.diffusion_model
 
-        # the third remaining model is still too big for 4 GB, so we also do the same for its submodules
-        # so that only one of them is in GPU at a time
-        stored = diff_model.input_blocks, diff_model.middle_block, diff_model.output_blocks, diff_model.time_embed
-        diff_model.input_blocks, diff_model.middle_block, diff_model.output_blocks, diff_model.time_embed = None, None, None, None
-        sd_model.model.to(devices.device)
-        diff_model.input_blocks, diff_model.middle_block, diff_model.output_blocks, diff_model.time_embed = stored
+#         # the third remaining model is still too big for 4 GB, so we also do the same for its submodules
+#         # so that only one of them is in GPU at a time
+#         stored = diff_model.input_blocks, diff_model.middle_block, diff_model.output_blocks, diff_model.time_embed
+#         diff_model.input_blocks, diff_model.middle_block, diff_model.output_blocks, diff_model.time_embed = None, None, None, None
+#         sd_model.model.to(devices.device)
+#         diff_model.input_blocks, diff_model.middle_block, diff_model.output_blocks, diff_model.time_embed = stored
 
-        # install hooks for bits of third model
-        diff_model.time_embed.register_forward_pre_hook(send_me_to_gpu)
-        for block in diff_model.input_blocks:
-            block.register_forward_pre_hook(send_me_to_gpu)
-        diff_model.middle_block.register_forward_pre_hook(send_me_to_gpu)
-        for block in diff_model.output_blocks:
-            block.register_forward_pre_hook(send_me_to_gpu)
+#         # install hooks for bits of third model
+#         diff_model.time_embed.register_forward_pre_hook(send_me_to_gpu)
+#         for block in diff_model.input_blocks:
+#             block.register_forward_pre_hook(send_me_to_gpu)
+#         diff_model.middle_block.register_forward_pre_hook(send_me_to_gpu)
+#         for block in diff_model.output_blocks:
+#             block.register_forward_pre_hook(send_me_to_gpu)
 
 import modules.sd_models as msd
 
@@ -898,90 +898,90 @@ sdxl_refiner_clip_weight = 'conditioner.embedders.0.model.ln_final.weight'
 
 def usemodel(checkpoint_info=None, already_loaded_state_dict=None):
   with threading.Lock():
-    usemodel_in(checkpoint_info,already_loaded_state_dict)
+    msd.load_model(checkpoint_info,already_loaded_state_dict)
   torch.cuda.empty_cache()
 
-def usemodel_in(checkpoint_info=None, already_loaded_state_dict=None):
-    from modules import lowvram, sd_hijack
-    checkpoint_info = checkpoint_info or msd.select_checkpoint()
+# def usemodel_in(checkpoint_info=None, already_loaded_state_dict=None):
+#     from modules import lowvram, sd_hijack
+#     checkpoint_info = checkpoint_info or msd.select_checkpoint()
 
-    if msd.model_data.sd_model:
-        sd_hijack.model_hijack.undo_hijack(msd.model_data.sd_model)
-        msd.model_data.sd_model = None
-        gc.collect()
-        devices.torch_gc()
+#     if msd.model_data.sd_model:
+#         sd_hijack.model_hijack.undo_hijack(msd.model_data.sd_model)
+#         msd.model_data.sd_model = None
+#         gc.collect()
+#         devices.torch_gc()
 
-    try:
-      msd.do_inpainting_hijack()
-    except:
-      pass
-    timer = msd.Timer()
+#     try:
+#       msd.do_inpainting_hijack()
+#     except:
+#       pass
+#     timer = msd.Timer()
 
-    if already_loaded_state_dict is not None:
-        state_dict = already_loaded_state_dict
-    else:
-        state_dict = msd.get_checkpoint_state_dict(checkpoint_info, timer)
+#     if already_loaded_state_dict is not None:
+#         state_dict = already_loaded_state_dict
+#     else:
+#         state_dict = msd.get_checkpoint_state_dict(checkpoint_info, timer)
 
-    checkpoint_config = msd.sd_models_config.find_checkpoint_config(state_dict, checkpoint_info)
-    clip_is_included_into_sd = any(x for x in [sd1_clip_weight, sd2_clip_weight, sdxl_clip_weight, sdxl_refiner_clip_weight] if x in state_dict)
+#     checkpoint_config = msd.sd_models_config.find_checkpoint_config(state_dict, checkpoint_info)
+#     clip_is_included_into_sd = any(x for x in [sd1_clip_weight, sd2_clip_weight, sdxl_clip_weight, sdxl_refiner_clip_weight] if x in state_dict)
 
-    timer.record("find config")
+#     timer.record("find config")
 
-    sd_config = msd.OmegaConf.load(checkpoint_config)
-    msd.repair_config(sd_config)
+#     sd_config = msd.OmegaConf.load(checkpoint_config)
+#     msd.repair_config(sd_config)
 
-    timer.record("load config")
+#     timer.record("load config")
 
-    print(f"Creating model from config: {checkpoint_config}")
+#     print(f"Creating model from config: {checkpoint_config}")
 
-    sd_model = None
-    try:
-        with msd.sd_disable_initialization.DisableInitialization(disable_clip=clip_is_included_into_sd or shared.cmd_opts.do_not_download_clip):
-            sd_model = msd.instantiate_from_config(sd_config.model)
-    except Exception:
-        pass
+#     sd_model = None
+#     try:
+#         with msd.sd_disable_initialization.DisableInitialization(disable_clip=clip_is_included_into_sd or shared.cmd_opts.do_not_download_clip):
+#             sd_model = msd.instantiate_from_config(sd_config.model)
+#     except Exception:
+#         pass
 
-    if sd_model is None:
-        print('Failed to create model quickly; will retry using slow method.', file=msd.sys.stderr)
-        sd_model = msd.instantiate_from_config(sd_config.model)
+#     if sd_model is None:
+#         print('Failed to create model quickly; will retry using slow method.', file=msd.sys.stderr)
+#         sd_model = msd.instantiate_from_config(sd_config.model)
 
-    sd_model.used_config = checkpoint_config
+#     sd_model.used_config = checkpoint_config
 
-    timer.record("create model")
+#     timer.record("create model")
 
-    load_model_weights(sd_model, checkpoint_info, state_dict, timer)
+#     msd.load_model_weights(sd_model, checkpoint_info, state_dict, timer)
 
-    if shared.cmd_opts.lowvram or shared.cmd_opts.medvram:
-        lowvram.setup_for_low_vram(sd_model, shared.cmd_opts.medvram)
-    else:
-        sd_model.to(shared.device)
+#     if shared.cmd_opts.lowvram or shared.cmd_opts.medvram:
+#         lowvram.setup_for_low_vram(sd_model, shared.cmd_opts.medvram)
+#     else:
+#         sd_model.to(shared.device)
 
-    timer.record("move model to device")
+#     timer.record("move model to device")
 
-    sd_hijack.model_hijack.hijack(sd_model)
+#     sd_hijack.model_hijack.hijack(sd_model)
 
-    timer.record("hijack")
+#     timer.record("hijack")
 
-    sd_model.eval()
-    msd.model_data.sd_model = sd_model
-    msd.model_data.was_loaded_at_least_once = True
+#     sd_model.eval()
+#     msd.model_data.sd_model = sd_model
+#     msd.model_data.was_loaded_at_least_once = True
 
-    sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=True)  # Reload embeddings after model load as they may or may not fit the model
+#     sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=True)  # Reload embeddings after model load as they may or may not fit the model
 
-    timer.record("load textual inversion embeddings")
+#     timer.record("load textual inversion embeddings")
 
-    msd.script_callbacks.model_loaded_callback(sd_model)
+#     msd.script_callbacks.model_loaded_callback(sd_model)
 
-    timer.record("scripts callbacks")
+#     timer.record("scripts callbacks")
 
-    with devices.autocast(), torch.no_grad():
-        sd_model.cond_stage_model_empty_prompt = get_empty_cond(sd_model)
+#     with devices.autocast(), torch.no_grad():
+#         sd_model.cond_stage_model_empty_prompt = get_empty_cond(sd_model)
 
-    timer.record("calculate empty prompt")
+#     timer.record("calculate empty prompt")
 
-    print(f"Model loaded in {timer.summary()}.")
+#     print(f"Model loaded in {timer.summary()}.")
 
-    return sd_model
+#     return sd_model
 
 def load_model_weights(model, checkpoint_info: msd.CheckpointInfo, state_dict, timer):
     sd_model_hash = checkpoint_info.calculate_shorthash()
