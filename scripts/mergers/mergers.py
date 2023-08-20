@@ -174,7 +174,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
-    if calcmode == calcmode == "trainDifference" and "Add" not in mode:
+    if calcmode == "trainDifference" and "Add" not in mode:
         print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
         mode = "Add"
 
