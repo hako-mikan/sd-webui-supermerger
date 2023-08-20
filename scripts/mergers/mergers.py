@@ -927,7 +927,7 @@ def eratiodealer(dr,randomer,block,num,lucks):
 
 def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
             genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-            id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,
+            id_task: str, prompt: str, negative_prompt: str, prompt_styles, steps: int, sampler_name: str, n_iter: int, batch_size: int, cfg_scale: float, height: int, width: int, enable_hr: bool, denoising_strength: float, hr_scale: float, hr_upscaler: str, hr_second_pass_steps: int, hr_resize_x: int, hr_resize_y: int, hr_checkpoint_name: str, hr_sampler_name: str, hr_prompt: str, hr_negative_prompt, override_settings_texts, *args,
             mergeinfo="",id_sets=[],modelid = "no id"):
     shared.state.begin()
 
@@ -941,10 +941,8 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
 
     override_settings = create_override_settings_dict(override_settings_texts)
 
-    if sampler_index is None:sampler_index = 0
-    if hr_sampler_index is None:hr_sampler_index = 0
+    if sampler_name is None:sampler_name = sd_samplers.samplers[0].name
     if s_sampler is None: s_sampler = 0
-
     p = processing.StableDiffusionProcessingTxt2Img(
         sd_model=shared.sd_model,
         outpath_samples=opts.outdir_samples or opts.outdir_txt2img_samples,
@@ -952,21 +950,13 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         prompt=prompt,
         styles=prompt_styles,
         negative_prompt=negative_prompt,
-        seed=seed,
-        subseed=subseed,
-        subseed_strength=subseed_strength,
-        seed_resize_from_h=seed_resize_from_h,
-        seed_resize_from_w=seed_resize_from_w,
-        seed_enable_extras=seed_enable_extras,
-        sampler_name=sd_samplers.samplers[sampler_index].name,
+        sampler_name=sampler_name,
         batch_size=batch_size,
         n_iter=n_iter,
         steps=steps,
         cfg_scale=cfg_scale,
         width=width,
         height=height,
-        restore_faces=restore_faces,
-        tiling=tiling,
         enable_hr=enable_hr,
         denoising_strength=denoising_strength if enable_hr else None,
         hr_scale=hr_scale,
@@ -974,11 +964,13 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         hr_second_pass_steps=hr_second_pass_steps,
         hr_resize_x=hr_resize_x,
         hr_resize_y=hr_resize_y,
+        hr_checkpoint_name=None if hr_checkpoint_name == 'Use same checkpoint' else hr_checkpoint_name,
+        hr_sampler_name=None if hr_sampler_name == 'Use same sampler' else hr_sampler_name,
+        hr_prompt=hr_prompt,
+        hr_negative_prompt=hr_negative_prompt,
         override_settings=override_settings,
-        do_not_save_grid=True,
-        do_not_save_samples=True,
-        do_not_reload_embeddings=True,
     )
+
 
     p.scripts = scripts.scripts_txt2img
     p.script_args = args
@@ -988,7 +980,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     if s_prompt: p.prompt = s_prompt
     if s_nprompt: p.negative_prompt = s_nprompt
     if s_steps: p.steps = s_steps
-    if s_sampler: p.sampler_name = sd_samplers.samplers[sampler_index].name
+    if s_sampler: p.sampler_name = sd_samplers.samplers[s_sampler].name
     if s_cfg: p.cfg_scale = s_cfg
     if s_seed: p.seed = s_seed
     if s_w: p.width = s_w
@@ -996,7 +988,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
 
     p.hr_prompt=hr_prompt
     p.hr_negative_prompt=hr_negative_prompt
-    p.hr_sampler_name=sd_samplers.samplers_for_img2img[hr_sampler_index - 1].name if hr_sampler_index != 0 else None
+    p.hr_sampler_name=hr_sampler_name if hr_sampler_name != None else None
 
     if "Hires. fix" in genoptions:
         if s_hrupscaler: p.hr_upscaler = s_hrupscaler
