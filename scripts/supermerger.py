@@ -229,9 +229,11 @@ def on_ui_tabs():
                             mulweight = gr.Button(elem_classes=["reset"], value="Mul")
 
                 with gr.Row():
+                    with gr.Column(scale=1, min_width=100):
+                        gr.Slider(visible=False)
                     with gr.Column(scale=2, min_width=200):
                         base = gr.Slider(label="Base", minimum=0, maximum=1, step=0.0001, value=0.5)
-                    with gr.Column(scale=2, min_width=200):
+                    with gr.Column(scale=1, min_width=100):
                         gr.Slider(visible=False)
                 with gr.Row():
                     with gr.Column(scale=2, min_width=200):
