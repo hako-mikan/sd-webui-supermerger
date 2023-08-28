@@ -280,7 +280,9 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
         dim = int(dim) if dim != "no" and dim != "auto" else 0
 
         if "LyCORIS" in ld:
-            sd = merge_lora_models(ln, lr, settings, True)
+            if len(ld) !=1:
+                return "multiple merge of LyCORIS is not supported"
+            sd = lycomerge(ln[0], lr[0])
         elif dim > 0:
             print("change demension to ", dim)
             sd = merge_lora_models_dim(ln, lr, dim,settings)
@@ -451,6 +453,49 @@ def merge_lora_models_dim(models, ratios, new_rank, sets):
 
     return merged_lora_sd
 
+def lycomerge(filename,ratios):
+    sd = load_state_dict(filename, torch.float)
+
+    if len(ratios) == 17:
+      r0 = 1
+      ratios = [ratios[0]] + [r0] + ratios[1:3]+ [r0] + ratios[3:5]+[r0] + ratios[5:7]+[r0,r0,r0] + [ratios[7]] + [r0,r0,r0] + ratios[8:]
+
+    print("LyCORIS: " , ratios)
+
+    keys_failed_to_match = []
+
+    for lkey, weight in sd.items():
+        ratio = 1
+        picked = False
+        if 'alpha' in lkey:
+          continue
+        
+        try:
+            import networks as lora
+        except:
+            import lora as lora
+
+        fullkey = lora.convert_diffusers_name_to_compvis(lkey,False)
+
+        if "." not in fullkey:continue
+
+        key, lora_key = fullkey.split(".", 1)
+
+        for i,block in enumerate(LBLCOKS26):
+            if block in key:
+                ratio = ratios[i]
+                picked = True
+        if not picked: keys_failed_to_match.append(key)
+
+        sd[lkey] = weight * math.sqrt(abs(float(ratio)))
+
+        if "down" in lkey and ratio < 0:
+          sd[key] = sd[key] * -1
+        
+    if len(keys_failed_to_match) > 0:
+      print(keys_failed_to_match)
+  
+    return sd 
 
 ##############################################################
 ####### merge to checkpoint
@@ -1548,4 +1593,3 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, mergeAll = True ):
     metadata[ "sshs_model_hash" ] = model_hash
     metadata[ "sshs_legacy_hash" ] = legacy_hash
     return metadata
-
