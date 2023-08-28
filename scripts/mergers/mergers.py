@@ -380,7 +380,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     if dw in skey:
                         flag = not dwn
                 if flag:
-                    dr = eratiodealer(dr,randomer,weight_index+1,num,lucks)
+                    dr = eratiodealer(dr,randomer,weight_index,num,lucks)
                     if deepprint :print(dbs,dws,key,dr)
                     current_alpha = dr
 
