@@ -229,14 +229,14 @@ def on_ui_tabs():
                             mulweight = gr.Button(elem_classes=["reset"], value="Mul")
 
                 with gr.Row():
-                    with gr.Column():
-                        base = gr.Slider(label="Base", minimum=0, maximum=1, step=0.0001, value=0.5)
-                    with gr.Column():
+                    with gr.Column(scale=1, min_width=100):
                         gr.Slider(visible=False)
-                    with gr.Column():
+                    with gr.Column(scale=2, min_width=200):
+                        base = gr.Slider(label="Base", minimum=0, maximum=1, step=0.0001, value=0.5)
+                    with gr.Column(scale=1, min_width=100):
                         gr.Slider(visible=False)
                 with gr.Row():
-                    with gr.Column():
+                    with gr.Column(scale=2, min_width=200):
                         in00 = gr.Slider(label="IN00", minimum=0, maximum=1, step=0.0001, value=0.5)
                         in01 = gr.Slider(label="IN01", minimum=0, maximum=1, step=0.0001, value=0.5)
                         in02 = gr.Slider(label="IN02", minimum=0, maximum=1, step=0.0001, value=0.5)
@@ -249,20 +249,7 @@ def on_ui_tabs():
                         in09 = gr.Slider(label="IN09", minimum=0, maximum=1, step=0.0001, value=0.5)
                         in10 = gr.Slider(label="IN10", minimum=0, maximum=1, step=0.0001, value=0.5)
                         in11 = gr.Slider(label="IN11", minimum=0, maximum=1, step=0.0001, value=0.5)
-                    with gr.Column():
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        gr.Slider(visible=False)
-                        mi00 = gr.Slider(label="M00", minimum=0, maximum=1, step=0.0001, value=0.5, elem_id="supermerger_mbw_M00")
-                    with gr.Column():
+                    with gr.Column(scale=2, min_width=200):
                         ou11 = gr.Slider(label="OUT11", minimum=0, maximum=1, step=0.0001, value=0.5)
                         ou10 = gr.Slider(label="OUT10", minimum=0, maximum=1, step=0.0001, value=0.5)
                         ou09 = gr.Slider(label="OUT09", minimum=0, maximum=1, step=0.0001, value=0.5)
@@ -275,6 +262,13 @@ def on_ui_tabs():
                         ou02 = gr.Slider(label="OUT02", minimum=0, maximum=1, step=0.0001, value=0.5)
                         ou01 = gr.Slider(label="OUT01", minimum=0, maximum=1, step=0.0001, value=0.5)
                         ou00 = gr.Slider(label="OUT00", minimum=0, maximum=1, step=0.0001, value=0.5)
+                with gr.Row():
+                    with gr.Column(scale=1, min_width=100):
+                        gr.Slider(visible=False)
+                    with gr.Column(scale=2, min_width=200):
+                        mi00 = gr.Slider(label="M00", minimum=0, maximum=1, step=0.0001, value=0.5)
+                    with gr.Column(scale=1, min_width=100):
+                        gr.Slider(visible=False)
             with gr.Tab("Weights Presets"):
                 with gr.Row():
                     s_reloadtext = gr.Button(value="Reload Presets",variant='primary')
