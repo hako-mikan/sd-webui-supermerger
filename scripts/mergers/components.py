@@ -6,6 +6,7 @@ s_reserve1 = None
 gengrid = None
 s_startreserve = None
 rand_merge = None
+paramsnames = None
 
 msettings = None
 esettings1 = None

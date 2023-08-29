@@ -956,6 +956,8 @@ def usemodel_in(checkpoint_info=None, already_loaded_state_dict=None):
     else:
         sd_model.to(shared.device)
 
+    if hasattr(msd,"send_model_to_device"):msd.send_model_to_device(sd_model)
+    
     timer.record("move model to device")
 
     sd_hijack.model_hijack.hijack(sd_model)

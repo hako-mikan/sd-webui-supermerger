@@ -34,7 +34,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                     genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
                     lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
-                    id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args):
+                    *txt2imgparams):
     global numadepth
     grids = []
     sep = "|"
@@ -47,15 +47,15 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         xtype,xmen,ytype,ymen,weights_a,weights_b = crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,startmode)
 
     lucks = {"on":startmode == RAND, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
-    gensets = [id_task, prompt, negative_prompt, prompt_styles, steps, sampler_index, restore_faces, tiling, n_iter, batch_size, cfg_scale, seed, subseed, subseed_strength, seed_resize_from_h, seed_resize_from_w, seed_enable_extras, height, width, enable_hr, denoising_strength, hr_scale, hr_upscaler, hr_second_pass_steps, hr_resize_x, hr_resize_y, hr_sampler_index, hr_prompt, hr_negative_prompt, override_settings_texts, *args,]
     gensets_s = [s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale]
 
     allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
                   useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,
-                  gensets,gensets_s,lucks]
+                  txt2imgparams,gensets_s,lucks]
 
-    print(xtype,xmen,ytype,ymen,weights_a,weights_b)
+    from scripts.mergers.components import paramsnames
+    seed = txt2imgparams[paramsnames.index("Seed")]
 
     if RAND not in startmode:
         if sep in xmen: allsets = separator(allsets,1,sep,xmen,seed,startmode)
@@ -390,7 +390,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 if xcount == 0: statid = modelid
 
-                image_temp = simggen(*gensets_s,*gensets,mergeinfo=currentmodel,id_sets=id_sets,modelid=modelid)
+                image_temp = simggen(*gensets_s,currentmodel,id_sets,modelid,*gensets)
                 gc.collect()
                 devices.torch_gc()
 
