@@ -123,7 +123,10 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return checkpoint_info
 
     checkpoint_info = fake_checkpoint_info(checkpoint_info)
-    usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
+    # XXX copy theta_0 before call load_model()
+    state_dict = theta_0.copy()
+    usemodel(checkpoint_info, already_loaded_state_dict=state_dict)
+    del state_dict
 
     save = True if SAVEMODES[0] in save_sets else False
 
