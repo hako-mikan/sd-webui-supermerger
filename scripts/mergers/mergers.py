@@ -2,6 +2,7 @@ from linecache import clearcache
 import random
 import os
 import gc
+import hashlib
 import numpy as np
 import os.path
 import re
@@ -13,10 +14,11 @@ import json
 import gradio as gr
 import torch.nn as nn
 import scipy.ndimage
+from copy import deepcopy
 from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
-from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
+from modules import cache, shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
@@ -29,6 +31,9 @@ from multiprocessing import cpu_count
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from scripts.mergers.bcolors import bcolors
+
+dump_cache = cache.dump_cache
+cache = cache.cache
 
 from inspect import currentframe
 
@@ -91,6 +96,33 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return result,"not loaded",*non4
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+    # XXX hack. fake checkpoint_info
+    def fake_checkpoint_info(checkpoint_info):
+
+        checkpoint_info = deepcopy(checkpoint_info)
+        # change model name etc.
+        sha256 = hashlib.sha256(json.dumps(metadata).encode("utf-8")).hexdigest()
+        checkpoint_info.sha256 = sha256
+        checkpoint_info.name_for_extra = currentmodel
+
+        checkpoint_info.name = checkpoint_info.name_for_extra + ".safetensors"
+        checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
+        checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
+
+        # force to set a new sha256 hash
+        hashes = cache("hashes")
+        hashes[f"checkpoint/{checkpoint_info.name}"] = {
+            "mtime": os.path.getmtime(checkpoint_info.filename),
+            "sha256": sha256,
+        }
+        # save cache
+        dump_cache()
+
+        # set ids for a fake checkpoint info
+        checkpoint_info.ids = [checkpoint_info.model_name, checkpoint_info.name, checkpoint_info.name_for_extra]
+        return checkpoint_info
+
+    checkpoint_info = fake_checkpoint_info(checkpoint_info)
     usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
 
     save = True if SAVEMODES[0] in save_sets else False
