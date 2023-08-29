@@ -126,6 +126,9 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     # XXX copy theta_0 before call load_model()
     state_dict = theta_0.copy()
     usemodel(checkpoint_info, already_loaded_state_dict=state_dict)
+    if shared.opts.sd_checkpoint_cache > 0:
+        # unload cached merged model
+        checkpoints_loaded.popitem()
     del state_dict
 
     save = True if SAVEMODES[0] in save_sets else False
