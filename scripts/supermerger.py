@@ -137,19 +137,20 @@ def on_ui_tabs():
                         with gr.Row():    
                             tensor = gr.Textbox(label="Adjust(IN,OUT,contrast,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
                     
-                    with gr.Row():
-                        x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
-                        x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
-                    xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
-                    y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
-                    ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
-                    z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")    
-                    zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
-                    esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
-                    with gr.Row():
-                        components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
-                        stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
-                        components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
+                    with gr.Accordion("XYZ Plot", open=False):
+                        with gr.Row():
+                            x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
+                            x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
+                        xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
+                        y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")
+                        ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
+                        z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")
+                        zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
+                        esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
+                        with gr.Row():
+                            components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
+                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
+                            components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
                     components.dtrue =  gr.Checkbox(value = True, visible = False)                
                     components.dfalse =  gr.Checkbox(value = False,visible = False)     
                     dummy_t =  gr.Textbox(value = "",visible = False)    
