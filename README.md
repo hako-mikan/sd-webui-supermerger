@@ -188,6 +188,7 @@ LoCon/LyCORIS merge to model is enable in web-ui 1.5
 |----------|-------|-------|---------|
 | Merge to Model |   Yes   | Yes   | Yes     |
 | Merge LoRAs   |    Yes   | Yes    | No     |
+| Apply Block Weight(single)|Yes|Yes|Yes|
 | Extract From Models   | Yes    | No    | No      |
 
 |  XL     | LoRA  | LoCon | LyCORIS |
