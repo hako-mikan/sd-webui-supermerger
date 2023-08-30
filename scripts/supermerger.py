@@ -100,10 +100,10 @@ def on_ui_tabs():
                                     create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
 
                     with gr.Row():
-                        components.merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
-                        components.mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
-                        components.gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
-                        stopmerge = gr.Button(elem_id="stopmerge", value="Stop")
+                        components.merge = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
+                        components.mergeandgen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge&Gen",variant='primary')
+                        components.gen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Gen",variant='primary')
+                        stopmerge = gr.Button(elem_id="stopmerge", elem_classes=["compact_button"], value="Stop")
 
                     with gr.Accordion("Generation Parameters",open = False):
                         gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
