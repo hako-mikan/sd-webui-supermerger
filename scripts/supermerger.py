@@ -82,22 +82,22 @@ def on_ui_tabs():
                                 base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25, interactive=False)
                         #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
 
-                    with gr.Row():
-                        with gr.Column(scale = 3):
-                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
-                        with gr.Column(min_width = 50, scale = 1):
-                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+                    with gr.Accordion("Save Settings", open=False):
+                        with gr.Row():
+                            with gr.Column(scale = 3):
+                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], show_label=False, label="save settings")
+                            with gr.Column(min_width = 50, scale = 1):
+                                components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
 
-                    with gr.Row():
-                        with gr.Column(min_width = 50):
-                            with gr.Row():
-                                custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
+                        with gr.Row():
+                            with gr.Column(min_width = 50):
+                                with gr.Row():
+                                    custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
 
-                        with gr.Column():
-                            with gr.Row():
-                                bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
-                                create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
-
+                            with gr.Column():
+                                with gr.Row():
+                                    bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
+                                    create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
 
                     with gr.Row():
                         components.merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
