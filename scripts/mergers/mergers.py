@@ -1067,7 +1067,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         processed.images.insert(0, grid)
         images.save_image(grid, opts.outdir_txt2img_grids, "grid", p.seed, p.prompt, opts.grid_format, info=infotext, short_filename=not opts.grid_extended_filename, p=p, grid=True)
     shared.state.end()
-    return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),
+    return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),p
 
 def blocker(blocks,blockids):
     blocks = blocks.split(" ")
