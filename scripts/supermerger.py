@@ -71,10 +71,7 @@ def on_ui_tabs():
                         model_c = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model C",interactive=True)
                         create_refresh_button(model_c, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
 
-                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum:A*(1-alpha)+B*alpha", "Add difference:A+(B-C)*alpha",
-                                                        "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
-                                                        "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
-                                                         ], value = "Weight sum:A*(1-alpha)+B*alpha") 
+                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha") 
                     calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
@@ -436,6 +433,14 @@ def on_ui_tabs():
         setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
         setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
         setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
+
+        mode_info = {
+            "Weight sum": "A*(1-alpha)+B*alpha",
+            "Add difference": "A+(B-C)*alpha",
+            "Triple sum": "A*(1-alpha-beta)+B*alpha+C*beta",
+            "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
+        }
+        mode.change(fn=lambda mode: gr.update(info=mode_info[mode]), inputs=[mode], outputs=[mode], show_progress=False)
 
         def addblockweights(val, blockopt, *blocks):
             if val == "none":
