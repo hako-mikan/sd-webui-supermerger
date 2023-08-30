@@ -74,9 +74,12 @@ def on_ui_tabs():
                     mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha") 
                     calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
                     with gr.Row(): 
-                        useblocks =  gr.Checkbox(label="use MBW")
-                        base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
-                        base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25)
+                        with gr.Column(scale = 1):
+                            useblocks =  gr.Checkbox(label="use MBW", info="use Merge Block Weights")
+                        with gr.Column(scale = 3), gr.Group() as alpha_group:
+                            with gr.Row():
+                                base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
+                                base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25, interactive=False)
                         #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
 
                     with gr.Row():
@@ -440,7 +443,8 @@ def on_ui_tabs():
             "Triple sum": "A*(1-alpha-beta)+B*alpha+C*beta",
             "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
         }
-        mode.change(fn=lambda mode: gr.update(info=mode_info[mode]), inputs=[mode], outputs=[mode], show_progress=False)
+        mode.change(fn=lambda mode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] else False)], inputs=[mode], outputs=[mode, base_beta], show_progress=False)
+        useblocks.change(fn=lambda mbw: gr.update(visible=False if mbw else True), inputs=[useblocks], outputs=[alpha_group])
 
         def addblockweights(val, blockopt, *blocks):
             if val == "none":
