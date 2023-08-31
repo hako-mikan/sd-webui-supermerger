@@ -906,6 +906,7 @@ def usemodel_in(checkpoint_info=None, already_loaded_state_dict=None):
     checkpoint_info = checkpoint_info or msd.select_checkpoint()
 
     if msd.model_data.sd_model:
+        if hasattr(msd,"send_model_to_trash"):msd.send_model_to_trash(msd.model_data.sd_model)
         sd_hijack.model_hijack.undo_hijack(msd.model_data.sd_model)
         msd.model_data.sd_model = None
         gc.collect()
