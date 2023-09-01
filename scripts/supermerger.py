@@ -53,7 +53,7 @@ def on_ui_tabs():
 
     with gr.Blocks() as supermergerui:
         with gr.Tab("Merge"):
-            with gr.Row().style(equal_height=False):
+            with gr.Row(equal_height=False):
                 with gr.Column(scale = 3):
                     gr.HTML(value="<p>Merge models and load it for generation</p>")
 
