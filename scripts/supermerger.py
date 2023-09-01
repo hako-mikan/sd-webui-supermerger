@@ -693,6 +693,7 @@ def reversparams(id):
     mgs[2] = selectfromhash(mgs[2]) if len(mgs[2]) > 5 else ""
     mgs[3] = selectfromhash(mgs[3]) if len(mgs[3]) > 5 else ""
     mgs[4] = selectfromhash(mgs[4]) if len(mgs[4]) > 5 else ""
+    mgs[7] = mgs[7].split(":")[0] # get mode name only
     mgs[8] = True if mgs[8] =="True" else False
     mgs[10] = mgs[10].replace("[","").replace("]","").replace("'", "") 
     mgs[10] = [x.strip() for x in mgs[10].split(",")]
