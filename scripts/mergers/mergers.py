@@ -811,7 +811,16 @@ def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,usebl
 path_root = scripts.basedir()
 
 def rwmergelog(mergedname = "",settings= [],id = 0):
+    # for compatible
+    mode_info = {
+        "Weight sum": "Weight sum:A*(1-alpha)+B*alpha",
+        "Add difference": "Add difference:A+(B-C)*alpha",
+        "Triple sum": "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
+        "sum Twice": "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
+    }
     setting = settings.copy()
+    if len(setting) > 7 and setting[7] in mode_info:
+        setting[7] = mode_info[setting[7]] # fix mode entry for compatible
     filepath = os.path.join(path_root, "mergehistory.csv")
     is_file = os.path.isfile(filepath)
     if not is_file:
