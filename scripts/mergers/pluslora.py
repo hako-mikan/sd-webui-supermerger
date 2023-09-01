@@ -67,26 +67,26 @@ def on_ui_tabs():
 
     with gr.Blocks(analytics_enabled=False) :
         sml_submit_result = gr.Textbox(label="Message")
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_cpmerge = gr.Button(elem_id="model_merger_merge", value="Merge to Checkpoint",variant='primary')
             sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * A - beta * B)",variant='primary')
             sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
             create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
             sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
             create_refresh_button(sml_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
             alpha = gr.Slider(label=" alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
             beta = gr.Slider(label=" beta", minimum=-1.0, maximum=2, step=0.001, value=1)
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
             precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
             sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
         sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True)
         sml_dims = gr.CheckboxGroup(label = "limit dimension",choices=[],value = [],type="value",interactive=True,visible = False)
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_calcdim = gr.Button(elem_id="calcloras", value="calculate dimension of LoRAs(It may take a few minutes if there are many LoRAs)",variant='primary')
             sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
             sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
