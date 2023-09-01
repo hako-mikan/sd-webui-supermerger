@@ -71,39 +71,39 @@ def on_ui_tabs():
                         model_c = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model C",interactive=True)
                         create_refresh_button(model_c, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
 
-                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum:A*(1-alpha)+B*alpha", "Add difference:A+(B-C)*alpha",
-                                                        "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
-                                                        "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
-                                                         ], value = "Weight sum:A*(1-alpha)+B*alpha") 
+                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha") 
                     calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
                     with gr.Row(): 
-                        useblocks =  gr.Checkbox(label="use MBW")
-                        base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
-                        base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25)
+                        with gr.Column(scale = 1):
+                            useblocks =  gr.Checkbox(label="use MBW", info="use Merge Block Weights")
+                        with gr.Column(scale = 3), gr.Group() as alpha_group:
+                            with gr.Row():
+                                base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
+                                base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25, interactive=False)
                         #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
 
-                    with gr.Row():
-                        with gr.Column(scale = 3):
-                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
-                        with gr.Column(min_width = 50, scale = 1):
-                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+                    with gr.Accordion("Save Settings", open=False):
+                        with gr.Row():
+                            with gr.Column(scale = 3):
+                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], show_label=False, label="save settings")
+                            with gr.Column(min_width = 50, scale = 1):
+                                components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+
+                        with gr.Row():
+                            with gr.Column(min_width = 50):
+                                with gr.Row():
+                                    custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
+
+                            with gr.Column():
+                                with gr.Row():
+                                    bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
+                                    create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
 
                     with gr.Row():
-                        with gr.Column(min_width = 50):
-                            with gr.Row():
-                                custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
-
-                        with gr.Column():
-                            with gr.Row():
-                                bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
-                                create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
-
-
-                    with gr.Row():
-                        components.merge = gr.Button(elem_id="model_merger_merge", value="Merge!",variant='primary')
-                        components.mergeandgen = gr.Button(elem_id="model_merger_merge", value="Merge&Gen",variant='primary')
-                        components.gen = gr.Button(elem_id="model_merger_merge", value="Gen",variant='primary')
-                        stopmerge = gr.Button(elem_id="stopmerge", value="Stop")
+                        components.merge = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
+                        components.mergeandgen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge&Gen",variant='primary')
+                        components.gen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Gen",variant='primary')
+                        stopmerge = gr.Button(elem_id="stopmerge", elem_classes=["compact_button"], value="Stop")
 
                     with gr.Accordion("Generation Parameters",open = False):
                         gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
@@ -137,19 +137,20 @@ def on_ui_tabs():
                         with gr.Row():    
                             tensor = gr.Textbox(label="Adjust(IN,OUT,contrast,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
                     
-                    with gr.Row():
-                        x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
-                        x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
-                    xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
-                    y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
-                    ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
-                    z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")    
-                    zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
-                    esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
-                    with gr.Row():
-                        components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
-                        stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
-                        components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
+                    with gr.Accordion("XYZ Plot", open=False):
+                        with gr.Row():
+                            x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
+                            x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
+                        xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
+                        y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")
+                        ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
+                        z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")
+                        zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
+                        esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
+                        with gr.Row():
+                            components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
+                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
+                            components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
                     components.dtrue =  gr.Checkbox(value = True, visible = False)                
                     components.dfalse =  gr.Checkbox(value = False,visible = False)     
                     dummy_t =  gr.Textbox(value = "",visible = False)    
@@ -436,6 +437,15 @@ def on_ui_tabs():
         setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
         setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
         setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
+
+        mode_info = {
+            "Weight sum": "A*(1-alpha)+B*alpha",
+            "Add difference": "A+(B-C)*alpha",
+            "Triple sum": "A*(1-alpha-beta)+B*alpha+C*beta",
+            "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
+        }
+        mode.change(fn=lambda mode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] else False)], inputs=[mode], outputs=[mode, base_beta], show_progress=False)
+        useblocks.change(fn=lambda mbw: gr.update(visible=False if mbw else True), inputs=[useblocks], outputs=[alpha_group])
 
         def addblockweights(val, blockopt, *blocks):
             if val == "none":

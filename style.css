@@ -1,3 +1,7 @@
 button.reset {
     min-width: min(100px,100%);
 }
+
+button.compact_button {
+    min-width: min(100px,100%);
+}
