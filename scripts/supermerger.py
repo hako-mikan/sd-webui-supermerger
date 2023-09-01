@@ -24,8 +24,8 @@ reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen, blockfromkey)
-from scripts.mergers.xyplot import freezetime, nulister, numanager
+from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, blockfromkey, clearcache)
+from scripts.mergers.xyplot import freezetime, nulister
 from scripts.mergers.model_util import filenamecutter
 
 path_root = basedir()
@@ -53,13 +53,14 @@ def on_ui_tabs():
 
     with gr.Blocks() as supermergerui:
         with gr.Tab("Merge"):
-            with gr.Row().style(equal_height=False):
+            with gr.Row(equal_height=False):
                 with gr.Column(scale = 3):
                     gr.HTML(value="<p>Merge models and load it for generation</p>")
 
                     with gr.Row():
-                        s_reverse= gr.Button(value="Load settings from:")
+                        s_reverse= gr.Button(value="Load settings from:",elem_classes=["compact_button"],variant='primary')
                         mergeid = gr.Textbox(label="merged model ID (-1 for last)", elem_id="model_converter_custom_name",value = "-1")
+                        mclearcache= gr.Button(value="Clear Cache",elem_classes=["compact_button"],variant='primary')
 
                     with gr.Row():
                         model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model A",interactive=True)
@@ -375,6 +376,7 @@ def on_ui_tabs():
             outputs=[metadata]
         )                 
 
+        mclearcache.click(fn=clearcache)
         smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,components.dfalse],outputs=[keys])
         smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,components.dtrue],outputs=[keys])
 
