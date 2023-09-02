@@ -178,7 +178,6 @@ BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8'
 RANDMAP = [0,50,100] #alpha,beta,elements
 
 statistics = {"sum":{},"mean":{},"max":{},"min":{}}
-@profile
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
                 useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks):
     caster("merge start",hearm)
