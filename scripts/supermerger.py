@@ -24,7 +24,7 @@ reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, blockfromkey, clearcache)
+from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
 from scripts.mergers.xyplot import freezetime, nulister
 from scripts.mergers.model_util import filenamecutter
 
@@ -423,7 +423,7 @@ def on_ui_tabs():
 
         s_reloadreserve.click(fn=nulister,inputs=[components.dfalse],outputs=[components.numaframe])
         s_delreserve.click(fn=nulister,inputs=[s_delnum],outputs=[components.numaframe])
-        loadcachelist.click(fn=load_cachelist,inputs=[],outputs=[currentcache])
+        loadcachelist.click(fn=getcachelist,inputs=[],outputs=[currentcache])
         addtox.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[xgrid])
         addtoy.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[ygrid])
 
