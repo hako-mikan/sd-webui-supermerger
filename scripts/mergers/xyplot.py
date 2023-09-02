@@ -170,13 +170,15 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     fine = fine.split(",") if fine else [0]*7
 
+
+
     deep_ori = deep
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
     xtype = TYPES[xtype]
     ytype = TYPES[ytype]
     ztype = TYPES[ztype]
     XYZ =xtype + ytype + ztype 
-
+    mainmodel = mainmodeldealer(XYZ)
     #ALL
     if "ALL" in [xmen,ymen,zmen]:
         xmen,ymen,zmen = alldealer([xmen,ymen,zmen],[xtype,ytype,ztype])
@@ -399,7 +401,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 print(f"{bcolors.OKGREEN}XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount}){bcolors.ENDC}")
                 if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
-                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks) 
+                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks,main=mainmodel) 
                     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
                 sd_models.model_data.__init__()
                 load_model(checkpoint_info, already_loaded_state_dict=theta_0)
@@ -769,3 +771,11 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
         draw_texts(d, x, y, ver_texts[row], fnt, fontsize)
 
     return result
+
+def mainmodeldealer(xyz):
+    abc = [True,True,True]
+    if "model" in xyz:
+        if "A" in xyz:abc[0] = False
+        if "B" in xyz:abc[1] = False       
+        if "C" in xyz:abc[2] = False
+    return abc

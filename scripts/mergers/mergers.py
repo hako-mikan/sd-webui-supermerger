@@ -94,6 +94,13 @@ def clearcache():
     gc.collect()
     devices.torch_gc()
 
+def getcachelist():
+    output = []
+    for key in modelcache.keys():
+        if hasattr(key, "model_name"):
+            output.append(key.model_name)
+    return ",".join(output)
+
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
@@ -179,7 +186,7 @@ RANDMAP = [0,50,100] #alpha,beta,elements
 
 statistics = {"sum":{},"mean":{},"max":{},"min":{}}
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks,main = [False,False,False]):
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
@@ -197,6 +204,11 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     else: lucks["ceed"]  = 0
     np.random.seed(int(lucks["ceed"]))
     randomer = np.random.rand(2500)
+
+    cachetarget =[]
+    for model,num in zip([model_a,model_b,model_c],main):
+        if model != "" and num:
+            cachetarget.append(model)
 
     weights_a,deep = randdealer(weights_a,randomer,0,lucks,deep)
     weights_b,_ = randdealer(weights_b,randomer,1,lucks,None)
@@ -283,7 +295,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  Weights Seed\t: {lucks['ceed']}")
     print(f"  Adjust \t: {fine}")
 
-    theta_1=load_model_weights_m(model_b,2,save).copy()
+    theta_1=load_model_weights_m(model_b,2,cachetarget).copy()
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
@@ -301,9 +313,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
         if calcmode == "trainDifference":
-            theta_2 = load_model_weights_m(model_c,3,save).copy()
+            theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
         else:
-            theta_2 = load_model_weights_m(model_c,3,save).copy()
+            theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
             for key in tqdm(theta_1.keys()):
                 if 'model' in key:
                     if key in theta_2:
@@ -316,16 +328,16 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if stopmerge: return "STOPPED", *non4
     
     if  "tensor" in calcmode or "self" in calcmode:
-        theta_t = load_model_weights_m(model_a,1,save).copy()
+        theta_t = load_model_weights_m(model_a,1,cachetarget).copy()
         theta_0 ={}
         for key in theta_t:
             theta_0[key] = theta_t[key].clone()
         del theta_t
     else:
-        theta_0=load_model_weights_m(model_a,1,save).copy()
+        theta_0=load_model_weights_m(model_a,1,cachetarget).copy()
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
-        theta_2 = load_model_weights_m(model_c,3,save).copy()
+        theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
     else:
         if calcmode != "trainDifference":
             theta_2 = {}
@@ -770,7 +782,7 @@ def forkforker(filename):
     except:
         return sd_models.read_state_dict(filename)
 
-def load_model_weights_m(model,abc,save):
+def load_model_weights_m(model,abc,cachetarget):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     sd_model_name = checkpoint_info.model_name
 
@@ -782,6 +794,14 @@ def load_model_weights_m(model,abc,save):
         state_dict = forkforker(checkpoint_info.filename)
         if orig_cache >= abc:
             modelcache[checkpoint_info] = state_dict
+        dontdelete = []
+        for model in cachetarget:
+            dontdelete.append(sd_models.get_closet_checkpoint_match(model))
+        while len(modelcache) > orig_cache:
+            for key in modelcache.keys():
+                if key in dontdelete:continue
+                modelcache.pop(key)
+                break
         return state_dict
 
 def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,useblocks,mode,calc):
