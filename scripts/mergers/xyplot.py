@@ -713,7 +713,7 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
             if not line.is_active:
                 drawing.line((draw_x - line.size[0] // 2, draw_y + line.size[1] // 2, draw_x + line.size[0] // 2, draw_y + line.size[1] // 2), fill=color_inactive, width=4)
 
-            draw_y += line.size[1] * 0.8  + line_spacing
+            draw_y += line.size[1] * 0.3  + line_spacing
 
     fontsize = (width + height) // 25
     line_spacing = fontsize // 20
@@ -762,7 +762,7 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
         x = pad_left + (width + margin) * col + width / 2
         y = pad_top / 2 - hor_text_heights[col] / 2
 
-        draw_texts(d, x, y / 0.8, hor_texts[col], fnt, fontsize)
+        draw_texts(d, x, y, hor_texts[col], fnt, fontsize)
 
     for row in range(rows):
         x = pad_left / 2
