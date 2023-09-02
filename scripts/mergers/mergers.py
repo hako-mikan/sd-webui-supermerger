@@ -771,20 +771,15 @@ def forkforker(filename):
 def load_model_weights_m(model,abc,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     sd_model_name = checkpoint_info.model_name
-    
-    if save:        
-        if abc == 1:
-            load_model(checkpoint_info)
-        print(f"Loading weights [{sd_model_name}] from file")
-        state_dict = forkforker(checkpoint_info.filename)
-        if orig_cache >= abc:
-            modelcache[checkpoint_info] = state_dict
-        return forkforker(checkpoint_info.filename)
+
+    if abc == 1:
+        load_model(checkpoint_info)
 
     if checkpoint_info in modelcache:
         print(f"Loading weights [{sd_model_name}] from cache")
         return modelcache[checkpoint_info]
     else:
+        print(f"Loading weights [{sd_model_name}] from file")
         state_dict = forkforker(checkpoint_info.filename)
         if orig_cache >= abc:
             modelcache[checkpoint_info] = state_dict
