@@ -6,6 +6,18 @@
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
 # Recent Update
+2023.09.02.1900(JST)
+bug fix/以下のバグを修正しました
+- XYZ plot でseedを選択すると発生するバグ
+- not work when selecting Seed in XYZ plot
+- LoRAマージができないバグ
+- Merging LoRA to checkpoint is not work
+- Hires fix を使用していないときでもDenoising Strength がPNGinfoに設定される
+- Denoising Strength is set to PNG info when Hires fix is not enabled
+
+remaining bug 既知のバグ
+- error in LOW/MIDVRAM
+- LOW/MIDVRAM設定時のバグ
 
 - ほぼすべてのtxt2imgタブの設定を使えるようになりました
 - Almost all txt2img tab settings are now available in generation    
