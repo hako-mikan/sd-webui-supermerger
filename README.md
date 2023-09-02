@@ -7,6 +7,12 @@
 
 # Recent Update
 2023.09.02.1900(JST)
+モデルキャッシュに関する仕様が変わりました。
+モデルキャッシュを設定している場合、これまではweb-ui側のモデルキャッシュを使用していましたが、web-ui側の仕様変更により使えなくなりました。
+そこで、web-ui側のモデルキャッシュを無効にしてSuperMerger側でモデルをキャッシュするように変更しました。よって、モデルキャッシュを使用する設定にしている場合、SuperMerger使用後にモデルのキャッシュが残ることになります。SuperMeger使用後はClear cacheボタンでメモリの解放を行って下さい。
+
+The specifications regarding model caching have changed. If you have set up model caching, we used to utilize the model cache on the web-ui side. However, due to changes in the web-ui specifications, this is no longer possible. Therefore, I have disabled the model cache on the web-ui side and have made changes to cache the model on the SuperMerger side instead. As a result, if you have set it to use model caching, the model cache will remain after using SuperMerger. Please clear the cache using the "Clear cache" button to free up memory after using SuperMerger.
+
 bug fix/以下のバグを修正しました
 - XYZ plot でseedを選択すると発生するバグ
 - not work when selecting Seed in XYZ plot
