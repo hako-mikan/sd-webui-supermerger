@@ -19,6 +19,8 @@ remaining bug 既知のバグ
 - error in LOW/MIDVRAM
 - LOW/MIDVRAM設定時のバグ
 
+2023.08.31
+
 - ほぼすべてのtxt2imgタブの設定を使えるようになりました
 - Almost all txt2img tab settings are now available in generation    
 Thanks! [Filexor](https://github.com/Filexor)  
