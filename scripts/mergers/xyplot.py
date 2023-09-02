@@ -6,11 +6,13 @@ import numpy as np
 import os
 import copy
 import csv
-from PIL import Image
+import textwrap
+from PIL import Image, ImageFont, ImageDraw, ImageColor, PngImagePlugin
 from modules import images, sd_models, devices
+from modules.sd_models import load_model
 from modules.shared import opts
-from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics
-from scripts.mergers.model_util import savemodel,usemodel
+from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font
+from scripts.mergers.model_util import savemodel
 from scripts.mergers.bcolors import bcolors
 
 hear = True
@@ -35,12 +37,17 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
                     lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
                     *txt2imgparams):
+
+    cachedealer(True)
+
     global numadepth
     grids = []
     sep = "|"
 
     if RAND in startmode:
-        if "off" in lmode:return "Random mode is off",*[None]*5
+        if "off" in lmode:
+            cachedealer(False)
+            return "Random mode is off",*[None]*5
         if lserial > 0 : lseed = -1
         useblocks = True
     if RAND in startmode or TYPES.index(RAND) in [xtype,ytype,ztype]:
@@ -62,7 +69,9 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if sep in ymen: allsets = separator(allsets,3,sep,ymen,seed,startmode)
         if sep in zmen: allsets = separator(allsets,5,sep,zmen,seed,startmode)
 
-    if "reserve" in startmode : return numaker(allsets)
+    if "reserve" in startmode :
+        cachedealer(False)
+        return numaker(allsets)
 
     if "normal" or RAND in startmode:
         result,currentmodel,xyimage,a,b,c= sgenxyplot(*allsets)
@@ -70,6 +79,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         else:print(result)
     else:
         if numadepth ==[]:
+            cachedealer(False)
             return "no reservation",*[None]*5
         result=currentmodel=xyimage=a=b=c = None
 
@@ -97,6 +107,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             break
 
     gc.collect()
+    cachedealer(False)
 
     return result,currentmodel,grids,a,b,c
 
@@ -149,6 +160,14 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     esettings = " ".join(esettings)
     savestat = "savestat" in deep
 
+    gensets = list(gensets)
+
+    from scripts.mergers.components import paramsnames
+    def g(wanted,wantedv=None,value = True):
+        if wanted in paramsnames:return gensets[paramsnames.index(wanted)] if value else paramsnames.index(wanted)
+        elif wantedv and wantedv in paramsnames:return gensets[paramsnames.index(wantedv)] if value else paramsnames.index(wantedv)
+        else:return None if value else 0
+
     fine = fine.split(",") if fine else [0]*7
 
     deep_ori = deep
@@ -200,8 +219,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         weights_b_in=wpreseter(weights_b,wpresets)
 
     #for X only plot, use same seed
-    if gensets[11] == -1: gensets[11] = int(random.randrange(4294967294))
-    
+    if g("Seed") == -1: gensets[g("Seed",value=False)] = int(random.randrange(4294967294))
+
     #gensets :prompt:1,seed:11
     #gensets_s :prompt:0, seed:5
 
@@ -324,7 +343,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             return
         if "alpha" in wt and not ("pinpoint element" in wta or "effective" in wta or "pinpoint adjust" in wta):alpha = w
         if "beta" in wt: beta = w
-        if "seed" in wt:gensets[11] = int(w)
+        if "seed" in wt:
+            gensets[g("Seed",value = False)] = int(w)
         if "model_A" in wt:model_a = w
         if "model_B" in wt:model_b = w
         if "model_C" in wt:model_c = w
@@ -381,7 +401,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks) 
                     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-                    usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
+                load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
                 if "save model" in esettings:
                     savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
@@ -389,6 +409,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 del theta_0
 
                 if xcount == 0: statid = modelid
+
+                print(currentmodel)
 
                 image_temp = simggen(*gensets_s,currentmodel,id_sets,modelid,*gensets)
                 gc.collect()
@@ -442,6 +464,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     return "Finished",currentmodel,xyzimage,*image_temp[1:4]
 
 def smakegrid(imgs,xs,ys,currentmodel,p):
+    xs = [makemultilineweight(x) for x in xs]
+    ys = [makemultilineweight(y) for y in ys]
+
     ver_texts = [[images.GridAnnotation(y)] for y in ys]
     hor_texts = [[images.GridAnnotation(x)] for x in xs]
 
@@ -451,12 +476,24 @@ def smakegrid(imgs,xs,ys,currentmodel,p):
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % len(xs) * w, i // len(xs) * h))
 
-    grid = images.draw_grid_annotations(grid,w,h, hor_texts, ver_texts)
+    grid = draw_grid_annotations(grid,w,h, hor_texts, ver_texts)
     grid = draw_origin(grid, currentmodel,w*len(xs),h*len(ys),w)
     if opts.grid_save:
         images.save_image(grid, opts.outdir_txt2img_grids, "xy_grid", extension=opts.grid_format, prompt=p.prompt, seed=p.seed, grid=True, p=p)
 
     return grid
+
+def makemultilineweight(weight):
+    i = 0
+    o = ""
+    for c in weight:
+        o += c
+        i += 1
+        if i > 25:
+            if c == ",":
+                o += "\n"
+                i = 0
+    return o
 
 def swapxy(imgs,xs,ys):
     nimgs = []
@@ -637,3 +674,99 @@ def alldealer(mens,types):
             if types[i] == "pinpoint blocks":mens[i] = "BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00|OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11"
             if types[i] == "pinpoint adjust":mens[i] ="IN,OUT,OUT2,CONT,COL1,COL2,COL3" 
     return mens
+
+def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
+
+    color_active = ImageColor.getcolor(opts.grid_text_active_color, 'RGB')
+    color_inactive = ImageColor.getcolor(opts.grid_text_inactive_color, 'RGB')
+    color_background = ImageColor.getcolor(opts.grid_background_color, 'RGB')
+
+    def wrap(drawing, text, font, line_length):
+        lines = ['']
+        for word in text.split():
+            line = f'{lines[-1]} {word}'.strip()
+            if drawing.textlength(line, font=font) <= line_length:
+                lines[-1] = line
+            else:
+                lines.append(word)
+        return lines
+
+    def draw_texts(drawing, draw_x, draw_y, lines, initial_fnt, initial_fontsize):
+        minfont = 2244096
+        for line in lines:
+            fnt = initial_fnt
+            fontsize = initial_fontsize
+            line_spacing = fontsize // 2
+            while drawing.multiline_textsize(line.text, font=fnt,spacing = 5)[0] > line.allowed_width and fontsize > 0:
+                fontsize -= 1
+                fnt = get_font(fontsize)
+                line_spacing = fontsize // 2
+            if minfont > fontsize:
+                minfont = fontsize
+        
+        fnt = get_font(minfont)
+        
+        for line in lines:
+            drawing.multiline_text((draw_x, draw_y + line.size[1] / 2), line.text, font=fnt, fill=color_active if line.is_active else color_inactive, anchor="mm", align="center",spacing = 5)
+
+            if not line.is_active:
+                drawing.line((draw_x - line.size[0] // 2, draw_y + line.size[1] // 2, draw_x + line.size[0] // 2, draw_y + line.size[1] // 2), fill=color_inactive, width=4)
+
+            draw_y += line.size[1] * 0.8  + line_spacing
+
+    fontsize = (width + height) // 25
+    line_spacing = fontsize // 20
+
+    fnt = get_font(fontsize)
+
+    pad_left = 0 if sum([sum([len(line.text) for line in lines]) for lines in ver_texts]) == 0 else width * 3 // 4
+
+    cols = im.width // width
+    rows = im.height // height
+
+    assert cols == len(hor_texts), f'bad number of horizontal texts: {len(hor_texts)}; must be {cols}'
+    assert rows == len(ver_texts), f'bad number of vertical texts: {len(ver_texts)}; must be {rows}'
+
+    calc_img = Image.new("RGB", (1, 1), color_background)
+    calc_d = ImageDraw.Draw(calc_img)
+
+    for texts, allowed_width in zip(hor_texts + ver_texts, [width] * len(hor_texts) + [pad_left] * len(ver_texts)):
+        items = [] + texts
+        texts.clear()
+
+        for line in items:
+            wrapped = wrap(calc_d, line.text, fnt, allowed_width)
+            texts += [images.GridAnnotation(x, line.is_active) for x in wrapped]
+
+        for line in texts:
+            bbox = calc_d.multiline_textbbox((0, 0), line.text, font=fnt)
+            line.size = (bbox[2] - bbox[0], bbox[3] - bbox[1])
+            line.allowed_width = allowed_width
+
+    hor_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing for lines in hor_texts]
+    ver_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing * len(lines) for lines in ver_texts]
+
+    pad_top = 0 if sum(hor_text_heights) == 0 else max(hor_text_heights) + line_spacing * 2
+
+    result = Image.new("RGB", (im.width + pad_left + margin * (cols-1), im.height + pad_top + margin * (rows-1)), color_background)
+
+    for row in range(rows):
+        for col in range(cols):
+            cell = im.crop((width * col, height * row, width * (col+1), height * (row+1)))
+            result.paste(cell, (pad_left + (width + margin) * col, pad_top + (height + margin) * row))
+
+    d = ImageDraw.Draw(result)
+
+    for col in range(cols):
+        x = pad_left + (width + margin) * col + width / 2
+        y = pad_top / 2 - hor_text_heights[col] / 2
+
+        draw_texts(d, x, y / 0.8, hor_texts[col], fnt, fontsize)
+
+    for row in range(rows):
+        x = pad_left / 2
+        y = pad_top + (height + margin) * row + height / 2 - ver_text_heights[row] / 2
+
+        draw_texts(d, x, y, ver_texts[row], fnt, fontsize)
+
+    return result

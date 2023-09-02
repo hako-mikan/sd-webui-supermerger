@@ -24,16 +24,21 @@ from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
 from modules.generation_parameters_copypaste import create_override_settings_dict
-from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel,usemodel
+from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel
 from math import ceil
 import sys
 from multiprocessing import cpu_count
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from scripts.mergers.bcolors import bcolors
+import collections
 
 dump_cache = cache.dump_cache
 cache = cache.cache
+
+orig_cache = 0
+
+modelcache = collections.OrderedDict()
 
 from inspect import currentframe
 
@@ -73,7 +78,20 @@ def casterr(*args,hear=hear):
     if hear:
         names = {id(v): k for k, v in currentframe().f_back.f_locals.items()}
         print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
-    
+
+def cachedealer(start):
+    if start:
+        global orig_cache
+        orig_cache = shared.opts.sd_checkpoint_cache
+        shared.opts.sd_checkpoint_cache = 0
+    else:
+        shared.opts.sd_checkpoint_cache = orig_cache
+
+def clearcache():
+    global modelcache
+    modelcache = {}
+    gc.collect()
+
   #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
                        calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
@@ -87,6 +105,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
     deepprint  = True if "print change" in esettings else False
 
+    cachedealer(True)
+
     result,currentmodel,modelid,theta_0,metadata = smerge(
                         weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
                         useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint,lucks
@@ -96,34 +116,11 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return result,"not loaded",*non4
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-    # XXX hack. fake checkpoint_info
-    def fake_checkpoint_info(checkpoint_info):
 
-        checkpoint_info = deepcopy(checkpoint_info)
-        # change model name etc.
-        sha256 = hashlib.sha256(json.dumps(metadata).encode("utf-8")).hexdigest()
-        checkpoint_info.sha256 = sha256
-        checkpoint_info.name_for_extra = currentmodel
+    checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+    load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
-        checkpoint_info.name = checkpoint_info.name_for_extra + ".safetensors"
-        checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
-        checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
-
-        # force to set a new sha256 hash
-        hashes = cache("hashes")
-        hashes[f"checkpoint/{checkpoint_info.name}"] = {
-            "mtime": os.path.getmtime(checkpoint_info.filename),
-            "sha256": sha256,
-        }
-        # save cache
-        dump_cache()
-
-        # set ids for a fake checkpoint info
-        checkpoint_info.ids = [checkpoint_info.model_name, checkpoint_info.name, checkpoint_info.name_for_extra]
-        return checkpoint_info
-
-    checkpoint_info = fake_checkpoint_info(checkpoint_info)
-    usemodel(checkpoint_info, already_loaded_state_dict=theta_0)
+    cachedealer(False)
 
     save = True if SAVEMODES[0] in save_sets else False
 
@@ -139,6 +136,32 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
+
+# XXX hack. fake checkpoint_info
+def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
+
+    checkpoint_info = deepcopy(checkpoint_info)
+    # change model name etc.
+    sha256 = hashlib.sha256(json.dumps(metadata).encode("utf-8")).hexdigest()
+    checkpoint_info.sha256 = sha256
+    checkpoint_info.name_for_extra = currentmodel
+
+    checkpoint_info.name = checkpoint_info.name_for_extra + ".safetensors"
+    checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
+    checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
+
+    # force to set a new sha256 hash
+    hashes = cache("hashes")
+    hashes[f"checkpoint/{checkpoint_info.name}"] = {
+        "mtime": os.path.getmtime(checkpoint_info.filename),
+        "sha256": sha256,
+    }
+    # save cache
+    dump_cache()
+
+    # set ids for a fake checkpoint info
+    checkpoint_info.ids = [checkpoint_info.model_name, checkpoint_info.name, checkpoint_info.name_for_extra]
+    return checkpoint_info
 
 NUM_INPUT_BLOCKS = 12
 NUM_MID_BLOCK = 1
@@ -257,7 +280,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  Weights Seed\t: {lucks['ceed']}")
     print(f"  Adjust \t: {fine}")
 
-    theta_1=load_model_weights_m(model_b,False,True,save).copy()
+    theta_1=load_model_weights_m(model_b,2,save).copy()
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
     if isxl and useblocks:
@@ -274,9 +297,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *non4
         if calcmode == "trainDifference":
-            theta_2 = load_model_weights_m(model_c,True,False,save).copy()
+            theta_2 = load_model_weights_m(model_c,3,save).copy()
         else:
-            theta_2 = load_model_weights_m(model_c,False,False,save).copy()
+            theta_2 = load_model_weights_m(model_c,3,save).copy()
             for key in tqdm(theta_1.keys()):
                 if 'model' in key:
                     if key in theta_2:
@@ -289,16 +312,18 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if stopmerge: return "STOPPED", *non4
     
     if  "tensor" in calcmode or "self" in calcmode:
-        theta_t = load_model_weights_m(model_a,True,False,save).copy()
+        theta_t = load_model_weights_m(model_a,1,save).copy()
         theta_0 ={}
         for key in theta_t:
             theta_0[key] = theta_t[key].clone()
         del theta_t
     else:
-        theta_0=load_model_weights_m(model_a,True,False,save).copy()
+        theta_0=load_model_weights_m(model_a,1,save).copy()
+
+    print(len(theta_0))
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
-        theta_2 = load_model_weights_m(model_c,False,False,save).copy()
+        theta_2 = load_model_weights_m(model_c,3,save).copy()
     else:
         if calcmode != "trainDifference":
             theta_2 = {}
@@ -743,38 +768,27 @@ def forkforker(filename):
     except:
         return sd_models.read_state_dict(filename)
 
-def load_model_weights_m(model,model_a,model_b,save):
+def load_model_weights_m(model,abc,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     sd_model_name = checkpoint_info.model_name
-
-    cachenum = shared.opts.sd_checkpoint_cache
     
     if save:        
-        if model_a:
+        if abc == 1:
             load_model(checkpoint_info)
         print(f"Loading weights [{sd_model_name}] from file")
+        state_dict = forkforker(checkpoint_info.filename)
+        if orig_cache >= abc:
+            modelcache[checkpoint_info] = state_dict
         return forkforker(checkpoint_info.filename)
 
-    if checkpoint_info in checkpoints_loaded:
+    if checkpoint_info in modelcache:
         print(f"Loading weights [{sd_model_name}] from cache")
-        return checkpoints_loaded[checkpoint_info]
-    elif cachenum>0 and model_a:
-        load_model(checkpoint_info)
-        print(f"Loading weights [{sd_model_name}] from cache")
-        return checkpoints_loaded[checkpoint_info]
-    elif cachenum>1 and model_b:
-        load_model(checkpoint_info)
-        print(f"Loading weights [{sd_model_name}] from cache")
-        return checkpoints_loaded[checkpoint_info]
-    elif cachenum>2:
-        load_model(checkpoint_info)
-        print(f"Loading weights [{sd_model_name}] from cache")
-        return checkpoints_loaded[checkpoint_info]
+        return modelcache[checkpoint_info]
     else:
-        if model_a:
-            load_model(checkpoint_info)
-        print(f"Loading weights [{sd_model_name}] from file")
-        return forkforker(checkpoint_info.filename)
+        state_dict = forkforker(checkpoint_info.filename)
+        if orig_cache >= abc:
+            modelcache[checkpoint_info] = state_dict
+        return state_dict
 
 def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,useblocks,mode,calc):
     model_a=filenamecutter(model_a)
@@ -1025,13 +1039,12 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         restore_faces=g("Restore faces","Face restore"),
         tiling=g("Tiling"),
         enable_hr=g("Hires. fix","Second pass"),
-        denoising_strength=g("Denoising strength"),
         hr_scale=g("Upscale by"),
         hr_upscaler=g("Upscaler"),
         hr_second_pass_steps=g("Hires steps","Secondary steps"),
         hr_resize_x=g("Resize width to"),
         hr_resize_y=g("Resize height to"),
-        override_settings=g("Override settings"),
+        override_settings=create_override_settings_dict(g("Override settings")),
         do_not_save_grid=True,
         do_not_save_samples=True,
         do_not_reload_embeddings=True,
@@ -1050,6 +1063,8 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     if s_seed: p.seed = s_seed
     if s_w: p.width = s_w
     if s_h: p.height = s_h
+
+    p.denoising_strength=g("Denoising strength") if p.enable_hr else None
 
     p.hr_prompt=g("Hires prompt","Secondary Prompt")
     p.hr_negative_prompt=g("Hires negative prompt","Secondary negative prompt")

@@ -67,26 +67,26 @@ def on_ui_tabs():
 
     with gr.Blocks(analytics_enabled=False) :
         sml_submit_result = gr.Textbox(label="Message")
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_cpmerge = gr.Button(elem_id="model_merger_merge", value="Merge to Checkpoint",variant='primary')
             sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * A - beta * B)",variant='primary')
             sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
             create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
             sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
             create_refresh_button(sml_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
             alpha = gr.Slider(label=" alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
             beta = gr.Slider(label=" beta", minimum=-1.0, maximum=2, step=0.001, value=1)
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
             precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
             sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
         sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True)
         sml_dims = gr.CheckboxGroup(label = "limit dimension",choices=[],value = [],type="value",interactive=True,visible = False)
-        with gr.Row().style(equal_height=False):
+        with gr.Row(equal_height=False):
             sml_calcdim = gr.Button(elem_id="calcloras", value="calculate dimension of LoRAs(It may take a few minutes if there are many LoRAs)",variant='primary')
             sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
             sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
@@ -660,31 +660,43 @@ def newpluslora(theta_0,filenames,lweis,names, isxl, keychanger):
             qvk = ["_q_proj","_k_proj","_v_proj","_out_proj"]
 
             if msd_key in keychanger.keys():
-                theta_0[keychanger[msd_key]] = plusweights(theta_0[keychanger[msd_key]], name ,module, net)
+                wkey = keychanger[msd_key]
+                bkey = wkey.replace("weight","bias")
+                if bkey in theta_0.keys():
+                    theta_0[wkey], theta_0[bkey]= plusweights(theta_0[wkey], module, bias = theta_0[bkey])
+                else:
+                    theta_0[wkey], _ = plusweights(theta_0[wkey] ,module)
+
             else:
                 if any(x in name for x in qvk):
                     for x in qvk:
                         if x in name:
                             inkey,outkey = name.replace(x,"") + "_in_proj" ,name.replace(x,"") + "_out_proj"
-
-                    theta_0[keychanger[inkey]] ,theta_0[keychanger[outkey]]= plusweightsqvk(theta_0[keychanger[inkey]],theta_0[keychanger[outkey]], name ,module, net)
-
+                    bkey = keychanger[outkey].replace("wieght","bias")
+                    if bkey in theta_0.keys():
+                        theta_0[keychanger[inkey]] ,theta_0[keychanger[outkey]], theta_0[bkey]= plusweightsqvk(theta_0[keychanger[inkey]],theta_0[keychanger[outkey]], name ,module, net, bias = theta_0[bkey])
+                    else:
+                        theta_0[keychanger[inkey]] ,theta_0[keychanger[outkey]], _= plusweightsqvk(theta_0[keychanger[inkey]],theta_0[keychanger[outkey]], name ,module, net)
+                else:
+                    print(msd_key)
         gc.collect()
     return theta_0
 
-def plusweights(weight, network_layer_name, module ,net):
+def plusweights(weight, module, bias = None):
     with torch.no_grad():
         updown = module.calc_updown(weight.to(dtype=torch.float))
-
         if len(weight.shape) == 4 and weight.shape[1] == 9:
             # inpainting model. zero pad updown to make channel[1]  4 to 9
             updown = torch.nn.functional.pad(updown, (0, 0, 0, 0, 0, 5))
+        if type(updown) == tuple:
+            updown, ex_bias = updown
+            if ex_bias is not None and bias is not None:
+                bias += ex_bias
 
         weight += updown
+    return weight, bias
 
-    return weight
-
-def plusweightsqvk(inweight, outweight, network_layer_name, module ,net):
+def plusweightsqvk(inweight, outweight, network_layer_name, module ,net,bias = None):
     with torch.no_grad():
         module_q = net.modules.get(network_layer_name + "_q_proj", None)
         module_k = net.modules.get(network_layer_name + "_k_proj", None)
@@ -698,11 +710,15 @@ def plusweightsqvk(inweight, outweight, network_layer_name, module ,net):
                 updown_v = module_v.calc_updown(inweight)
                 updown_qkv = torch.vstack([updown_q, updown_k, updown_v])
                 updown_out = module_out.calc_updown(outweight)
+                if type(updown_out) is tuple:
+                    updown_out,ex_bias = updown_out
 
                 inweight += updown_qkv
                 outweight += updown_out
+                if bias is not None and ex_bias is not None:
+                    bias += ex_bias
 
-    return inweight,outweight
+    return inweight,outweight,bias
 
 def lbw(lora,lwei):
     errormodules = []
