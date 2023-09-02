@@ -89,10 +89,13 @@ def cachedealer(start):
 
 def clearcache():
     global modelcache
+    del modelcache
     modelcache = {}
     gc.collect()
+    devices.torch_gc()
 
-  #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
+#msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
+
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
                        calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
                        esettings,
@@ -118,6 +121,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
 
     checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+    sd_models.model_data.__init__()
     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
     cachedealer(False)
@@ -174,13 +178,13 @@ BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8'
 RANDMAP = [0,50,100] #alpha,beta,elements
 
 statistics = {"sum":{},"mean":{},"max":{},"min":{}}
-
+@profile
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
                 useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks):
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
-
+    unload_model_weights(sd_models.model_data.sd_model)
     # for from file
     if type(useblocks) is str:
         useblocks = True if useblocks =="True" else False
@@ -281,6 +285,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     print(f"  Adjust \t: {fine}")
 
     theta_1=load_model_weights_m(model_b,2,save).copy()
+
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
     if isxl and useblocks:
@@ -319,8 +324,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         del theta_t
     else:
         theta_0=load_model_weights_m(model_a,1,save).copy()
-
-    print(len(theta_0))
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
         theta_2 = load_model_weights_m(model_c,3,save).copy()
@@ -771,9 +774,6 @@ def forkforker(filename):
 def load_model_weights_m(model,abc,save):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     sd_model_name = checkpoint_info.model_name
-
-    if abc == 1:
-        load_model(checkpoint_info)
 
     if checkpoint_info in modelcache:
         print(f"Loading weights [{sd_model_name}] from cache")
