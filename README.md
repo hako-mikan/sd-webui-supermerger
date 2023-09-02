@@ -20,10 +20,8 @@ bug fix/以下のバグを修正しました
 - Merging LoRA to checkpoint is not work
 - Hires fix を使用していないときでもDenoising Strength がPNGinfoに設定される
 - Denoising Strength is set to PNG info when Hires fix is not enabled
-
-remaining bug 既知のバグ
-- error in LOW/MIDVRAM
-- LOW/MIDVRAM設定時のバグ
+- LOWVRAM/MEDVRAM使用時に正常に動作しない
+- bug when LOWVRAM/MEDVRAM
 
 2023.08.31
 
