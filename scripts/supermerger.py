@@ -556,8 +556,8 @@ def on_ui_tabs():
         addweight.click(fn=addblockweights,inputs=[resetval,resetblockopt,*menbers],outputs=menbers)
         mulweight.click(fn=mulblockweights,inputs=[resetval,resetblockopt,*menbers],outputs=menbers)
 
-        readalpha.click(fn=text2slider,inputs=weights_a,outputs=menbers)
-        readbeta.click(fn=text2slider,inputs=weights_b,outputs=menbers)
+        readalpha.click(fn=text2slider,inputs=[weights_a,isxl],outputs=menbers)
+        readbeta.click(fn=text2slider,inputs=[weights_b,isxl],outputs=menbers)
 
         dd_preset_weight.change(fn=on_change_dd_preset_weight,inputs=[wpresets, dd_preset_weight],outputs=menbers)
         dd_preset_weight_r.change(fn=on_change_dd_preset_weight_r,inputs=[wpresets, dd_preset_weight_r,luckab],outputs=[weights_a,weights_b])
@@ -736,9 +736,21 @@ def showxy(x,y,z):
     if not "none" in t[z] : flags[4] = flags[2] = True
     return [gr.update(visible = x) for x in flags]
 
-def text2slider(text):
+def text2slider(text, isxl=False):
     vals = [t.strip() for t in text.split(",")]
     vals = [0 if v in "RUX" else v for v in vals]
+
+    if isxl:
+        j = 0
+        ret = []
+        for i, v in enumerate(ISXLBLOCK):
+            if v:
+                ret.append(gr.update(value = float(vals[j])))
+                j += 1
+            else:
+                ret.append(gr.update())
+        return ret
+
     return [gr.update(value = float(v)) for v in vals]
 
 def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset, isxl):
@@ -808,6 +820,7 @@ def find_preset_by_name(presets, preset):
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
 BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
 BLOCKIDXLL=['BASE', 'IN00', 'IN01', 'IN02', 'IN03', 'IN04', 'IN05', 'IN06', 'IN07', 'IN08', 'M00', 'OUT00', 'OUT01', 'OUT02', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'VAE']
+ISXLBLOCK=[True,  True,  True,  True,  True,  True,  True,  True,  True,  True, False, False, False, True,   True,   True,   True,   True,   True,   True,   True,   True,   True,  False,  False,  False]
 
 def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
