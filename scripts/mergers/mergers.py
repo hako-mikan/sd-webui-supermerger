@@ -18,7 +18,7 @@ from copy import deepcopy
 from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
-from modules import cache, shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
+from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
@@ -33,8 +33,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from scripts.mergers.bcolors import bcolors
 import collections
 
-dump_cache = cache.dump_cache
-cache = cache.cache
+try:
+    from mogules import cache
+    dump_cache = cache.dump_cache
+    c_cache = cache.cache
+except:
+    c_cache = None
 
 orig_cache = 0
 
@@ -129,7 +133,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
 
     checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
-    
+
     save = True if SAVEMODES[0] in save_sets else False
 
     result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
@@ -138,7 +142,6 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
     cachedealer(False)
-
 
     del theta_0
     devices.torch_gc()
@@ -165,14 +168,15 @@ def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
     checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
     checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
 
-    # force to set a new sha256 hash
-    hashes = cache("hashes")
-    hashes[f"checkpoint/{checkpoint_info.name}"] = {
+        # force to set a new sha256 hash
+    if c_cache is not None: 
+        hashes = cache("hashes")
+        hashes[f"checkpoint/{checkpoint_info.name}"] = {
         "mtime": os.path.getmtime(checkpoint_info.filename),
         "sha256": sha256,
-    }
-    # save cache
-    dump_cache()
+        }
+        # save cache
+        dump_cache()
 
     # set ids for a fake checkpoint info
     checkpoint_info.ids = [checkpoint_info.model_name, checkpoint_info.name, checkpoint_info.name_for_extra]
