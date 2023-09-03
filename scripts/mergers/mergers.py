@@ -12,6 +12,7 @@ import datetime
 import csv
 import json
 import gradio as gr
+import launch
 import torch.nn as nn
 import scipy.ndimage
 from copy import deepcopy
@@ -34,11 +35,9 @@ from scripts.mergers.bcolors import bcolors
 import collections
 
 try:
-    from mogules import cache
-    dump_cache = cache.dump_cache
-    c_cache = cache.cache
+    ui_version = int(launch.git_tag().replace("v","").replace(".",""))
 except:
-    c_cache = None
+    ui_version = 100
 
 orig_cache = 0
 
@@ -131,8 +130,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
 
-
-    checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+    if ui_version > 155: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
 
     save = True if SAVEMODES[0] in save_sets else False
 
@@ -157,7 +155,10 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
 # XXX hack. fake checkpoint_info
 def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
-
+    from mogules import cache
+    dump_cache = cache.dump_cache
+    c_cache = cache.cache
+    
     checkpoint_info = deepcopy(checkpoint_info)
     # change model name etc.
     sha256 = hashlib.sha256(json.dumps(metadata).encode("utf-8")).hexdigest()
