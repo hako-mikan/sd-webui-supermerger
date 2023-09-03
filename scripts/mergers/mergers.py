@@ -155,7 +155,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
 # XXX hack. fake checkpoint_info
 def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
-    from mogules import cache
+    from modules import cache
     dump_cache = cache.dump_cache
     c_cache = cache.cache
     
