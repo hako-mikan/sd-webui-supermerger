@@ -171,7 +171,7 @@ def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
 
         # force to set a new sha256 hash
     if c_cache is not None: 
-        hashes = cache("hashes")
+        hashes = c_cache("hashes")
         hashes[f"checkpoint/{checkpoint_info.name}"] = {
         "mtime": os.path.getmtime(checkpoint_info.filename),
         "sha256": sha256,
