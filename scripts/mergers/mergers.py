@@ -127,15 +127,19 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
 
+
     checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+    
+    save = True if SAVEMODES[0] in save_sets else False
+
+    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
+
     sd_models.model_data.__init__()
     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
     cachedealer(False)
 
-    save = True if SAVEMODES[0] in save_sets else False
 
-    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
     del theta_0
     devices.torch_gc()
 
