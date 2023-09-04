@@ -35,7 +35,7 @@ from scripts.mergers.bcolors import bcolors
 import collections
 
 try:
-    ui_version = int(launch.git_tag().replace("v","").replace(".",""))
+    ui_version = int(launch.git_tag().split("-",1)[0].replace("v","").replace(".",""))
 except:
     ui_version = 100
 
