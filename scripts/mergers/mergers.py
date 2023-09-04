@@ -248,8 +248,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     model_c = namefromhash(model_c)
 
     #adjust
-    if fine:
-        fine = [float(t) for t in fine.split(",")]
+    if fine.rstrip(",0") != "":
         fine = fineman(fine)
 
     caster(mergedmodel,False)
@@ -1219,13 +1218,27 @@ def blockfromkey(key,isxl):
     return "Not Merge", "Not Merge"
 
 def fineman(fine):
+    if fine.find(",") != -1:
+        tmp = [t.strip() for t in fine.split(",")]
+        fines = [0.0]*7
+        for i,f in enumerate(tmp[0:7]):
+            try:
+                f = float(f)
+                fines[i] = f
+            except Exception:
+                pass
+
+        fine = fines
+    else:
+        return None
+
     fine = [
         1 - fine[0] * 0.01,
         1+ fine[0] * 0.02,
         1 - fine[1] * 0.01,
         1+ fine[1] * 0.02,
         1 - fine[2] * 0.01,
-        [x*0.02 for x in fine[3:]]
+        [x*0.02 for x in fine[3:7]]
                 ]
     return fine
 
