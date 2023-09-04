@@ -673,10 +673,44 @@ def to_half(sd):
             sd[key] = sd[key].half()
     return sd
 
-def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
+def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
+    import json
     from modules import sd_models,shared
+
+    if state_dict is None:
+        if shared.sd_model and shared.sd_model.sd_checkpoint_info:
+            metadata = shared.sd_model.sd_checkpoint_info.metadata.copy()
+        else:
+            return "Current model is not a valid merged model"
+
+        checkpoint_info = shared.sd_model.sd_checkpoint_info
+        # check if current merged model is a fake checkpoint_info
+        if checkpoint_info is not None:
+            filename = checkpoint_info.filename
+            name = os.path.basename(filename)
+            info = sd_models.get_closet_checkpoint_match(name)
+            if info == checkpoint_info:
+                # this is a valid checkpoint_info
+                # no need to save
+                return "Current model is not a merged model or you've already saved model"
+
+        # prepare metadata
+        save_metadata = "save metadata" in savesets
+        if save_metadata:
+            metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
+        else:
+            metadata = {"format": "pt"}
+
+        if shared.sd_model is not None:
+            print("load from shared.sd_model..")
+            state_dict = shared.sd_model.state_dict()
+        else:
+            return "No current loaded model found"
+
+        # name_for_extra was set with the currentmodel
+        currentmodel = checkpoint_info.name_for_extra
+
     if "fp16" in savesets: 
-        state_dict = to_half(state_dict)
         pre = ".fp16"
     else:pre = ""
     ext = ".safetensors" if "safetensors" in savesets else ".ckpt"
@@ -689,17 +723,13 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
         if shape[1] == 8:
             pre += "-instruct-pix2pix"
 
-    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-    model_a_path= checkpoint_info.filename
-    modeldir = os.path.split(model_a_path)[0]
-
     if not fname or fname == "":
         fname = currentmodel.replace(" ","").replace(",","_").replace("(","_").replace(")","_")+pre+ext
         if fname[0]=="_":fname = fname[1:]
     else:
         fname = fname if ext in fname else fname +pre+ext
 
-    fname = os.path.join(modeldir, fname)
+    fname = os.path.join(sd_models.model_path, fname)
     fname = fname.replace("ProgramFiles_x86_","Program Files (x86)")
 
     if len(fname) > 255:
@@ -713,6 +743,16 @@ def savemodel(state_dict,currentmodel,fname,savesets,model_a,metadata={}):
         return _err_msg
 
     print("Saving...")
+    isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in state_dict
+    if isxl:
+        # prune share memory tensors, "cond_stage_model." prefixed base tensors are share memory with "conditioner." prefixed tensors
+        for i, key in enumerage(state_dict.keys()):
+            if "cond_stage_model." in key:
+                del state_dict[key]
+
+    if "fp16" in savesets:
+        state_dict = to_half(state_dict)
+
     try:
       if ext == ".safetensors":
           safetensors.torch.save_file(state_dict, fname, metadata=metadata)
