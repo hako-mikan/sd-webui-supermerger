@@ -1087,6 +1087,9 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     if s_w: p.width = s_w
     if s_h: p.height = s_h
 
+    p.scripts = scripts.scripts_txt2img
+    p.script_args = txt2imgparams[paramsnames.index("Override settings")+1:]
+                
     p.denoising_strength=g("Denoising strength") if p.enable_hr else None
 
     p.hr_prompt=g("Hires prompt","Secondary Prompt")
