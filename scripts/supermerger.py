@@ -138,7 +138,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Adjust settings", open=False):
                         with gr.Row():
-                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,COL1,COL2,COL3", visible=True, value="0,0,0,0,0,0,0", lines=1)
+                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,COL1,COL2,COL3", visible=True, value="", lines=1)
                             finetune_write = gr.Button(value="↑", elem_classes=["tool"])
                             finetune_read = gr.Button(value="↓", elem_classes=["tool"])
                             finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
@@ -592,7 +592,7 @@ def on_ui_tabs():
 
         # update finetune
         finetunes = [detail1, detail2, detail3, contrast, col1, col2, col3]
-        finetune_reset.click(fn=lambda: [gr.update(value="0,0,0,0,0,0,0")]+[gr.update(value=0.0)]*7, inputs=[], outputs=[finetune, *finetunes])
+        finetune_reset.click(fn=lambda: [gr.update(value="")]+[gr.update(value=0.0)]*7, inputs=[], outputs=[finetune, *finetunes])
         finetune_read.click(fn=finetune_reader, inputs=[finetune], outputs=[*finetunes])
         finetune_write.click(fn=finetune_update, inputs=[finetune, *finetunes], outputs=[finetune])
         detail1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)

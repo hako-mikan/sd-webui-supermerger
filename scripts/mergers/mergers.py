@@ -250,6 +250,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #adjust
     if fine.rstrip(",0") != "":
         fine = fineman(fine)
+    else:
+        fine = ""
 
     caster(mergedmodel,False)
 
