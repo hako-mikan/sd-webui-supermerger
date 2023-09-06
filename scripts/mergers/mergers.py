@@ -130,7 +130,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
 
-    if ui_version > 155: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+    if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
 
     save = True if SAVEMODES[0] in save_sets else False
 
@@ -168,6 +168,9 @@ def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
     checkpoint_info.name = checkpoint_info.name_for_extra + ".safetensors"
     checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
     checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
+
+    # for sd-webui  v1.5.x
+    sd_models.checkpoints_list[checkpoint_info.title] = checkpoint_info
 
         # force to set a new sha256 hash
     if c_cache is not None: 
