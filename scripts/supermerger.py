@@ -26,7 +26,7 @@ import csv
 import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
 from scripts.mergers.xyplot import freezetime, nulister
-from scripts.mergers.model_util import filenamecutter
+from scripts.mergers.model_util import filenamecutter, savemodel
 
 path_root = basedir()
 
@@ -86,7 +86,7 @@ def on_ui_tabs():
                     with gr.Accordion("Save Settings", open=False):
                         with gr.Row():
                             with gr.Column(scale = 3):
-                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], show_label=False, label="save settings")
+                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune"], value=["safetensors"], show_label=False, label="save settings")
                             with gr.Column(min_width = 50, scale = 1):
                                 components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
 
@@ -99,6 +99,9 @@ def on_ui_tabs():
                                 with gr.Row():
                                     bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
                                     create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
+
+                        with gr.Row():
+                            savecurrent = gr.Button(elem_id="savecurrent", elem_classes=["compact_button"], value="Save current merge(fp16 only)")
 
                     with gr.Row():
                         components.merge = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
@@ -470,6 +473,10 @@ def on_ui_tabs():
         mode.change(fn=lambda mode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] else False)], inputs=[mode], outputs=[mode, base_beta], show_progress=False)
         useblocks.change(fn=lambda mbw: gr.update(visible=False if mbw else True), inputs=[useblocks], outputs=[alpha_group])
 
+        def save_current_merge(custom_name, save_settings):
+            msg = savemodel(None,None,custom_name,save_settings)
+            return gr.update(value=msg)
+
         def addblockweights(val, blockopt, *blocks):
             if val == "none":
                 val = 0
@@ -602,6 +609,8 @@ def on_ui_tabs():
         col1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         col2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         col3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+
+        savecurrent.click(fn=save_current_merge, inputs=[custom_name, save_sets], outputs=[components.submit_result])
 
         resetopt.change(fn=resetvalopt,inputs=[resetopt],outputs=[resetval])
         resetweight.click(fn=resetblockweights,inputs=[resetval,resetblockopt],outputs=menbers)
