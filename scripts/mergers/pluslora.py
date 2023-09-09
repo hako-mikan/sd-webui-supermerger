@@ -629,7 +629,7 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
     #usemodelgen(theta_0,model)
     settings.append(precision)
     settings.append("safetensors")
-    result = savemodel(theta_0,dname,output,settings,model)
+    result = savemodel(theta_0,dname,output,settings)
     del theta_0
     gc.collect()
     return result

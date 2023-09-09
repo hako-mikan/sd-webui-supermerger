@@ -407,7 +407,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
                 if "save model" in esettings:
-                    savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) 
+                    savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
                 theta_0 = None
                 del theta_0
 

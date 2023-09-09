@@ -35,7 +35,7 @@ from scripts.mergers.bcolors import bcolors
 import collections
 
 try:
-    ui_version = int(launch.git_tag().replace("v","").replace(".",""))
+    ui_version = int(launch.git_tag().split("-",1)[0].replace("v","").replace(".",""))
 except:
     ui_version = 100
 
@@ -134,7 +134,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     save = True if SAVEMODES[0] in save_sets else False
 
-    result = savemodel(theta_0,currentmodel,custom_name,save_sets,model_a,metadata) if save else "Merged model loaded:"+currentmodel
+    result = savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) if save else "Merged model loaded:"+currentmodel
 
     sd_models.model_data.__init__()
     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
@@ -168,6 +168,7 @@ def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
     checkpoint_info.name = checkpoint_info.name_for_extra + ".safetensors"
     checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
     checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
+    checkpoint_info.metadata = metadata
 
         # force to set a new sha256 hash
     if c_cache is not None: 
@@ -233,7 +234,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     # mode select booleans
     save = True if SAVEMODES[0] in save_sets else False
     usebeta = MODES[2] in mode or MODES[3] in mode or "tensor" in calcmode
-    save_metadata = "save metadata" in save_sets
     metadata = {"format": "pt"}
 
     if not useblocks:
@@ -696,7 +696,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
-    if save_metadata:
+    if True: # always set metadata. savemodel() will check save_sets later
         merge_recipe = {
             "type": "sd-webui-supermerger",
             "weights_alpha": weights_a if useblocks else None,
