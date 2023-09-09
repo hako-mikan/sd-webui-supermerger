@@ -133,14 +133,35 @@ def on_ui_tabs():
                             resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
                             resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
 
-                    with gr.Accordion("Elemental Merge, Adjust",open = False):
+                    with gr.Accordion("Elemental Merge",open = False):
                         with gr.Row():
                             components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
-                        with gr.Row():    
-                            tensor = gr.Textbox(label="Adjust(IN,OUT,contrast,colors,colors,colors) 0,0,0,0,0,0,0",lines=2,value="")
-                    
+
+                    with gr.Accordion("Adjust settings", open=False):
+                        with gr.Row():
+                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,COL1,COL2,COL3", visible=True, value="", lines=1)
+                            finetune_write = gr.Button(value="↑", elem_classes=["tool"])
+                            finetune_read = gr.Button(value="↓", elem_classes=["tool"])
+                            finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
+                        with gr.Row():
+                            with gr.Column(scale=1, min_width=100):
+                                detail1 = gr.Slider(label="IN", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                            with gr.Column(scale=1, min_width=100):
+                                detail2 = gr.Slider(label="OUT", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                            with gr.Column(scale=1, min_width=100):
+                                detail3 = gr.Slider(label="OUT2", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                        with gr.Row():
+                            with gr.Column(scale=1, min_width=100):
+                                contrast = gr.Slider(label="Contrast", minimum=-10, maximum=10, step=0.01, value=0, info="Contrast/Detail")
+                            with gr.Column(scale=1, min_width=100):
+                                col1 = gr.Slider(label="Color1", minimum=-10, maximum=10, step=0.01, value=0, info="Color Tone 1")
+                            with gr.Column(scale=1, min_width=100):
+                                col2 = gr.Slider(label="Color2", minimum=-10, maximum=10, step=0.01, value=0, info="Color Tone 2")
+                            with gr.Column(scale=1, min_width=100):
+                                col3 = gr.Slider(label="Color3", minimum=-10, maximum=10, step=0.01, value=0, info="Color Tone 3")
+
                     with gr.Accordion("XYZ Plot", open=False):
                         with gr.Row():
                             x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
@@ -400,7 +421,7 @@ def on_ui_tabs():
         load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
         reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
 
-        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,tensor,bake_in_vae]
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
@@ -419,7 +440,7 @@ def on_ui_tabs():
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,tensor]
+            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune]
         )
 
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
@@ -557,6 +578,37 @@ def on_ui_tabs():
                 value = float(opt)
 
             return gr.update(value = value)
+
+        def finetune_update(finetune, detail1, detail2, detail3, contrast, col1, col2, col3):
+            arr = [detail1, detail2, detail3, contrast, col1, col2, col3]
+            tmp = ",".join(map(lambda x: str(int(x)) if x == 0.0 else str(x), arr))
+            if finetune != tmp:
+                return gr.update(value=tmp)
+            return gr.update()
+
+        def finetune_reader(finetune):
+            tmp = [t.strip() for t in finetune.split(",")]
+            ret = [gr.update()]*7
+            for i, f in enumerate(tmp[0:7]):
+                try:
+                    f = float(f)
+                    ret[i] = gr.update(value=f)
+                except:
+                    pass
+            return ret
+
+        # update finetune
+        finetunes = [detail1, detail2, detail3, contrast, col1, col2, col3]
+        finetune_reset.click(fn=lambda: [gr.update(value="")]+[gr.update(value=0.0)]*7, inputs=[], outputs=[finetune, *finetunes])
+        finetune_read.click(fn=finetune_reader, inputs=[finetune], outputs=[*finetunes])
+        finetune_write.click(fn=finetune_update, inputs=[finetune, *finetunes], outputs=[finetune])
+        detail1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        detail2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        detail3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        contrast.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        col1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        col2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        col3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
 
         savecurrent.click(fn=save_current_merge, inputs=[custom_name, save_sets], outputs=[components.submit_result])
 
