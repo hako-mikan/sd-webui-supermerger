@@ -470,7 +470,8 @@ def on_ui_tabs():
             "Triple sum": "A*(1-alpha-beta)+B*alpha+C*beta",
             "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
         }
-        mode.change(fn=lambda mode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] else False)], inputs=[mode], outputs=[mode, base_beta], show_progress=False)
+        mode.change(fn=lambda mode,calcmode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] or calcmode in ["tensor", "tensor2"] else False)], inputs=[mode,calcmode], outputs=[mode, base_beta], show_progress=False)
+        calcmode.change(fn=lambda calcmode: gr.update(interactive=True) if calcmode in ["tensor", "tensor2"] else gr.update(), inputs=[calcmode], outputs=base_beta, show_progress=False)
         useblocks.change(fn=lambda mbw: gr.update(visible=False if mbw else True), inputs=[useblocks], outputs=[alpha_group])
 
         def save_current_merge(custom_name, save_settings):
