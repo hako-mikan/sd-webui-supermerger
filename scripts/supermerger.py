@@ -101,7 +101,7 @@ def on_ui_tabs():
                                     create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
 
                         with gr.Row():
-                            savecurrent = gr.Button(elem_id="savecurrent", elem_classes=["compact_button"], value="Save current merge")
+                            savecurrent = gr.Button(elem_id="savecurrent", elem_classes=["compact_button"], value="Save current merge(fp16 only)")
 
                     with gr.Row():
                         components.merge = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
