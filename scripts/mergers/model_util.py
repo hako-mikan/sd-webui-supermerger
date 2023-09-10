@@ -754,7 +754,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in state_dict
     if isxl:
         # prune share memory tensors, "cond_stage_model." prefixed base tensors are share memory with "conditioner." prefixed tensors
-        for i, key in enumerage(state_dict.keys()):
+        for i, key in enumerate(state_dict.keys()):
             if "cond_stage_model." in key:
                 del state_dict[key]
 
