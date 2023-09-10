@@ -188,17 +188,19 @@ def on_ui_tabs():
                             stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
                             components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
 
-                        blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
-                        with gr.Row(visible = False) as row_inputers:
-                            inputer = gr.Textbox(label="",lines=1,value="")
-                            addtox = gr.Button(value="Add to Sequence X")
-                            addtoy = gr.Button(value="Add to Sequence Y")
+                        with gr.Column(visible = False, variant="compact") as row_inputers:
+                            with gr.Row(variant="compact"):
+                                inputer = gr.Textbox(label="Selected", lines=1, value="", show_copy_button=True)
+                            with gr.Row(variant="compact"):
+                                addtox = gr.Button(value="↑ Add to Sequence X")
+                                addtoy = gr.Button(value="↑ Add to Sequence Y")
                         with gr.Row(visible = False) as row_blockids:
-                            blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
+                            blockids = gr.CheckboxGroup(label = "block IDs",choices=BLOCKID[:-1],type="value",interactive=True)
                         with gr.Row(visible = False) as row_calcmode:
                             calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","smoothAdd MT","tensor","tensor2","self"],type="value",interactive=True)
                         with gr.Row(visible = False) as row_checkpoints:
-                             checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
+                            checkpoints = gr.CheckboxGroup(label = "checkpoints",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
+                            create_refresh_button(checkpoints, sd_models.list_models, lambda: {"choices": [x.model_name for x in sd_models.checkpoints_list.values()]}, "refresh_checkpoint_xyz")
                         with gr.Row(visible = False) as row_esets:
                             pass
 
@@ -230,22 +232,21 @@ def on_ui_tabs():
                             isxl = gr.Radio(label = "Block Type",choices = ["1.X or 2.X", "XL"], value = "1.X or 2.X", type="index")
 
                         with gr.Tab("Weights Setting"):
-                            with gr.Row():
-                                setx = gr.Button(elem_id="copytogen", value="↑ Set X",variant='primary')
-
                             with gr.Group(), gr.Tabs():
                                 with gr.Tab("Weights for alpha"):
                                     with gr.Row(variant="compact"):
-                                        weights_a = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
-                                    with gr.Row(variant="compact"):
-                                        setalpha = gr.Button(elem_id="copytogen", value="↑ Set alpha",variant='primary')
-                                        readalpha = gr.Button(elem_id="copytogen", value="↓ Read alpha",variant='primary')
+                                        weights_a = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5", show_copy_button=True)
+                                    with gr.Row(scale=2):
+                                        setalpha = gr.Button(elem_id="copytogen", value="↑ Set alpha",variant='primary', scale=3)
+                                        readalpha = gr.Button(elem_id="copytogen", value="↓ Read alpha",variant='primary', scale=3)
+                                        setx = gr.Button(elem_id="copytogen", value="↑ Set X", min_width="80px", scale=1)
                                 with gr.Tab("beta"):
                                     with gr.Row(variant="compact"):
-                                        weights_b = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2")
-                                    with gr.Row():
-                                        setbeta = gr.Button(elem_id="copytogen", value="↑ Set beta",variant='primary')
-                                        readbeta = gr.Button(elem_id="copytogen", value="↓ Read beta",variant='primary')
+                                        weights_b = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2", show_copy_button=True)
+                                    with gr.Row(scale=2):
+                                        setbeta = gr.Button(elem_id="copytogen", value="↑ Set beta",variant='primary', scale=3)
+                                        readbeta = gr.Button(elem_id="copytogen", value="↓ Read beta",variant='primary', scale=3)
+                                        sety = gr.Button(elem_id="copytogen", value="↑ Set Y", min_width="80px", scale=1)
 
                             with gr.Group(), gr.Tabs():
                                 with gr.Tab("Preset"):
@@ -486,6 +487,7 @@ def on_ui_tabs():
         setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
         setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
         setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
+        sety.click(fn=add_to_seq,inputs=[ygrid,weights_b],outputs=[ygrid])
 
         mode_info = {
             "Weight sum": "A*(1-alpha)+B*alpha",
