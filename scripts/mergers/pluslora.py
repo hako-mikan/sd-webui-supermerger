@@ -911,6 +911,30 @@ def svd(model_a,model_b,v2,dim,save_precision,save_to,alpha,beta):
   print(f"LoRA weights are saved to: {save_to}")
   return "Finished"  
 
+def get_safetensors_header(filename):
+    import json
+    with open(filename, mode="rb") as file:
+        metadata_len = file.read(8)
+        metadata_len = int.from_bytes(metadata_len, "little")
+        json_start = file.read(2)
+
+        if metadata_len > 2 and json_start in (b'{"', b"{'"):
+            json_data = json_start + file.read(metadata_len-2)
+            return json.loads(json_data)
+
+        # invalid safetensors
+        return {}
+
+def load_state_header(file_name, dtype):
+  """load safetensors header if available"""
+  if os.path.splitext(file_name)[1] == '.safetensors':
+    sd = get_safetensors_header(file_name)
+  else:
+    sd = torch.load(file_name, map_location='cpu')
+  for key in list(sd.keys()):
+    if type(sd[key]) == torch.Tensor:
+      sd[key] = sd[key].to(dtype)
+  return sd
 
 def load_state_dict(file_name, dtype):
   if os.path.splitext(file_name)[1] == '.safetensors':
@@ -923,17 +947,21 @@ def load_state_dict(file_name, dtype):
   return sd
 
 def dimgetter(filename):
-    lora_sd = load_state_dict(filename, torch.float)
+    lora_sd = load_state_header(filename, torch.float)
     alpha = None
     dim = None
-    type = None
+    ltype = None
 
     if "lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight" in lora_sd.keys():
-      type = "LoCon"
+      ltype = "LoCon"
+      if type(lora_sd["lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight"]) is dict:
+          lora_sd = load_state_dict(filename, torch.float)
       _, _, dim, _ = dimalpha(lora_sd)
 
     if "lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight" in lora_sd.keys():
         sdx = "XL"
+        if type(lora_sd["lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight"]) is dict:
+            lora_sd = load_state_dict(filename, torch.float)
         _, _, dim, _ = dimalpha(lora_sd)
     else:
         sdx = ""
@@ -942,17 +970,20 @@ def dimgetter(filename):
   
         if alpha is None and 'alpha' in key:
             alpha = value
-        if dim is None and 'lora_down' in key and len(value.size()) == 2:
-            dim = value.size()[0]
+        if dim is None and 'lora_down' in key:
+            if type(value) == torch.Tensor and len(value.size()) == 2:
+                dim = value.size()[0]
+            elif type(value) == dict:
+                dim = value.get("shape",[0,0])[0]
         if "hada_" in key:
-            dim,type, sdx = "LyCORIS","LyCORIS", "LyCORIS"
+            dim,ltype, sdx = "LyCORIS","LyCORIS", "LyCORIS"
         if alpha is not None and dim is not None:
             break
     if alpha is None:
         alpha = dim
-    if type == None:type = "LoRA"
+    if ltype == None:ltype = "LoRA"
     if dim :
-      return dim, type, sdx
+      return dim, ltype, sdx
     else:
       return "unknown","unknown","unknown"
 
