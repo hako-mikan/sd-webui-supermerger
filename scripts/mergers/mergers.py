@@ -239,6 +239,14 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     usebeta = MODES[2] in mode or MODES[3] in mode or "tensor" in calcmode
     metadata = {"format": "pt"}
 
+    if calcmode == "trainDifference" and "Add" not in mode:
+        print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
+        mode = "Add"
+    if model_c == "" or model_c is None:
+        #fallback to avoid crash
+        model_c = model_a
+        print(f"{bcolors.WARNING}Substituting empty model_c with model_a{bcolors.ENDC}")
+
     if not useblocks:
         weights_a = weights_b = ""
     #for save log and save current model
@@ -258,14 +266,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     caster(mergedmodel,False)
 
-    if calcmode == "trainDifference" and "Add" not in mode:
-        print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
-        mode = "Add"
-        if model_c == "":
-            #fallback to avoid crash
-            model_c = model_a
-            print(f"{bcolors.WARNING}Substituting empty model_c with model_a{bcolors.ENDC}")
-            
     result_is_inpainting_model = False
     result_is_instruct_pix2pix_model = False
 
