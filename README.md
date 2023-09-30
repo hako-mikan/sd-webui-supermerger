@@ -46,6 +46,11 @@ A minimum of 64GB of CPU memory is required for the XL model merge. Even with 64
 **注意！**
 XLモデルのマージには最低64GBのCPUメモリが必要です。64Gのメモリであっても併用しているソフトによってはシステムが不安定になる恐れがあるのでシステムが落ちてもいい状態で作業して下さい。私は久しぶりにブルースクリーンに遭遇しました。
 
+## Knowon issues/既知の問題
+If you have other extensions (like sd-webui-prompt-all-in-one) installed simultaneously, enabling the option to automatically open the browser upon launch can cause instability in its operation. It's likely an issue with Gradio, so it might be difficult to fix. Please disable that option and use it.  
+他の拡張機能（sd-webui-prompt-all-in-oneなど）を同時にインストールしている場合、起動時にブラウザを自動的に開くオプションを有効にすると、動作が不安定になることがあります。Gradioの問題である可能性が高いので、修正は難しいかもしれません。そのオプションを無効にしてお使いください。
+
+
 All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
 
 update 2023.07.07.2000(JST)
