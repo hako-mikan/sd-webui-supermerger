@@ -97,7 +97,7 @@ def on_ui_tabs():
                     with gr.Accordion("Save Settings", open=False):
                         with gr.Row(variant="compact"):
                             with gr.Column(scale = 3):
-                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune"], value=["safetensors"], show_label=False, label="save settings")
+                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune","debug"], value=["safetensors"], show_label=False, label="save settings")
                             with gr.Column(min_width = 50, scale = 1):
                                 components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
 
