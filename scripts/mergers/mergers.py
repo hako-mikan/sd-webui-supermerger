@@ -144,11 +144,13 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     del theta_0
     devices.torch_gc()
 
+    debug = "debug" in save_sets
+
     if imggen :
         images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                         genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
                         currentmodel,id_sets,modelid,
-                        *txt2imgparams)
+                        *txt2imgparams,debug = debug)
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -1015,11 +1017,12 @@ def eratiodealer(dr,randomer,block,num,lucks):
 def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
             genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
             mergeinfo,id_sets,modelid,
-            *txt2imgparams
+            *txt2imgparams,
+            debug = False
             ):
     shared.state.begin()
     from scripts.mergers.components import paramsnames
-    #print(paramsnames)
+    if debug: print(paramsnames)
 
     #[None, 'Prompt', 'Negative prompt', 'Styles', 'Sampling steps', 'Sampling method', 'Batch count', 'Batch size', 'CFG Scale', 
     # 'Height', 'Width', 'Hires. fix', 'Denoising strength', 'Upscale by', 'Upscaler', 'Hires steps', 'Resize width to', 'Resize height to', 
