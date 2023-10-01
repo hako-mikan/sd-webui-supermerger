@@ -403,11 +403,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks,main=mainmodel) 
                     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+                    if "save model" in esettings:
+                        savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
+                    
                     sd_models.model_data.__init__()
                     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
 
-                if "save model" in esettings:
-                    savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
                 theta_0 = None
                 del theta_0
 
