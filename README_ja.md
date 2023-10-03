@@ -1,36 +1,18 @@
 # SuperMerger
-- Model merge extention for [AUTOMATIC1111's stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 
-- Merge models can be loaded directly for generation without saving
+- [AUTOMATIC1111's stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 用の拡張です。
+- このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
 
 # Recent Update
 すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)にあります。  
-All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md).
 
 ### English / 日本語
 English: [![jp](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
 
 ## Updates
-- XLに対応(Web-ui 1.5が必要です)
-XLでいまできること Merge/Block merge/マージ/階層マージ
-
-できないこと
-モデルへのLoRAのマージ(数日中に対応) 
-モデル差分からLoRA作成(未定) 
-LyCORISは対応しません。
+- [LoRAマージの際のMetadataの扱いが変わりました。](#Metadata)
 
 **注意！** 
 XLモデルのマージには最低64GBのCPUメモリが必要です。64Gのメモリであっても併用しているソフトによってはシステムが不安定になる恐れがあるのでシステムが落ちてもいい状態で作業して下さい。私は久しぶりにブルースクリーンに遭遇しました。
-
-
-- [ランダムマージモード](#random-merge)が追加されました
-- モデルの[描き込み・色調調整機能](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_ja.md#adjust)を追加しました
-
-- 機能更新, コサイン類似度を用いた最適値計算機能を強化しました[詳細](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
-- 新機能, 新しいマージ方式tensorを導入しました [詳細](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
-- XYプロットに新しい軸タイプを追加しました : calcmode,prompt
-
-一部LoRA関係の機能を使用する場合diffusers(0.10.2以降),sklearnが必要です。
-# 
 
 # 概要
 このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
@@ -203,6 +185,18 @@ colabで使用する場合に多くのエラーが発生することが報告さ
 ひとつまたは複数のLoRA同士をマージします。kohya-ss氏の最新のスクリプトを使用しているので、dimensionの異なるLoRA同氏もマージ可能ですが、dimensionの変換の際はLoRAの再計算を行うため、生成される画像が大きく異なる可能性があることに注意してください。  
 
 calculate dimentionボタンで各LoRAの次元を計算して表示・ソート機能が有効化します。計算にはわりと時間がかかって、50程度のLoRAでも数十秒かかります。新しくマージされたLoRAはリストに表示されないのでリロードボタンを押してください。次元の再計算は追加されたLoRAだけを計算します。
+
+### Metadata
+#### create new
+新しく最小限のMetadataを作製します。dim,alpha,basemodelのversion,filename,networktypeのみが作製されます。
+#### merge
+各LoRAの情報が保存され、タグがマージされます。
+(各LoRAの情報はWeb-uiの簡易Metadata読み込み機能では見えません)
+#### save all
+各LoRAの情報が保存されます。
+(各LoRAの情報はWeb-uiの簡易Metadata読み込み機能では見えません)
+#### use first LoRA
+最初のLoRAの情報をそのままコピーします
 
 ### 通常マージとsame to Strengthの違い
 same to Strengthオプションを使用しない場合は、kohya-ss氏の作製したスクリプトのマージと同じ結果になります。この場合、下図のようにWeb-ui上でLoRAを適用した場合と異なる結果になります。これはLoRAをU-netに組み込む際の数式が関係しています。kohya-ss氏のスクリプトでは比率をそのまま掛けていますが、適用時の数式では比率が２乗されてしまうため、比率を1以外の数値に設定すると、あるいはマイナスに設定するとStrength（適用時の強度）と異なる結果となります。same to Strengthオプションを使用すると、マージ時には比率の平方根を駆けることで、適用時にはStrengthと比率が同じ意味を持つように計算しています。また、マイナスが効果が出るようにも計算しています。追加学習をしない場合などはsame to Strengthオプションを使用しても問題ないと思いますが、マージしたLoRAに対して追加学習をする場合はだれも使用しない方がいいかもしれません。  
