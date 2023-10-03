@@ -6,39 +6,15 @@
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
 # Recent Update
+2023.10.03 
+[Merge function of metadata for LoRAs is changed.](#Metadata)
+
 2023.09.02.1900(JST)  
 モデルキャッシュに関する仕様が変わりました。
 モデルキャッシュを設定している場合、これまではweb-ui側のモデルキャッシュを使用していましたが、web-ui側の仕様変更により使えなくなりました。
 そこで、web-ui側のモデルキャッシュを無効にしてSuperMerger側でモデルをキャッシュするように変更しました。よって、モデルキャッシュを使用する設定にしている場合、SuperMerger使用後にモデルのキャッシュが残ることになります。SuperMeger使用後はClear cacheボタンでメモリの解放を行って下さい。
 
 The specifications regarding model caching have changed. If you have set up model caching, we used to utilize the model cache on the web-ui side. However, due to changes in the web-ui specifications, this is no longer possible. Therefore, I have disabled the model cache on the web-ui side and have made changes to cache the model on the SuperMerger side instead. As a result, if you have set it to use model caching, the model cache will remain after using SuperMerger. Please clear the cache using the "Clear cache" button to free up memory after using SuperMerger.
-
-bug fix/以下のバグを修正しました
-- XYZ plot でseedを選択すると発生するバグ
-- not work when selecting Seed in XYZ plot
-- LoRAマージができないバグ
-- Merging LoRA to checkpoint is not work
-- Hires fix を使用していないときでもDenoising Strength がPNGinfoに設定される
-- Denoising Strength is set to PNG info when Hires fix is not enabled
-- LOWVRAM/MEDVRAM使用時に正常に動作しない
-- bug when LOWVRAM/MEDVRAM
-
-2023.08.31
-
-- ほぼすべてのtxt2imgタブの設定を使えるようになりました
-- Almost all txt2img tab settings are now available in generation    
-Thanks! [Filexor](https://github.com/Filexor)  
-  
-- support XL
-- XLモデル対応
-
-XL capabilities at the moment:XLでいまできること  
-Merge/Block merge/マージ/階層マージ  
-Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ
-
-Cannot be done:できないこと
-Creating LoRA from model differences (TBD)/モデル差分からLoRA作成(未定)  
-
 **Attention!**
 
 A minimum of 64GB of CPU memory is required for the XL model merge. Even with 64GB of memory, depending on the software you are using in conjunction, there is a risk of system instability. Therefore, please work in a state where it is acceptable for the system to crash. I encountered a blue screen for the first time in a while.
@@ -239,6 +215,20 @@ First is a memory problem. It is recommended that the fp16 model be used. If the
 Merges one or more LoRAs. kohya-ss's latest script is used, so LoRAs with different dimensions can be merged, but note that the generated images may differ significantly because LoRAs are recalculated when dimensions are converted. 
 
 The calculate dimention button calculates the dimensions of each LoRA and activates the display and sorting functions. The calculation is rather time-consuming and takes several tens of seconds for a LoRA of about 50. Newly merged LoRAs will not appear in the list, so please press the reload button. Dimension recalculation only calculates the added LoRAs.
+
+### Metadata
+#### create new
+Create new minimal Metadata. Only dim, alpha, basemodel version, filename, and networktype will be generated.
+#### merge
+Information of each LoRA is saved, and tags are merged.
+(The information of each LoRA is not visible with the simple Metadata reading function in the Web-UI)
+#### save all
+Information of each LoRA is saved.
+(The information of each LoRA is not visible with the simple Metadata reading function in the Web-UI)
+#### use first LoRA
+Copy the information of the first LoRA as is.
+
+Note: "LoRA" seems to be a specific term or abbreviation related to your context, which is not universally recognized and thus, is left as-is in the translation. If "LoRA" refers to something specific in English, feel free to replace it.
 
 ### Difference between Normal Merge and SAME TO STRENGTH
 If the same to Strength option is not used, the result is the same as the merge in the script created by kohya-ss. In this case, the result is different from the case where LoRA is applied on Web-ui as shown in the figure below. The reason for this is related to the mathematical formula used to adopt LoRA into U-net. kohya-ss's script multiplies the ratio as it is, but the formula used to apply LoRA squares the ratio, so if the ratio is set to a number other than 1, or to a negative value, the result will differ from Strength (strength when applied).  Using the SAME TO STRENGTH option, the square root of the ratio is driven at merge time, so that Strength and the ratio are calculated to have the same meaning at apply time. It is also calculated so that a negative value will have the same effect. If you are not doing additional learning, for example, you may be fine using the SAME TO STRENGTH option, but if you are doing additional learning on the merged LoRA, you may not want to use anyone else's option.  
