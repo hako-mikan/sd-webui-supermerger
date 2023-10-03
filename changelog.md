@@ -1,4 +1,30 @@
 # Changelog
+bug fix/以下のバグを修正しました
+- XYZ plot でseedを選択すると発生するバグ
+- not work when selecting Seed in XYZ plot
+- LoRAマージができないバグ
+- Merging LoRA to checkpoint is not work
+- Hires fix を使用していないときでもDenoising Strength がPNGinfoに設定される
+- Denoising Strength is set to PNG info when Hires fix is not enabled
+- LOWVRAM/MEDVRAM使用時に正常に動作しない
+- bug when LOWVRAM/MEDVRAM
+
+update 2023.08.31
+
+- ほぼすべてのtxt2imgタブの設定を使えるようになりました
+- Almost all txt2img tab settings are now available in generation    
+Thanks! [Filexor](https://github.com/Filexor)  
+  
+- support XL
+- XLモデル対応
+
+XL capabilities at the moment:XLでいまできること  
+Merge/Block merge/マージ/階層マージ  
+Merging LoRA into the model (supported within a few days)/モデルへのLoRAのマージ
+
+Cannot be done:できないこと
+Creating LoRA from model differences (TBD)/モデル差分からLoRA作成(未定)  
+
 update 2023.06.28.2000(JST)
 - add Image Generation Parameters(prompt,seed,etc.)  
 for Vlad fork users, use this panel
