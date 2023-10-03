@@ -5,6 +5,7 @@ import torch
 import tqdm
 import math
 import sys
+import json
 import traceback
 import os
 import gc
@@ -80,6 +81,7 @@ def on_ui_tabs():
             beta = gr.Slider(label=" beta", minimum=-1.0, maximum=2, step=0.001, value=1)
         with gr.Row(equal_height=False):
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
+            sml_metasettings = gr.Radio(value = "create new",choices = ["create new", "merge","save all", "use first lora"], label="metadata")
             precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
         with gr.Row(equal_height=False):
             sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
@@ -102,19 +104,19 @@ def on_ui_tabs():
 
         sml_merge.click(
             fn=lmerge,
-            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,precision],
+            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,precision,sml_metasettings],
             outputs=[sml_submit_result]
         )
 
         sml_makelora.click(
             fn=makelora,
-            inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings,alpha,beta,precision],
+            inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings,alpha,beta,precision,sml_metasettings],
             outputs=[sml_submit_result]
         )
 
         sml_cpmerge.click(
             fn=pluslora,
-            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,precision],
+            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,precision,sml_metasettings],
             outputs=[sml_submit_result]
         )
         llist ={}
@@ -197,7 +199,7 @@ def on_ui_tabs():
 ##############################################################
 ####### make LoRA from checkpoint
 
-def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision):
+def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision,metasets):
     print("make LoRA start")
     if model_a == "" or model_b =="":
       return "ERROR: No model Selected"
@@ -222,7 +224,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision):
 ##############################################################
 ####### merge LoRAs
 
-def lmerge(loranames,loraratioss,settings,filename,dim,precision):
+def lmerge(loranames,loraratioss,settings,filename,dim,precision,metasets):
     try:
         import lora
         loras_on_disk = [lora.available_loras.get(name, None) for name in loranames]
@@ -298,7 +300,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision):
             return _err_msg
         
         # マージ後のメタデータを取得
-        metadata = create_merge_metadata( sd, lm, loraname, precision )
+        metadata = create_merge_metadata( sd, lm, loraname, precision,metasets )
 
         save_to_file(filename,sd,sd, str_to_dtype(precision), metadata)
         return "saved : "+filename
@@ -319,7 +321,7 @@ def merge_lora_models(models, ratios, sets, locon):
         keylist = LBLCOKS26
 
         print(f"merging {model}: {ratios}")
-        lora_sd = load_state_dict(model, merge_dtype)
+        lora_sd, metadata = load_state_dict(model, merge_dtype)
 
         # get alpha and dim
         alphas = {}                             # alpha for current model
@@ -377,7 +379,7 @@ def merge_lora_models_dim(models, ratios, new_rank, sets):
     fugou = 1
     for model, ratios in zip(models, ratios):
         merge_dtype = torch.float
-        lora_sd = load_state_dict(model, merge_dtype)
+        lora_sd, medadata = load_state_dict(model, merge_dtype)
 
         # merge
         print(f"merging {model}: {ratios}")
@@ -454,7 +456,7 @@ def merge_lora_models_dim(models, ratios, new_rank, sets):
     return merged_lora_sd
 
 def lycomerge(filename,ratios):
-    sd = load_state_dict(filename, torch.float)
+    sd, metadata = load_state_dict(filename, torch.float)
 
     if len(ratios) == 17:
       r0 = 1
@@ -499,7 +501,7 @@ def lycomerge(filename,ratios):
 
 ##############################################################
 ####### merge to checkpoint
-def pluslora(lnames,loraratios,settings,output,model,precision):
+def pluslora(lnames,loraratios,settings,output,model,precision,metasets):
     if model == []: return "ERROR: No model Selected"
     if lnames == "":return "ERROR: No LoRA Selected"
 
@@ -572,7 +574,7 @@ def pluslora(lnames,loraratios,settings,output,model,precision):
     else:
         for name,filename, lwei in zip(names,filenames, lweis):
             print(f"loading: {name}")
-            lora_sd = load_state_dict(filename, torch.float)
+            lora_sd, metadata = load_state_dict(filename, torch.float)
 
             print(f"merging..." ,lwei)
             for key in lora_sd.keys():
@@ -773,16 +775,16 @@ LORAANDSOON = {
     "NetworkModuleLokr": "w1",
 }
 
-def save_to_file(file_name, model, state_dict, dtype, meta):
+def save_to_file(file_name, model, state_dict, dtype, metadata):
     if dtype is not None:
         for key in list(state_dict.keys()):
             if type(state_dict[key]) == torch.Tensor:
                 state_dict[key] = state_dict[key].to(dtype)
 
-    if os.path.splitext(file_name)[1] == '.safetensors':
-        save_file(model, file_name, metadata=meta)
+    if os.path.splitext(file_name)[1] == ".safetensors":
+        save_file(model, file_name, metadata=metadata)
     else:
-        torch.save(model, file_name, metadata=meta)
+        torch.save(model, file_name)
 
 CLAMP_QUANTILE = 0.99
 MIN_DIFF = 1e-6
@@ -937,14 +939,32 @@ def load_state_header(file_name, dtype):
   return sd
 
 def load_state_dict(file_name, dtype):
-  if os.path.splitext(file_name)[1] == '.safetensors':
-    sd = load_file(file_name)
-  else:
-    sd = torch.load(file_name, map_location='cpu')
-  for key in list(sd.keys()):
-    if type(sd[key]) == torch.Tensor:
-      sd[key] = sd[key].to(dtype)
-  return sd
+    if os.path.splitext(file_name)[1] == ".safetensors":
+        sd = load_file(file_name)
+        metadata = load_metadata_from_safetensors(file_name)
+    else:
+        sd = torch.load(file_name, map_location="cpu")
+        metadata = {}
+
+    for key in list(sd.keys()):
+        if type(sd[key]) == torch.Tensor:
+            sd[key] = sd[key].to(dtype)
+
+    return sd, metadata
+
+def load_metadata_from_safetensors(safetensors_file: str) -> dict:
+    """
+    This method locks the file. see https://github.com/huggingface/safetensors/issues/164
+    If the file isn't .safetensors or doesn't have metadata, return empty dict.
+    """
+    if os.path.splitext(safetensors_file)[1] != ".safetensors":
+        return {}
+
+    with safetensors.safe_open(safetensors_file, framework="pt", device="cpu") as f:
+        metadata = f.metadata()
+    if metadata is None:
+        metadata = {}
+    return metadata
 
 def dimgetter(filename):
     lora_sd = load_state_header(filename, torch.float)
@@ -955,13 +975,13 @@ def dimgetter(filename):
     if "lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight" in lora_sd.keys():
       ltype = "LoCon"
       if type(lora_sd["lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight"]) is dict:
-          lora_sd = load_state_dict(filename, torch.float)
+          lora_sd, _ = load_state_dict(filename, torch.float)
       _, _, dim, _ = dimalpha(lora_sd)
 
     if "lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight" in lora_sd.keys():
         sdx = "XL"
         if type(lora_sd["lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight"]) is dict:
-            lora_sd = load_state_dict(filename, torch.float)
+            lora_sd, _ = load_state_dict(filename, torch.float)
         _, _, dim, _ = dimalpha(lora_sd)
     else:
         sdx = ""
@@ -1556,7 +1576,23 @@ def prepare_merge_metadata( ratio, blocks, fromLora ):
 
     return meta
 
-def create_merge_metadata( sd, lmetas, lname, lprecision, mergeAll = True ):
+BASE_METADATA = [
+    "sshs_ratio", "sshs_blocks", "ss_output_name",
+    "sshs_model_hash", "sshs_legacy_hash",
+    "ss_network_module",
+    "ss_network_alpha", "ss_network_dim",
+    "ss_mixed_precision", "ss_v2",
+    "ss_training_comment",
+    "ss_sd_model_name", "ss_new_sd_model_hash",
+    "ss_clip_skip",
+    "ss_base_model_version"
+]
+
+MINIMUM_METADATA = [
+    "ss_network_module","ss_network_alpha", "ss_network_dim","ss_v2","ss_sd_model_name", "ss_base_model_version"
+]
+
+def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
     """
     LoRAマージ後のメタデータを作成する
 
@@ -1580,46 +1616,40 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, mergeAll = True ):
     dict[str, str]
         メタデータ
     """
-    import json
-    BASE_METADATA = [
-        "sshs_ratio", "sshs_blocks", "ss_output_name",
-        "sshs_model_hash", "sshs_legacy_hash",
-        "ss_network_module",
-        "ss_network_alpha", "ss_network_dim",
-        "ss_mixed_precision", "ss_v2",
-        "ss_training_comment",
-        "ss_sd_model_name", "ss_new_sd_model_hash",
-        "ss_clip_skip",
-    ]
+
     metadata = {}
     networkModule = None
 
-    if len(lmetas) == 1:
+    if "first" in metasets:
         # 単なるweightマージならそのままコピー
         metadata = lmetas[0]
+    elif "new" in metasets:
+        new = {}
+        for key in MINIMUM_METADATA:
+            if key in lmetas[0].keys():
+                new[key] = lmetas[0][key]
     else:
         # 複数マージの場合はマージしたタグと主要メタデータを保存
+        metadata = lmetas[0]
         tags = {}
         for i, lmeta in enumerate( lmetas ):
             meta = {}
-            if mergeAll:
-                # 全データコピー
-                metadata[ f"sshs_cp{i}" ] = json.dumps( lmeta )
-            else:
-                # 基礎メタデータをコピー
-                for key in BASE_METADATA:
-                    if key in lmeta:
-                        meta[key] = lmeta[key]
-                metadata[ f"sshs_cp{i}" ] = json.dumps( meta )
+            metadata[ f"sshs_cp{i}" ] = json.dumps( lmeta )
 
             # 最初の network_module を保持
             if networkModule is None and "ss_network_module" in lmeta:
                 networkModule = lmeta["ss_network_module"]
 
             # タグをマージ
-            if "ss_tag_frequency" in lmeta:
-                tags = dict( tags, **lmeta["ss_tag_frequency"] )
-        metadata["ss_tag_frequency"] = tags
+            if "merge" in metasets:
+                if "ss_tag_frequency" in lmeta:
+                    ldict = lmeta["ss_tag_frequency"]
+                    if "ss_tag_frequency" in metadata:
+                        mdict = metadata["ss_tag_frequency"]
+                        if type(ldict) is dict and type(mdict) is dict:
+                            for key in ldict:
+                                if key not in mdict:
+                                    mdict[key] = ldict[key]
 
     # network_moduleからLoRA種別判定する場合が多いため、最初に見つけたものにする
     if networkModule is not None:
@@ -1630,7 +1660,6 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, mergeAll = True ):
     metadata["ss_mixed_precision"] = lprecision
     # dimの出し方が分からない・・・
 
-
     # metadataで保存できる形式に変換
     for key in metadata:
         if type(metadata[key] ) is not str:
@@ -1639,4 +1668,8 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, mergeAll = True ):
     model_hash, legacy_hash = precalculate_safetensors_hashes( sd, metadata )
     metadata[ "sshs_model_hash" ] = model_hash
     metadata[ "sshs_legacy_hash" ] = legacy_hash
+
+    for key in metadata:
+        print(key,metadata[key])
+
     return metadata
