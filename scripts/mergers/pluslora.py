@@ -4,23 +4,26 @@ from sklearn.linear_model import PassiveAggressiveClassifier
 import torch
 import tqdm
 import math
+import random
 import sys
 import json
 import traceback
 import os
 import gc
 import gradio as gr
+import scripts.mergers.components as components
 from torchmetrics import Precision
 import modules.shared as shared
 import gc
 from safetensors.torch import load_file, save_file
 from typing import List
 from tqdm import tqdm
-from modules import  sd_models,scripts
+from modules import  sd_models,scripts, extra_networks
 from scripts.mergers.model_util import load_models_from_stable_diffusion_checkpoint,filenamecutter,savemodel
 from modules.ui import create_refresh_button
 
 selectable = []
+pchanged = False
 
 BLOCKID26=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
 BLOCKID17=["BASE","IN01","IN02","IN04","IN05","IN07","IN08","M00","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
@@ -96,11 +99,15 @@ def on_ui_tabs():
         with gr.Row():
             sml_selectall = gr.Button(elem_id="sml_selectall", value="select all",variant='primary')
             sml_deselectall = gr.Button(elem_id="slm_deselectall", value="deselect all",variant='primary')
+            components.frompromptb = gr.Button(elem_id="slm_deselectall", value="get from prompt",variant='primary')
+            hidenb = gr.Checkbox(value = False,visible = False)
         sml_loras = gr.CheckboxGroup(label = "Lora",choices = selectable,type="value",interactive=True,visible = True)
         sml_loraratios = gr.TextArea(label="",value=sml_lbwpresets,visible =True,interactive  = True)  
 
         sml_selectall.click(fn = lambda x:gr.update(value = selectable),outputs = [sml_loras])
         sml_deselectall.click(fn = lambda x:gr.update(value =[]),outputs = [sml_loras])
+
+        components.sml_loranames = [sml_loras, sml_loranames, hidenb]
 
         sml_merge.click(
             fn=lmerge,
@@ -119,6 +126,8 @@ def on_ui_tabs():
             inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,precision,sml_metasettings],
             outputs=[sml_submit_result]
         )
+
+
         llist ={}
         dlist =[]
         dn = []
@@ -185,16 +194,17 @@ def on_ui_tabs():
 
             return gr.update(choices = [l for l in rl],value =[])
 
-        def llister(names,ratio):
+        def llister(names,ratio, hiden):
+          if hiden:return gr.update()
           if names ==[] : return ""
           else:
             for i,n in enumerate(names):
               if "(" in n:names[i] = n[:n.rfind("(")]
             return f":{ratio},".join(names)+f":{ratio} "
 
-        sml_loras.change(fn=llister,inputs=[sml_loras,sml_lratio],outputs=[sml_loranames])     
+        hidenb.change(fn=lambda x: False, outputs = [hidenb])
+        sml_loras.change(fn=llister,inputs=[sml_loras,sml_lratio, hidenb],outputs=[sml_loranames])     
         sml_dims.change(fn=dimselector,inputs=[sml_dims],outputs=[sml_loras])  
-
 
 ##############################################################
 ####### make LoRA from checkpoint
@@ -1673,3 +1683,73 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
         print(key,metadata[key])
 
     return metadata
+
+## get loranames from prompt
+def frompromptf(*args):
+    outst = []
+    outss = []
+    prompt = args[1]
+    names, multis, lbws = loradealer(prompt, "", "")
+    for name, multi, lbw in zip(names, multis, lbws):
+        nml = [name,str(multi),lbw] if lbw is not None else [name,str(multi)]
+        outst.append(":".join(nml))
+        if name in selectable:
+            outss.append(name)
+    global pchanged
+    pchanged = True
+    return outss,",".join(outst), True
+
+def loradealer(prompts,lratios,elementals):
+    _, extra_network_data = extra_networks.parse_prompts([prompts])
+    moduletypes = extra_network_data.keys()
+
+    outnames = []
+    outmultis = []
+    outlbws = []
+
+    for ltype in moduletypes:
+        lorans = []
+        lorars = []
+        loraps = []
+        multipliers = []
+        elements = []
+        if not (ltype == "lora" or ltype == "lyco") : continue
+        for called in extra_network_data[ltype]:
+            multiple = float(syntaxdealer(called.items,"unet=","te=",1))
+            multipliers.append(multiple)
+            lorans.append(called.items[0])
+            loraps.append(syntaxdealer(called.items,"lbw=",None,2))
+
+        if len(lorans) > 0:
+            outnames.extend(lorans)
+            outmultis.extend(multipliers)
+            outlbws.extend(loraps)
+
+    return outnames, outmultis, outlbws
+
+def syntaxdealer(items,type1,type2,index): #type "unet=", "x=", "lwbe=" 
+    target = [type1,type2] if type2 is not None else [type1]
+    for t in target:
+        for item in items:
+            if t in item:
+                return item.replace(t,"")
+    if index > len(items) - 1 :return None
+    return items[index] if "@" not in items[index] else 1
+
+def isfloat(t):
+    try:
+        float(t)
+        return True
+    except:
+        return False
+
+re_inherited_weight = re.compile(r"X([+-])?([\d.]+)?")
+
+def getinheritedweight(weight, offset):
+    match = re_inherited_weight.search(offset)
+    if match.group(1) == "+":
+        return float(weight) + float(match.group(2))
+    elif match.group(1) == "-":
+        return float(weight) - float(match.group(2))  
+    else:
+        return float(weight) 
