@@ -2,6 +2,7 @@ import gradio as gr
 import scripts.mergers.components as components
 from scripts.mergers.mergers import smergegen, simggen
 from scripts.mergers.xyplot import numanager
+from scripts.mergers.pluslora import frompromptf
 from modules import scripts, script_callbacks
 
 class GenParamGetter(scripts.Script):
@@ -130,6 +131,12 @@ class GenParamGetter(scripts.Script):
                     fn=numanager,
                     inputs=[gr.Textbox(value="random",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.hiresfix,*components.lucks,*components.txt2img_params],
                     outputs=[components.submit_result,components.currentmodel,*components.imagegal],
+                )
+
+                components.frompromptb.click(
+                    fn=frompromptf,
+                    inputs=[*components.txt2img_params],
+                    outputs=components.sml_loranames,
                 )
             GenParamGetter.events_assigned = True
 
