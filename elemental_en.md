@@ -79,10 +79,11 @@ The seven numbers correspond to
 1. Detail/Noise 
 2. Detail/Noise 
 3. Detail/Noise 
-4. Contrast/Detail 
-5. Color Tone 1
-6. Color Tone 2
-7. Color Tone 3
+4. Contrast/Detail
+5. Brightness
+6. Color Tone 1 (Cyan-Red)
+7. Color Tone 2 (Magenta-Green)
+8. Color Tone 3 (Yellow-Blue)
 
 Please be aware that as the level of detail increases, so inevitably does the noise. Also, when using Hires.fix, the output may look different, so I recommend testing it with the expected settings.
 The values should be good up to about 5/-5, but it depends on the model. Entering a positive value will increase the level of detail. There are three types of color tones, which seem to correspond roughly to color balance.
@@ -95,9 +96,9 @@ The values should be good up to about 5/-5, but it depends on the model. Enterin
 Adjusting this will change the contrast and brightness, as well as the level of detail. It's faster to see the sample.
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample3.jpg)
 
-#### 5,6,7 Color Tone
+#### 5,6,7,8 Brightness, Color Tone
 You can correct the color tone. It seems to correspond roughly to the color balance.
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample5.jpg)
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/asample1.jpg)
 
 
 ### List of elements
