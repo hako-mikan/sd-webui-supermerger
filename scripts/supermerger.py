@@ -94,10 +94,10 @@ def on_ui_tabs():
                                 base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25, interactive=False)
                         #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
 
-                    with gr.Accordion("Save Settings", open=False):
+                    with gr.Accordion("Options", open=False):
                         with gr.Row(variant="compact"):
                             with gr.Column(scale = 3):
-                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune","debug"], value=["safetensors"], show_label=False, label="save settings")
+                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune","Reset CLIP ids","debug"], value=["safetensors"], show_label=False, label="save settings")
                             with gr.Column(min_width = 50, scale = 1):
                                 components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
 
@@ -152,7 +152,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Adjust settings", open=False):
                         with gr.Row(variant="compact"):
-                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,COL1,COL2,COL3", visible=True, value="", lines=1)
+                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,COL1,COL2,COL3,Brightness", visible=True, value="", lines=1)
                             finetune_write = gr.Button(value="↑", elem_classes=["tool"])
                             finetune_read = gr.Button(value="↓", elem_classes=["tool"])
                             finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
@@ -167,11 +167,13 @@ def on_ui_tabs():
                             with gr.Column(scale=1, min_width=100):
                                 contrast = gr.Slider(label="Contrast", minimum=-10, maximum=10, step=0.01, value=0, info="Contrast/Detail")
                             with gr.Column(scale=1, min_width=100):
-                                col1 = gr.Slider(label="Color1", minimum=-10, maximum=10, step=0.01, value=0, info="Color Tone 1")
+                                bri = gr.Slider(label="Brightness", minimum=-10, maximum=10, step=0.01, value=0, info="Dark(Minius)-Bright(Plus)")
                             with gr.Column(scale=1, min_width=100):
-                                col2 = gr.Slider(label="Color2", minimum=-10, maximum=10, step=0.01, value=0, info="Color Tone 2")
+                                col1 = gr.Slider(label="Cyan-Red", minimum=-10, maximum=10, step=0.01, value=0, info="Cyan(Minius)-Red(Plus)")
                             with gr.Column(scale=1, min_width=100):
-                                col3 = gr.Slider(label="Color3", minimum=-10, maximum=10, step=0.01, value=0, info="Color Tone 3")
+                                col2 = gr.Slider(label="Magenta-Green", minimum=-10, maximum=10, step=0.01, value=0, info="Magenta(Minius)-Green(Plus)")
+                            with gr.Column(scale=1, min_width=100):
+                                col3 = gr.Slider(label="Yellow-Blue", minimum=-10, maximum=10, step=0.01, value=0, info="Yellow(Minius)-Blue(Plus)")
 
                     with gr.Accordion("XYZ Plot", open=False):
                         with gr.Row():
@@ -605,8 +607,8 @@ def on_ui_tabs():
 
             return gr.update(value = value)
 
-        def finetune_update(finetune, detail1, detail2, detail3, contrast, col1, col2, col3):
-            arr = [detail1, detail2, detail3, contrast, col1, col2, col3]
+        def finetune_update(finetune, detail1, detail2, detail3, contrast, bri, col1, col2, col3):
+            arr = [detail1, detail2, detail3, contrast, bri, col1, col2, col3]
             tmp = ",".join(map(lambda x: str(int(x)) if x == 0.0 else str(x), arr))
             if finetune != tmp:
                 return gr.update(value=tmp)
@@ -624,14 +626,15 @@ def on_ui_tabs():
             return ret
 
         # update finetune
-        finetunes = [detail1, detail2, detail3, contrast, col1, col2, col3]
-        finetune_reset.click(fn=lambda: [gr.update(value="")]+[gr.update(value=0.0)]*7, inputs=[], outputs=[finetune, *finetunes])
+        finetunes = [detail1, detail2, detail3, contrast, bri, col1, col2, col3]
+        finetune_reset.click(fn=lambda: [gr.update(value="")]+[gr.update(value=0.0)]*8, inputs=[], outputs=[finetune, *finetunes])
         finetune_read.click(fn=finetune_reader, inputs=[finetune], outputs=[*finetunes])
         finetune_write.click(fn=finetune_update, inputs=[finetune, *finetunes], outputs=[finetune])
         detail1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         detail2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         detail3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         contrast.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        bri.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         col1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         col2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
         col3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
