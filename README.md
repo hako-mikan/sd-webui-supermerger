@@ -6,6 +6,12 @@
 日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
 
 # Recent Update
+2023.10.15
+Adjust機能が改良されました。CD TunerのようにBrightness, Cyan-Red, Magenta-Gree, Yellow-Blueのような色指定に変わります。
+その他バグfix
+Adjust feature was improved, changed to "Brightness, Cyan-Red, Magenta-Gree, Yellow-Blue" like CD Tuner
+other bug fixes added.
+
 2023.10.03 
 [Merge function of metadata for LoRAs is changed.](#Metadata)
 
