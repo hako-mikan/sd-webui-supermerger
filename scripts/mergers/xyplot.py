@@ -168,9 +168,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         elif wantedv and wantedv in paramsnames:return gensets[paramsnames.index(wantedv)] if value else paramsnames.index(wantedv)
         else:return None if value else 0
 
-    fine = fine.split(",") if fine else [0]*7
-
-
+    fine = fine.split(",") if fine else [0]*8
 
     deep_ori = deep
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
@@ -438,6 +436,8 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         
         (xs_t, ys_t) = (xs.copy(), ys.copy())
 
+        xs,ys,zs = ajustlegend(xs,XYZ),ajustlegend(ys,XYZ),ajustlegend(zs,XYZ)
+
         if "mbw alpha and beta" in xtype: xs_t = [f"alpha:({x[0]}),beta({x[1]})" for x in xs ]
         if "mbw alpha and beta" in ytype: ys_t = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
 
@@ -464,6 +464,14 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     state_mergen = False
     return "Finished",currentmodel,xyzimage,*image_temp[1:4]
+
+def ajustlegend(ws,xyz):
+    if "pinpoint adjust" in xyz:
+        for i, s in enumerate(ws):
+            if "COL1" == s:ws[i] = "COL1(Cyan-Red)"
+            if "COL2" == s:ws[i] = "COL2(Magenta-Green)"
+            if "COL3" == s:ws[i] = "COL3(Yellow-Blue)"
+    return ws
 
 def smakegrid(imgs,xs,ys,currentmodel,p):
     xs = [makemultilineweight(x) for x in xs]

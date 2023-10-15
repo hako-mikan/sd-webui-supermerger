@@ -1,5 +1,6 @@
 from random import choices
 import re
+import launch
 from sklearn.linear_model import PassiveAggressiveClassifier
 import torch
 import tqdm
@@ -39,6 +40,9 @@ def to26(ratios):
     for i, id in enumerate(ids):
         output[BLOCKID26.index(id)] = ratios[i]
     return output
+
+def f_changediffusers(version):
+    launch.run_pip(f"install diffusers=={version}", f"diffusers ver {version}")
 
 def on_ui_tabs():
     import lora
@@ -107,14 +111,23 @@ def on_ui_tabs():
         sml_selectall.click(fn = lambda x:gr.update(value = selectable),outputs = [sml_loras])
         sml_deselectall.click(fn = lambda x:gr.update(value =[]),outputs = [sml_loras])
 
+        with gr.Row():
+            changediffusers = gr.Button(elem_id="change diffusers version", value="change diffusers version",variant='primary')
+            dversion = gr.Textbox(label="diffusers version",lines=1,visible =True,interactive  = True)  
         components.sml_loranames = [sml_loras, sml_loranames, hidenb]
+
+        changediffusers.click(
+            fn=f_changediffusers,
+            inputs=[dversion],
+            outputs=[sml_submit_result]
+        )
 
         sml_merge.click(
             fn=lmerge,
             inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,precision,sml_metasettings],
             outputs=[sml_submit_result]
         )
-
+        
         sml_makelora.click(
             fn=makelora,
             inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings,alpha,beta,precision,sml_metasettings],

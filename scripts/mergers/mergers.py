@@ -61,8 +61,8 @@ def freezemtime():
     stopmerge = True
 
 mergedmodel=[]
-FINETUNEX = ["IN","OUT","OUT2","CONT","COL1","COL2","COL3"]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,COL1,COL2,,COL3)","calcmode","prompt","random"]
+FINETUNEX = ["IN","OUT","OUT2","CONT","BRI","COL1","COL2","COL3"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)","calcmode","prompt","random"]
 TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","adjust","pinpoint adjust","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
@@ -260,12 +260,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
 
-    #adjust
-    if fine.rstrip(",0") != "":
-        fine = fineman(fine)
-    else:
-        fine = ""
-
     caster(mergedmodel,False)
 
     result_is_inpainting_model = False
@@ -313,6 +307,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     theta_1=load_model_weights_m(model_b,2,cachetarget).copy()
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
+
+    #adjust
+    if fine.rstrip(",0") != "":
+        fine = fineman(fine,isxl)
+    else:
+        fine = ""
 
     if isxl and useblocks:
         if len(weights_a) == 25:
@@ -701,6 +701,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
 
     caster(mergedmodel,False)
+    if "Reset CLIP ids" in save_sets: resetclip(theta_0)
 
     if True: # always set metadata. savemodel() will check save_sets later
         merge_recipe = {
@@ -742,6 +743,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
 
     return "",currentmodel,modelid,theta_0,metadata
+
+######################################################################
+############ sub functions
 
 def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear):  
     lock_theta_0 = Lock()
@@ -1095,6 +1099,8 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     if s_w: p.width = s_w
     if s_h: p.height = s_h
 
+    if not p.cfg_scale: p.cfg_scale = 7
+
     p.scripts = scripts.scripts_txt2img
     p.script_args = txt2imgparams[paramsnames.index("Override settings")+1:]
                 
@@ -1226,11 +1232,11 @@ def blockfromkey(key,isxl):
 
     return "Not Merge", "Not Merge"
 
-def fineman(fine):
+def fineman(fine,isxl):
     if fine.find(",") != -1:
         tmp = [t.strip() for t in fine.split(",")]
-        fines = [0.0]*7
-        for i,f in enumerate(tmp[0:7]):
+        fines = [0.0]*8
+        for i,f in enumerate(tmp[0:8]):
             try:
                 f = float(f)
                 fines[i] = f
@@ -1247,9 +1253,17 @@ def fineman(fine):
         1 - fine[1] * 0.01,
         1+ fine[1] * 0.02,
         1 - fine[2] * 0.01,
-        [x*0.02 for x in fine[3:7]]
-                ]
+        [fine[3]*0.02] + colorcalc(fine[4:8],isxl)
+        ]
     return fine
+
+def colorcalc(cols,isxl):
+    colors = COLSXL if isxl else COLS
+    outs = [[y * cols[i] * 0.02 for y in x] for i,x in enumerate(colors)]
+    return [sum(x) for x in zip(*outs)]
+
+COLS = [[-1,1/3,2/3],[1,1,0],[0,-1,-1],[1,0,1]]
+COLSXL = [[0,0,1],[1,0,0],[-1,-1,0],[-1,1,0]]
 
 def weighttoxl(weight):
     weight = weight[:9] + weight[12:22] +[0]
@@ -1263,3 +1277,17 @@ FINETUNES = [
 "model.diffusion_model.out.2.weight",
 "model.diffusion_model.out.2.bias",
 ]
+
+def resetclip(theta):
+    idkey = "cond_stage_model.transformer.text_model.embeddings.position_ids"
+    broken = []
+    if idkey in theta.keys():
+        correct = torch.Tensor([list(range(77))]).to(torch.int64)
+        current = theta[idkey].to(torch.int64)
+
+        broken = correct.ne(current)
+        broken = [i for i in range(77) if broken[0][i]]
+
+        if broken != []: print("Clip IDs broken and fixed: ",broken)
+        
+        theta[idkey] = correct
