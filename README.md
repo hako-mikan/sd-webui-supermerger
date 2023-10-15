@@ -9,8 +9,10 @@
 2023.10.15  
 Adjust機能が改良されました。CD TunerのようにBrightness, Cyan-Red, Magenta-Gree, Yellow-Blueのような色指定に変わります。  
 その他バグfix  
+自動でClip Idのリセットを行うオプションを追加
 Adjust feature was improved, changed to "Brightness, Cyan-Red, Magenta-Gree, Yellow-Blue" like CD Tuner  
 other bug fixes were added.
+Added option to reset CLIP Ids.
 
 2023.10.03 
 [Merge function of metadata for LoRAs is changed.](#Metadata)
