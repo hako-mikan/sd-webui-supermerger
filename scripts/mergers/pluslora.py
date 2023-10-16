@@ -1679,10 +1679,11 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
         metadata["ss_network_module"] = networkModule
 
     # output名とprecision、dimは変更された可能性がある
-    if "without" in metasets:
+    if "without" not in metasets:
         metadata["ss_output_name"] = lname
     else:
-        del metadata["ss_output_name"]
+        if "ss_output_name" in metadata:
+            del metadata["ss_output_name"]
     metadata["ss_mixed_precision"] = lprecision
 
     # metadataで保存できる形式に変換
