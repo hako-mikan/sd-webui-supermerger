@@ -1646,7 +1646,7 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
     if "first" in metasets:
         # 単なるweightマージならそのままコピー
         metadata = lmetas[0]
-    elif "create new" == metasets:
+    elif "new" in metasets:
         new = {}
         for key in MINIMUM_METADATA:
             if key in lmetas[0].keys():
@@ -1694,9 +1694,6 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
     model_hash, legacy_hash = precalculate_safetensors_hashes( sd, metadata )
     metadata[ "sshs_model_hash" ] = model_hash
     metadata[ "sshs_legacy_hash" ] = legacy_hash
-
-    for key in metadata:
-        print(key,metadata[key])
 
     return metadata
 
