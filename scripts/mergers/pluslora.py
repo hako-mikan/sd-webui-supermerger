@@ -88,7 +88,7 @@ def on_ui_tabs():
             beta = gr.Slider(label=" beta", minimum=-1.0, maximum=2, step=0.001, value=1)
         with gr.Row(equal_height=False):
             sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
-            sml_metasettings = gr.Radio(value = "create new",choices = ["create new","create new without filename" "merge","save all", "use first lora"], label="metadata")
+            sml_metasettings = gr.Radio(value = "create new",choices = ["create new","create new without filename", "merge","save all", "use first lora"], label="metadata")
             precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
         with gr.Row(equal_height=False):
             sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
