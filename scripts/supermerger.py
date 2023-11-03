@@ -152,7 +152,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Adjust settings", open=False):
                         with gr.Row(variant="compact"):
-                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,COL1,COL2,COL3,Brightness", visible=True, value="", lines=1)
+                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,Brightness,COL1,COL2,COL3", visible=True, value="", lines=1)
                             finetune_write = gr.Button(value="↑", elem_classes=["tool"])
                             finetune_read = gr.Button(value="↓", elem_classes=["tool"])
                             finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
@@ -168,6 +168,7 @@ def on_ui_tabs():
                                 contrast = gr.Slider(label="Contrast", minimum=-10, maximum=10, step=0.01, value=0, info="Contrast/Detail")
                             with gr.Column(scale=1, min_width=100):
                                 bri = gr.Slider(label="Brightness", minimum=-10, maximum=10, step=0.01, value=0, info="Dark(Minius)-Bright(Plus)")
+                        with gr.Row(variant="compact"):
                             with gr.Column(scale=1, min_width=100):
                                 col1 = gr.Slider(label="Cyan-Red", minimum=-10, maximum=10, step=0.01, value=0, info="Cyan(Minius)-Red(Plus)")
                             with gr.Column(scale=1, min_width=100):
