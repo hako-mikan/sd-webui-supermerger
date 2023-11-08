@@ -498,7 +498,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     theta_0_a = theta_1[key]
                 elif current_alpha !=0:
                     caster(f"{num}, {block}, {key}, {model_a}*{1-current_alpha}+{model_b}*{current_alpha}",hear)
-                    theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
+                    if "lerp" in mode:
+                        theta_0_a = torch.lerp(theta_0_a.to(torch.float32), theta_1[key].to(torch.float32), current_alpha).to(theta_0_a.dtype)
+                    else:
+                        theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
 
             if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
                 theta_0[key][:, 0:4, :, :] = theta_0_a
@@ -861,6 +864,7 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
     # for compatible
     mode_info = {
         "Weight sum": "Weight sum:A*(1-alpha)+B*alpha",
+        "Weight sum(lerp)": "Weight sum:A*(1-alpha)+B*alpha",
         "Add difference": "Add difference:A+(B-C)*alpha",
         "Triple sum": "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
         "sum Twice": "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",

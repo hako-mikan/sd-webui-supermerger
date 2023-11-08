@@ -83,7 +83,7 @@ def on_ui_tabs():
                         model_c = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model C",interactive=True)
                         create_refresh_button(model_c, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
 
-                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha") 
+                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Weight sum(lerp)", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha")
                     calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
                     with gr.Row(variant="compact"):
                         with gr.Column(scale = 1):
@@ -494,6 +494,7 @@ def on_ui_tabs():
 
         mode_info = {
             "Weight sum": "A*(1-alpha)+B*alpha",
+            "Weight sum(lerp)": "A*(1-alpha)+B*alpha",
             "Add difference": "A+(B-C)*alpha",
             "Triple sum": "A*(1-alpha-beta)+B*alpha+C*beta",
             "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
