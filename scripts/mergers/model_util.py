@@ -27,6 +27,7 @@ UNET_PARAMS_OUT_CHANNELS = 4
 UNET_PARAMS_NUM_RES_BLOCKS = 2
 UNET_PARAMS_CONTEXT_DIM = 768
 UNET_PARAMS_NUM_HEADS = 8
+# UNET_PARAMS_USE_LINEAR_PROJECTION = False
 
 VAE_PARAMS_Z_CHANNELS = 4
 VAE_PARAMS_RESOLUTION = 256
@@ -39,6 +40,7 @@ VAE_PARAMS_NUM_RES_BLOCKS = 2
 # V2
 V2_UNET_PARAMS_ATTENTION_HEAD_DIM = [5, 10, 20, 20]
 V2_UNET_PARAMS_CONTEXT_DIM = 1024
+# V2_UNET_PARAMS_USE_LINEAR_PROJECTION = True
 
 # Diffusersの設定を読み込むための参照モデル
 DIFFUSERS_REF_MODEL_ID_V1 = "runwayml/stable-diffusion-v1-5"
@@ -402,8 +404,9 @@ def convert_ldm_unet_checkpoint(v2, checkpoint, config):
 
         new_checkpoint[new_path] = unet_state_dict[old_path]
 
-  # SDのv2では1*1のconv2dがlinearに変わっているので、linear->convに変換する
-  if v2:
+  # SDのv2では1*1のconv2dがlinearに変わっている
+  # 誤って Diffusers 側を conv2d のままにしてしまったので、変換必要
+  if v2 and not config.get("use_linear_projection", False):
     linear_transformer_to_conv(new_checkpoint)
 
   return new_checkpoint
@@ -512,7 +515,8 @@ def convert_ldm_vae_checkpoint(checkpoint, config):
     conv_attn_to_linear(new_checkpoint)
     return new_checkpoint
 
-def create_unet_diffusers_config(v2):
+
+def create_unet_diffusers_config(v2, use_linear_projection_in_v2=False):
   """
   Creates a config for the diffusers based on the config of the LDM model.
   """
@@ -544,7 +548,10 @@ def create_unet_diffusers_config(v2):
       layers_per_block=UNET_PARAMS_NUM_RES_BLOCKS,
       cross_attention_dim=UNET_PARAMS_CONTEXT_DIM if not v2 else V2_UNET_PARAMS_CONTEXT_DIM,
       attention_head_dim=UNET_PARAMS_NUM_HEADS if not v2 else V2_UNET_PARAMS_ATTENTION_HEAD_DIM,
+      # use_linear_projection=UNET_PARAMS_USE_LINEAR_PROJECTION if not v2 else V2_UNET_PARAMS_USE_LINEAR_PROJECTION,
   )
+  if v2 and use_linear_projection_in_v2:
+    config["use_linear_projection"] = True
 
   return config
 
@@ -801,7 +808,7 @@ def filenamecutter(name,model_a = False):
     return name
 
 # TODO dtype指定の動作が怪しいので確認する text_encoderを指定形式で作れるか未確認
-def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
+def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, device="cpu", dtype=None, unet_use_linear_projection_in_v2=True):
   import diffusers
   print("diffusers version : ",diffusers.__version__)
 
@@ -812,10 +819,10 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
         state_dict[k] = v.to(dtype)
 
   # Convert the UNet2DConditionModel model.
-  unet_config = create_unet_diffusers_config(v2)
+  unet_config = create_unet_diffusers_config(v2, unet_use_linear_projection_in_v2)
   converted_unet_checkpoint = convert_ldm_unet_checkpoint(v2, state_dict, unet_config)
 
-  unet = diffusers.UNet2DConditionModel(**unet_config)
+  unet = diffusers.UNet2DConditionModel(**unet_config).to(device)
   info = unet.load_state_dict(converted_unet_checkpoint)
   print("loading u-net:", info)
 
@@ -858,7 +865,32 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, dtype=None):
     info = text_model.load_state_dict(converted_text_encoder_checkpoint, strict=False)
   else:
     converted_text_encoder_checkpoint = convert_ldm_clip_checkpoint_v1(state_dict)
-    text_model = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14")
+
+    # logging.set_verbosity_error()  # don't show annoying warning
+    # text_model = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+    # logging.set_verbosity_warning()
+    # print(f"config: {text_model.config}")
+    cfg = CLIPTextConfig(
+        vocab_size=49408,
+        hidden_size=768,
+        intermediate_size=3072,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        max_position_embeddings=77,
+        hidden_act="quick_gelu",
+        layer_norm_eps=1e-05,
+        dropout=0.0,
+        attention_dropout=0.0,
+        initializer_range=0.02,
+        initializer_factor=1.0,
+        pad_token_id=1,
+        bos_token_id=0,
+        eos_token_id=2,
+        model_type="clip_text_model",
+        projection_dim=768,
+        torch_dtype="float32",
+    )
+    text_model = CLIPTextModel._from_config(cfg)
     info = text_model.load_state_dict(converted_text_encoder_checkpoint, strict=False)
   print("loading text encoder:", info)
 
