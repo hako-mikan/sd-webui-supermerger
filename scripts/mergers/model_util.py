@@ -5,7 +5,7 @@ from transformers import CLIPTextModel,  CLIPTextConfig
 from safetensors.torch import load_file
 import safetensors.torch
 import threading
-from modules import shared
+from modules import shared, sd_hijack
 from modules.sd_models import read_state_dict
 try:
   from modules import sd_models_xl
@@ -727,7 +727,12 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
 
         if shared.sd_model is not None:
             print("load from shared.sd_model..")
+            # restore textencoder
+            sd_hijack.model_hijack.undo_hijack(shared.sd_model)
+
             state_dict = shared.sd_model.state_dict()
+
+            sd_hijack.model_hijack.hijack(shared.sd_model)
         else:
             return "No current loaded model found"
 
