@@ -4,6 +4,7 @@
 - [cosineA/cosineB](#cosine)
 - [trainDifference](#train)
 - [smoothAdd](#smooth)
+- [extract](#extract)
 - [tensor](#tensor)
 
 ## normal
@@ -173,6 +174,41 @@ _Note also compared with either the Median/Guassin filters individually how you 
 >**TIP**
 >Sometimes you may want to use this smooth Add difference as an alternative to the regular, even without the risk of burning.
 >In these cases you could increase the Alpha up to 2, as smooth Add at 1 is a lower impact change individually than regular Add, but this of course depends on your desired outcome.
+
+### extract
+### xFed Feature Extraction method
+
+xFed is a cutting-edge tool designed for the extraction of similar or dissimilar features from differential models of the same machine learning architecture. It is particularly useful for isolating elements learned uniquely by models, such as "red object", "green object", or "apple", when trained on different datasets or with different learning objectives.
+
+#### How to Use
+
+1. **Prepare Your Models**: Before using xFed, you need to have the weights of your base model(model A) and the two differential models (B and C) that have been fine-tuned or adapted from the base model. 
+
+2. **Select Model Weights**:
+    - **Model_A**: Use the dropdown to select the path to the base model weights tensor.
+    - **Model_B**: Use the dropdown to select the path to model B's weights tensor.
+    - **Model_C**: Use the dropdown to select the path to model C's weights tensor.
+
+3. **Configure Parameters**:
+    - **α (alpha)**: Adjust the slider to set the value of α. Setting α to 0 will extract components from B that are (dis)similar to C, while setting α to 1 will do the reverse.
+    - **β (beta)**: Adjust the slider to toggle between extracting similar and dissimilar features. B β of 0 extracts similar features, and a β of 1 extracts dissimilar features.
+    - **option (smoothness)**: Adjust the slider to set the smoothness level, which affects the rectification of cosine similarity from the interval [-1, 1] to [0, 1].
+
+### Notes
+- The alpha (α), beta (β), and smoothness (σ) parameters allow fine-grained control over the feature extraction process, enabling you to tailor the results to your specific needs.
+
+### Example Configuration
+
+- **Checkpoint Name**: `extracted_features_red_apple`
+- **Model A**: `base_model`
+- **Model B**: `red_apple_model`
+- **Model C**: `green_apple_model`
+- **α**: `0.0`
+- **β**: `0.5`
+- **σ**: `0.0`
+
+With this configuration, if α is set to 0, β is set to 0.5, and σ is set to 0, the result will be equivalent to `Model A + (a - Model A) * 0.5`. This would extract features that are midway between the model A and model B, emphasizing features learned exclusively by model B.
+
 
 ## tensor
 ### Available modes : weight sum only
