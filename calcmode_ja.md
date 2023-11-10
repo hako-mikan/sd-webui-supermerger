@@ -1,4 +1,4 @@
-## Calculation method
+## 計算手法
 
 - [normal](#normal)
 - [cosineA/cosineB](#cosine)
@@ -9,47 +9,46 @@
 
 ## normal
 ### _Available modes :_ All
-Normal calculation method. Can be used in all modes.
+通常の計算方法です。全てのモードで使用できます。
 
 ## <a id="cosine">cosineA/cosineB</a>
 ### _Available modes :_ weight sum
-The comparison of two models is performed using cosine similarity, centered on the set ratio, and is calculated to eliminate loss due to merging. See below for further details.
+2つのモデルの比較は、設定された比率を中心にコサイン類似度を使用して行われ、マージによる損失を排除するために計算されます。詳細については以下を参照してください。
 https://github.com/hako-mikan/sd-webui-supermerger/issues/33 https://github.com/recoilme/losslessmix
 
-The original simple weight mode is the most basic method and works by linearly interpolating between the two models based on a given weight alpha. At alpha = 0, the output is the first model (model A), and at alpha = 1, the output is the second model (model B). Any other value of alpha results in a weighted average of the two models.
-- Original merge results between AnythingV3 and FeverDream model  
+元のシンプルな重みモードは最も基本的な方法で、与えられた重みアルファに基づいて2つのモデル間で線形に補間します。アルファが0の場合、出力は最初のモデル（モデルA）で、アルファが1の場合、出力は二番目のモデル（モデルB）です。アルファの他の値は、2つのモデルの重み付き平均になります。
+
+- AnythingV3とFeverDreamモデルの元のマージ結果 
 `charming girl mid-shot. scenery-beautiful majestic`
 ![MergeStandard](https://user-images.githubusercontent.com/6239068/232734670-958a6db3-1022-49ed-af73-f777223e71e6.png)
 
-One key advantage of the cosine methods over the original simple weight mode is that they take into account the structural similarity between the two models, which can lead to better results when the two models are similar but not identical. Another advantage of the cosine methods is that they can help prevent overfitting and improve generalization by limiting the amount of detail from one model that is incorporated into the other.
+コサイン手法の一つの大きな利点は、元のシンプルな加算と比べて、2つのモデル間の構造的な類似性を考慮に入れる点です。これにより、2つのモデルが似ているが同一ではない場合に、より良い結果が得られる可能性があります。また、コサイン手法のもう一つの利点は、一方のモデルから他方へ組み込まれる詳細の量を制限することで、過学習を防ぎ、一般化を改善するのに役立つ点です。
 
-**In the case of CosineA**, we normalize the vectors of the first model (model A) before merging, so the resulting merged model will favor the structure of the first model while incorporating details from the second model. This is because we are essentially aligning the direction of the first model's vectors with the direction of the corresponding vectors in the second model.
-- CosineA merge results between AnythingV3 and FeverDream model
-_Note structure-wise the pose direction/flow and face area_
+**CosineAの場合**, 最初のモデル（モデルA）のベクトルをマージする前に正規化するため、結果として得られるマージモデルは、第一モデルの構造を優先しつつ、第二モデルからの詳細を組み込むことになります。これは、基本的に第一モデルのベクトルの方向を、第二モデルの対応するベクトルの方向に合わせているからです。
+- AnythingV3とFeverDreamのマージ結果。
+_ポーズの方向・流れと顔の領域に関して構造的な注意点を覚えておいてください。_
 ![MergeCosineA](https://user-images.githubusercontent.com/6239068/232741979-f40450ab-6006-47e5-ae00-cf5e89b7ac09.png)
 
 
-_Detail-wise for example note how above and below, in all cases there's more blur preserved for the background compared to foreground, instead of the linear difference in the original merge._
+_描き込みに関して上下を比べると、すべての場合において、通常のマージの線形な変化とは異なり、背景に対して前景よりもより多くのぼかしが保持されている点に注意してください。_
 
-**On the other hand, in CosineB**, we normalize the vectors of the second model (model B) before merging, so the resulting merged model will favor the structure of the second model while incorporating details from the first model. This is because we are aligning the direction of the second model's vectors with the direction of the corresponding vectors in the first model.
-- CosineB merge results between AnythingV3 and FeverDream model
-_Note structure-wise the pose direction/flow and face area, and how in the background it tried to keep the form more from the right too_
+**CosineBの場合**一方で、CosineBでは、マージする前に第二モデル（モデルB）のベクトルを正規化するため、結果として得られるマージモデルは、第二モデルの構造を優先しつつ、第一モデルからの詳細を組み込むことになります。これは、第二モデルのベクトルの方向を、第一モデルの対応するベクトルの方向に合わせているためです。
+- AnythingV3とFeverDreamのマージ結果
+_構造的には、ポーズの方向・流れと顔の領域に注目し、背景では右側からの形状をより保持しようとしている点にも注意してください。_
 ![MergeCosineB](https://user-images.githubusercontent.com/6239068/232744751-20786eff-a654-468c-93e7-c19db5829c69.png)
 
-**In summary, the choice between CosineA and CosineB depends on which model's structure you want to prioritize in the resulting merged model. If you want to prioritize the structure of the first model, use CosineA. If you want to prioritize the structure of the second model, use CosineB.**
+**要約すると、CosineAとCosineBの選択は、結果として得られるマージモデルでどちらのモデルの構造を優先したいかに依存します。もし第一モデルの構造を優先したい場合はCosineAを使用し、第二モデルの構造を優先したい場合はCosineBを使用します。**
 
-Note also how the second model is more the 'reference point' for the merging looking at Alpha 1 compared to the changes at 0, so the order of models can also change the end result to look for your desired output.
-- CosineA merge results between FeverDream and AnythingV3 model
+また、Alpha 1での変化と比較して第二モデルがマージングの「参照点」となっていることにも注目してください。したがって、モデルの順序も変更することで、望ましい出力を得るための最終結果に影響を与える可能性があります。
+- FeverDreamとAnythingV3のマージ結果
 ![MergeOppositeCosineA](https://user-images.githubusercontent.com/6239068/232741034-ce3c9739-7f5a-4a7d-b979-fec4ac7d9b71.png)
 
 ## <a id="train">trainDifference</a>
 ### _Available modes :_ Add difference
-This method at its simplest, can be thought of as a 'super Lora' for permanent merges,
-it no longer adds the calculated difference between (B)-(C) models to model (A),
-now it 'trains' that difference as if it was finetuning it relative to model (A).
+この方法は、そのもっとも単純な形では、「永続的なマージのためのスーパーローラ」と考えることができます。これにより、モデル（B）と（C）の間の計算された差をモデル（A）に加えるのではなく、その差をモデル（A）に対して微調整しているかのように「訓練」します。
 
-### Comparisons
-- **Regular addDifference vs trainDifference**
+### 比較
+- **通常の addDifference（差分の追加） と trainDifference（差分の訓練） の違い**
 With [rev animated](https://civitai.com/models/7371/rev-animated) and [isometric-future](https://civitai.com/models/10063/isometric-future)  
 *"IsometricFuture, garden, IsometricFuture"*  
 **Generated with addDifference ('rev animated')+('isometric future'-'sdv1.5')**   
@@ -65,155 +64,122 @@ With [rev animated](https://civitai.com/models/7371/rev-animated) and [anything 
 **Generated with trainDifference ('rev animated')+('anything v3'-'sdv1.4')**  
 ![FaceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/872259c4-af29-4624-ac65-a820d5edfd33)  
 - **Lora vs trainDifference**
-Lora's obviously aren't invalidated by this because of their utility, plug-and-play flexibility, etc.
-However it's often discussed how some models 'don't work well' with Lora's, and you've got some models like 'AnyLoRA' which was developed for that user on civitai to train their Lora's with in relation to this. You can see how to take advantage of this and trainDifference [here](#LoramergingfortrainDifference).
-Using [FeverDream](https://civitai.com/models/26396?modelVersionId=32375) (a model definitely further away from the 'compatibility' an anime Lora would require), and [Thicker Lines Anime Style LoRA Mix](https://civitai.com/models/13910?modelVersionId=16368) who provided both a Lora version and pre-merged with [Anything V4.5](https://huggingface.co/andite/anything-v4.0/blob/main/anything-v4.5-pruned.safetensors) version we'll use for this, a direct comparison between the Lora on 'FeverDream' vs trainDifference ('Feverdream')+('Thicker Lines'-'Anythingv4.5') can be seen.
-We'll compare at 1/1.2/1.4/1.6 lora/merge strength, as it's easiest to see at the extremes how the Lora pulls apart compared to the train difference.
-![CompareLora](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/6ad4c28f-c282-4005-8542-2cb697790b65)
+LoRAがこのような理由から無効になるわけではありません。LoRAはその使い勝手の良さ、プラグアンドプレイの柔軟性などから、引き続き有用です。 
+
+しかし、あるモデルは「LoRAとうまく合わない」という話がよくされています。Civitaiのユーザーのために、LoRAとの関係でトレーニングできる「AnyLoRA」のようなモデルも開発されています。 この利点を生かす方法とtrainDifferenceでのトレーニング方法は[こちら](#LoramergingfortrainDifference)を参照してください。
+
+明らかにアニメ風LoRAに必要な「互換性」から距離のある[FeverDream](https://civitai.com/models/26396?modelVersionId=32375)と、LoRAバージョンと[Anything V4.5](https://huggingface.co/andite/anything-v4.0/blob/main/anything-v4.5-pruned.safetensors)との事前マージバージョンの両方を提供した[Thicker Lines Anime Style LoRA Mix](https://civitai.com/models/13910?modelVersionId=16368)を使用し、FeverDreamのLoRAとtrainDifference(FeverDream + Thicker Lines - Anythingv4.5)の直接比較を行います。
+
+LoRA強度とマージ強度を1/1.2/1.4/1.6と変化させて比較します。極端な値で、LoRAがtrainDifferenceとどう異なるかが最もわかりやすいでしょう。
 
 ### Usage guidance
-#### Possibilities and general usage
+#### 可能性と一般的な使い方
 <details>
-  <summary> Expand a model with new concepts, or reinforce existing concepts (and quality output), instead of mixing</summary>
+  <summary> マージする代わりにモデルを新しい概念で拡張するか、既存の概念(と品質の高いアウトプット)を強化する</summary>
 
-Sci-Fi Diffusion as an example https://civitai.com/models/4404?modelVersionId=4980 was trained on general sci-fi images.
-You don't have to merge/mix into it anymore, you can use this to practically train Sci-Fi into your model by trainDifferencing it against SDv1.5, you aren't limited to generating an aproximated Lora difference for expansion.
-Another example is you could cosime similarity merge [Analog Diffusion](https://civitai.com/models/1265/analog-diffusion) and [Timeless Diffusion](https://civitai.com/models/3557?modelVersionId=3936) that are similar in nature (and you wouldn't want to re-inforce the negative elements of the photographs too much) then trainDifference [Modelshoot Style](https://civitai.com/models/2147/modelshoot-style) ontop of that which focuses on medium body shots with a stronger photography foundation built by the previous merge.
-The potential for models, being able to now in a sense 'continue training' with broad models like [Surreality](https://civitai.com/models/21666?modelVersionId=25854) and [seek.art MEGA](https://civitai.com/models/1315?modelVersionId=22808) that gratefully lifted their license restrictions with V2, is now much larger than when it was limited to mixing them into models (though of course the utility for styling with different weighting of ins/outs etc all still has its value, and everything depends on your goal).
-Also models like [RPG](https://civitai.com/models/1116?modelVersionId=7133) with v5 sounding like it is being developed from SDv1.5 instead of a merge, with this can be trained into models without the heavy NSFW/female bias in many from F222/etc merges.
+Sci-Fi Diffusionは、一般的なSF画像を使ってトレーニングされたモデルです。もう他のモデルと統合する必要はなく、SDv1.5に対してtrainDifferencingを行うことで、実質的にモデルにSci-Fi要素をトレーニングすることができます。LoRAのような近似差分を生成する制限はありません。
+
+別の例として、性質が似ている[Analog Diffusion](https://civitai.com/models/1265/analog-diffusion)と[Timeless Diffusion](https://civitai.com/models/3557?modelVersionId=3936)をコサイン類似度で統合し、それに写真のネガティブな要素を強化しすぎないように注意しつつ、中距離のボディショットに焦点を当てた[Modelshoot Style](https://civitai.com/models/2147/modelshoot-style)をトレーニングすることもできます。
+
+さらに、[Surreality](https://civitai.com/models/21666?modelVersionId=25854)や[seek.art MEGA](https://civitai.com/models/1315?modelVersionId=22808)のような広範なモデルに対して、V2でライセンス制限が緩和されたおかげで、これまでよりもはるかに大きな可能性があります。もちろん、入出力の異なるウェイトでのスタイリングには依然として価値がありますが、すべては目標によって異なります。
+
+また、[RPG](https://civitai.com/models/1116?modelVersionId=7133)のようなモデルは、SDv1.5から開発されているようで、F222等の統合から生じるNSFWや女性バイアスなしでモデルにトレーニングを行うことができます。
 </details>
 <details>
-  <summary> Direction of trainDifference and style of the difference matters</summary>
+  <summary> トレーニングの差異の方向とスタイルが重要</summary>
 
-It is harder for a model to learn to be realistic, than to be stylistic.
-For example if building a model that intends to eventually be stylistic, consider having multiple model branches based on similar styles, to eventually trainDifference the stylistic branch onto the most realistic branch.
-Generally you should merge anime/cartoon > stylish > realistic, if the styles differ.
+リアリスティックなモデルをトレーニングすることは、スタイリスティックなモデルをトレーニングするよりも難しいです。たとえば、最終的にスタイリスティックなモデルを目指す場合は、似たスタイルに基づいて複数のモデルブランチを作り、最終的にスタイリスティックなブランチを最もリアリスティックなブランチに対してtrainDifferenceすることを検討してください。一般的に、スタイルが異なる場合はアニメ/カートゥーン > スタイリッシュ > リアリスティックの順で統合すべきです。
 </details>
 <details>
-  <summary> trainDifference is not always the best solution</summary>
+  <summary> trainDifferenceが常に最適解ではない</summary>
 
-Sometimes depending on the type/scope of the difference, cosine similarity merge can provide better results (if the differences aren't from SDv1.5 already, trainDifference both onto SDv1.5, and then cosine similiarity merge them from there before you trainDifference it back onto your working model).
-Also, sometimes if the material is similar but large and varied, the best result can come from using trainDifference in both directions, and then weight-sum merge between those 2 to find the best result, like [waifu diffusion](https://huggingface.co/hakurei/waifu-diffusion-v1-3) and [Acertainty](https://huggingface.co/JosephusCheung/ACertainty).
+場合によっては、差異のタイプや範囲によって、コサイン類似度による統合がより良い結果をもたらすことがあります（差異がSDv1.5からではない場合、まずSDv1.5に対してtrainDifferenceを行い、その後コサイン類似度で統合してから、作業中のモデルに対してtrainDifferenceを行います）。また、素材が似ているが広範囲にわたる場合、最良の結果を得るためには、両方向にtrainDifferenceを使用し、その2つの間で重み付き合計を行うことが最適な場合があります。例えば[waifu diffusion](https://huggingface.co/hakurei/waifu-diffusion-v1-3)や[Acertainty](https://huggingface.co/JosephusCheung/ACertainty)が該当します。
+
 </details>
 <details>
-  <summary> Gain the benefits of a trained model anywhere</summary>
+  <summary> どこでも訓練されたモデルの利点を得る</summary>
 
-Models like [knollingcase](https://civitai.com/models/1092?modelVersionId=1093) and [Bubble Toys](https://civitai.com/models/23945/bubble-toys-the-model) are cool, but their effort has been limited by the framework they were trained on. Now you can trainDifference them onto any of the newer models that people have developed.
-Additionally some people that have made checkpoints instead of Lora's mentioned trying Lora first but without getting valuable results, with trainDifference their work can still be applied onto any model.
+[Knollingcase](https://civitai.com/models/1092?modelVersionId=1093)や[Bubble Toys](https://civitai.com/models/23945/bubble-toys-the-model)のようなモデルは魅力的ですが、これらはトレーニングされたフレームワークによってその効果が限られていました。今では、これらのモデルを他の人が開発した新しいモデルにtrainDifferenceでトレーニングすることができます。
+
+さらに、LoRAではなくチェックポイントを作成した人々の中には、最初にLoRAを試したものの有益な結果を得られなかったと述べている人もいますが、trainDifferenceを使えば彼らの作業をどのモデルにも適用することができます。
 </details>
 
-#### Limitations and what to avoid/problems and solutions
+#### 限界と避けるべきこと
 <details>
-  <summary> Knowing and having access to the origin of the model pre-training is required</summary>
-
-A lot of models have some mix of SDv1.4 now. This trainDifference merge is accurate enough that, if you were to try and for example train 'rev animated' onto 'Sci-fi Diffusion' with SDv1.5 as model (C), because 'rev animated's origin is an unknown ratio between SDv1.4 and SDv1.5 (and mix of individual in/out weights too), the merge would negatively affect the output (the 'training' would be offset/distorted), but you could trainDifference 'sci-fi Diffusion' onto 'rev animated' because it was trained on SDv1.5.
+  <summary> モデルの事前トレーニングの起源を知り、アクセスすることが必要</summary>
+現在、多くのモデルがSDv1.4の何らかの混合を持っています。このtrainDifference統合は十分に正確であり、例えば「rev animated」をSDv1.5をモデル(C)として「Sci-fi Diffusion」にトレーニングしようとすると、問題が生じます。なぜなら、「rev animated」の起源はSDv1.4とSDv1.5の間の不明な比率（そして個々の入出力のウェイトの混合も）であるため、統合は出力に悪影響を与えます（「トレーニング」がずれたり歪んだりする）。しかし、「Sci-fi Diffusion」をSDv1.5でトレーニングされた「rev animated」に対してtrainDifferenceすることは可能です。
 </details>
 <details>
-  <summary> After enough time / with similar materials, 'burning'/'over training' can eventually occur</summary>
+  <summary> 十分な時間が経過すると、または類似した素材を使用すると、「焼き込み」/「過度のトレーニング」が発生する可能性がある</summary>
 
-You can 'pull back' the model at this point by cosine similarity merging it with SDv1.5, which helps ground it while keeping more qualities from the training.
+この時点で、モデルをSDv1.5とのコサイン類似度による統合によって「引き戻す」ことができます。これにより、トレーニングから得た質を保ちつつ、モデルを基盤に戻すことができます。
 </details>
 <details>
-  <summary> After enough merges, the 'clip/comprehension' can become heavy, negatively effecting simple prompts</summary>
+  <summary> 十分な量の統合が行われると、「クリップ/理解」が重くなり、シンプルなプロンプトに悪影響を与える可能性がある</summary>
 
-For example complex prompts may still look good, but 'female portrait, blue eyes' could spill the 'blue' concept too much.
-To help avoid this, as you make trainDifference merges or large scope, you can use [model toolkit](https://github.com/arenasys/stable-diffusion-webui-model-toolkit) to manipulate the clip.
-Load the final model into that extension, and create 2 different models. 'clipA' importing the clip of your base model, 'clipB' importing the clip of what you trained into it, and use a regular weightsum merge to find the best output/comprehension between those 2 models, to soften out the clip as you expand your model.
-Sometimes weightsum merging the final model with a version of it using the SDv1.5 clip can be better than mixing between clipA and clipB.
+たとえば、複雑なプロンプトは依然として良い見た目を保つかもしれませんが、「女性の肖像、青い目」といったシンプルなプロンプトでは「青」の概念が過度に現れるかもしれません。これを避けるためには、trainDifference統合や広範囲のスコープを行う際に、[model toolkit](https://github.com/arenasys/stable-diffusion-webui-model-toolkit)を使用してクリップを操作することができます。最終モデルをその拡張機能に読み込み、2つの異なるモデルを作成します。'clipA' は基本モデルのクリップをインポートし、'clipB' はトレーニングしたもののクリップをインポートします。そして、これら2つのモデル間で通常のweightsum統合を使用して、最適な出力/理解を見つけ、モデルを拡張する際にクリップを和らげます。場合によっては、最終モデルをSDv1.5のクリップを使用したバージョンとweightsum統合することが、clipAとclipBの間で混合するよりも良い結果をもたらすことがあります。
 </details>
 
 <a id="LoramergingfortrainDifference"></a>
-#### Practical demonstration
-- One of the simpler ways you can take advantage of this is for more natural/accurate Lora styling of a different model.
-In this we'll use [BreakDomainAnime](https://civitai.com/models/72675/breakdomainanime) and [Mika Pikazo Style LoRA](https://civitai.com/models/8479/mika-pikazo-style-lora) that was trained on [AnyLora](https://civitai.com/models/23900?modelVersionId=28562)
+このテキストは、AIモデルトレーニングの実践的なデモンストレーションに関する説明です。翻訳します。
+
+---
+
+#### 実践的なデモンストレーション
+- これを活用するよりシンプルな方法の一つは、異なるモデルに対してより自然で正確なLoRAスタイリングを行うことです。
+ここでは、[BreakDomainAnime](https://civitai.com/models/72675/breakdomainanime)と、[AnyLora](https://civitai.com/models/23900?modelVersionId=28562)でトレーニングされた[Mika Pikazo Style LoRA](https://civitai.com/models/8479/mika-pikazo-style-lora)を使用します。
 *"1girl, smiling, scenic background BREAK [mika-pikazo]"*
-**Generated with 'BreakDomainAnime'**  
+**'BreakDomainAnime'で生成された画像**  
 ![LoraDifferenceA](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/cbcbf1bf-c58b-4e70-b8af-1baf6d4102ce)  
-**Generated with 'BreakDomainAnime' using 'Mika Pikazo Style LoRA' at 1 strength**  
+**'Mika Pikazo Style LoRA'を1の強度で使用して'BreakDomainAnime'で生成された画像**  
 ![LoraDifferenceB](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/332a61f1-d1d1-4c84-9639-f56c94e556db)  
-Now instead of having the Lora apply over 'BreakDomainAnime', we'll use trainDifference to get a better alignment.
-Using the Lora tab of SuperMerger, Merge to Checkpoint 'Mika Pikazo Style LoRA' onto "anyloraCheckpoint_novaeFp16" (the checkpoint they describe as the one to use for training, so assumed to be what they use for their training) as "anyloraCheckpoint_mika_pikazo".
-Then **trainDifference ('BreakDomainAnime')+('Desired Lora combination merged onto AnyLora, in this case anyloraCheckpoint_mika_pikazo'-'AnyLora') to generate**  
-![LoraDifferenceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/50457b98-b2ad-4e28-a048-b023a86a2530)   
-Another more immediately visible comparison between Lora/the above technique, for a trainDifference of a background Lora that was originally trained on an anime model moved to a realistic model.
+ここでは、LoRAを'BreakDomainAnime'に適用するのではなく、trainDifferenceを使用してより良いアライメントを得ます。
+SuperMergerのLoRAタブを使用し、「Mika Pikazo Style LoRA」をトレーニング用に記述されたチェックポイント「anyloraCheckpoint_novaeFp16」（彼らがトレーニングに使用していると推測されるもの）に統合し、「anyloraCheckpoint_mika_pikazo」として保存します。
+その後 **trainDifference ('BreakDomainAnime')+('任意のLoRA組み合わせをAnyLoraに統合、この場合anyloraCheckpoint_mika_pikazo'-'AnyLora') を使用して生成**  
+![LoraDifferenceC](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/50457b98-b2ad-4e28-a048-b023a86a2530)  
+LoRAと上記の技術を使ってもう一つの例を示します。もともとアニメモデルでトレーニングされた背景LoRAをリアリスティックなモデルに移行するtrainDifferenceです。
 *"An eco-friendly residential building covered in vertical gardens in an urban setting"*  
 ![LoraTraindifferenceBackgroundExamplepng](https://github.com/hako-mikan/sd-webui-supermerger/assets/6239068/c40c1833-f166-49b5-abfe-56a28780a736)  
 
 ## <a id="smooth">smoothAdd</a>
 ### _Available modes :_ Add difference
-A method of add difference that mixes the benefits of Median and Gaussian filters, to add model differences in a smoother way trying to avoid the negative 'burning' effect that can be seen when adding too many models this way. This also achieves more than just simply adding the difference at a lower value.
+MedianフィルタとGaussianフィルタの利点を組み合わせた差分追加の方法です。この方法では、多くのモデルをこのように追加するときに見られるネガティブな「焼き付け」効果を避けつつ、よりスムーズな方法でモデルの差分を追加しようとします。これは単に差分を低い値で追加するだけでは得られない効果をもたらします。
 
-- The starting point for reference
+- 参照のための出発点
 ![Untitled-1](https://user-images.githubusercontent.com/6239068/232780130-19caa53a-a767-4ee1-80a7-dc37ad948322.png)
-- Adding a collection of models on top of it, each with a value of 1
-`The burn here is very obvious`
+- それに対して、それぞれの値が1であるモデルのコレクションを追加
+`ここでは焼き付けが非常に明白`
 ![Untitled-2](https://user-images.githubusercontent.com/6239068/232781113-3e2de251-711d-463a-82c9-a080be47e180.png)
-- Adding a collection of models on top of it, each with a value of 0.5
-`Still not an outcome I would accept, especially you can see with the bird`
+- それに対して、それぞれの値が0.5であるモデルのコレクションを追加
+`特に鳥の部分で見ると、まだ私が受け入れる結果ではありません`
 ![Untitled-3](https://user-images.githubusercontent.com/6239068/232785787-cfde6967-fc86-47e8-b208-3aa8f5f46c40.png)
 <details>
-  <summary> The functionality and result of just the Median filter</summary>
+  <summary> 単独のMedianフィルタの機能と結果</summary>
   
-- Reduces noise in the difference by replacing each value with the median of the neighboring values.
-- Preserves edges and structures in the difference, which is helpful when you want to transfer the learning related to object shapes and boundaries.
-- Non-linear filtering, which means it can better preserve the important features in the difference while reducing noise.
+- 差分のノイズを減らすために、各値を隣接する値の中央値で置き換えます。
+- 物体の形状や境界に関連する学習を転送したい場合に役立つよう、差分のエッジと構造を保存します。
+- 非線形フィルタリングであるため、差分の重要な特徴を保存しつつノイズを減らすことができます。
 ![Untitled-5](https://user-images.githubusercontent.com/6239068/232785599-1e40ee9f-43de-4721-bb5f-0c21485fd8d3.png)
 </details>
 <details>
-  <summary> The functionality and result of just the Gaussian filter</summary>
+  <summary> 単独のGaussianフィルタの機能と結果</summary>
   
-- Smooths the difference by applying a Gaussian kernel, which reduces high-frequency noise and retains the low-frequency components.
-- The level of smoothing can be controlled by the sigma parameter, allowing you to experiment with different levels of smoothing.
-- Linear filtering, which means it can better preserve the global structure in the difference while reducing noise.
+- ガウシアンカーネルを適用して差分を滑らかにし、高周波ノイズを減らし低周波成分を保持します。
+- スムージングのレベルはシグマパラメータによって制御でき、異なるレベルのスムージングを試すことができます。
+- 線形フィルタリングであるため、グローバルな構造を保存しつつノイズを減らすことができます。
 ![Untitled-4](https://user-images.githubusercontent.com/6239068/232785723-aecce7bb-1bc6-4731-a879-f8a7e4dc5a0c.png)
 </details>
 
-- The final result when instead using the combination of Median and Gaussian filters
-_Note also compared with either the Median/Guassin filters individually how you can see the top left of the mans hair in the top right image doesn't get 'stuck' when combining them here, achieving the best result overall_
+- MedianフィルタとGaussianフィルタの組み合わせを使用した最終結果
+_特に、Median/Gaussianフィルタを個別に使用した場合と比較して、右上の画像で左上の男性の髪が「固まらない」ことがわかります。ここでの組み合わせが全体的に最良の結果をもたらしています_
 ![Untitled-6](https://user-images.githubusercontent.com/6239068/232786207-f7f41c55-939e-46a1-ab24-2e6d885f65f9.png)
->**TIP**
->Sometimes you may want to use this smooth Add difference as an alternative to the regular, even without the risk of burning.
->In these cases you could increase the Alpha up to 2, as smooth Add at 1 is a lower impact change individually than regular Add, but this of course depends on your desired outcome.
-
-### extract
-### xFed Feature Extraction method
-
-xFed is a cutting-edge tool designed for the extraction of similar or dissimilar features from differential models of the same machine learning architecture. It is particularly useful for isolating elements learned uniquely by models, such as "red object", "green object", or "apple", when trained on different datasets or with different learning objectives.
-
-#### How to Use
-
-1. **Prepare Your Models**: Before using xFed, you need to have the weights of your base model(model A) and the two differential models (B and C) that have been fine-tuned or adapted from the base model. 
-
-2. **Select Model Weights**:
-    - **Model_A**: Use the dropdown to select the path to the base model weights tensor.
-    - **Model_B**: Use the dropdown to select the path to model B's weights tensor.
-    - **Model_C**: Use the dropdown to select the path to model C's weights tensor.
-
-3. **Configure Parameters**:
-    - **α (alpha)**: Adjust the slider to set the value of α. Setting α to 0 will extract components from B that are (dis)similar to C, while setting α to 1 will do the reverse.
-    - **β (beta)**: Adjust the slider to toggle between extracting similar and dissimilar features. B β of 0 extracts similar features, and a β of 1 extracts dissimilar features.
-    - **option (smoothness)**: Adjust the slider to set the smoothness level, which affects the rectification of cosine similarity from the interval [-1, 1] to [0, 1].
-
-### Notes
-- The alpha (α), beta (β), and smoothness (σ) parameters allow fine-grained control over the feature extraction process, enabling you to tailor the results to your specific needs.
-
-### Example Configuration
-
-- **Checkpoint Name**: `extracted_features_red_apple`
-- **Model A**: `base_model`
-- **Model B**: `red_apple_model`
-- **Model C**: `green_apple_model`
-- **α**: `0.0`
-- **β**: `0.5`
-- **σ**: `0.0`
-
-With this configuration, if α is set to 0, β is set to 0.5, and σ is set to 0, the result will be equivalent to `Model A + (a - Model A) * 0.5`. This would extract features that are midway between the model A and model B, emphasizing features learned exclusively by model B.
-
+>**ヒント**
+>時には、焼き付けのリスクがなくても、通常のAddとは異なるsmooth Add差分を使用したい場合があります。
+>これらのケースでは、smooth Addで1よりも個別の影響が小さいため、Alphaを2まで上げることができます。しかし、これはもちろん望む結果に依存します。
 
 ## tensor
 ### Available modes : weight sum only
-- This is an Elemental merge that goes beyond Elemental merging.
-As you know, each elemental tensor determines the features of an image in U-NET, and in normal merging, the values of each tensor are multiplied by a ratio and added together as shown below (normal). In the tensor method, the tensors are combined by dividing them by the ratio as shown in the figure below (tensor).
+通常のマージでは下図のようにテンソルの加算が行われノーマライズ(2分の1)されます。tensorではテンソルの部分部分を取り替えることによりマージが行われます。これはつまり、元のモデルのテンソルがそのまま維持されることを意味し、通常のマージとは異なる結果を得られます。tensorとtensor2の違いは、tensor2の場合、次元の大きなテンソル([1280, 1280]のような)の時のみ、2時限目を基準にして分割しますす。tensorの場合は1次元めです。
 
 ![](https://github.com/hako-mikan/sd-webui-supermerger/blob/images/tensor.jpg)
 

@@ -1,4 +1,23 @@
 # Changelog
+### 2023.10.15  
+Adjust機能が改良されました。CD TunerのようにBrightness, Cyan-Red, Magenta-Gree, Yellow-Blueのような色指定に変わります。  
+その他バグfix  
+自動でClip Idのリセットを行うオプションを追加
+Adjust feature was improved, changed to "Brightness, Cyan-Red, Magenta-Gree, Yellow-Blue" like CD Tuner  
+other bug fixes were added.
+Added option to reset CLIP Ids.
+
+### update 2023.10.03 
+[Merge function of metadata for LoRAs is changed.](#Metadata)
+
+### update 2023.09.02.1900(JST)  
+モデルキャッシュに関する仕様が変わりました。
+モデルキャッシュを設定している場合、これまではweb-ui側のモデルキャッシュを使用していましたが、web-ui側の仕様変更により使えなくなりました。
+そこで、web-ui側のモデルキャッシュを無効にしてSuperMerger側でモデルをキャッシュするように変更しました。よって、モデルキャッシュを使用する設定にしている場合、SuperMerger使用後にモデルのキャッシュが残ることになります。SuperMeger使用後はClear cacheボタンでメモリの解放を行って下さい。
+
+The specifications regarding model caching have changed. If you have set up model caching, we used to utilize the model cache on the web-ui side. However, due to changes in the web-ui specifications, this is no longer possible. Therefore, I have disabled the model cache on the web-ui side and have made changes to cache the model on the SuperMerger side instead. As a result, if you have set it to use model caching, the model cache will remain after using SuperMerger. Please clear the cache using the "Clear cache" button to free up memory after using SuperMerger.
+
+
 bug fix/以下のバグを修正しました
 - XYZ plot でseedを選択すると発生するバグ
 - not work when selecting Seed in XYZ plot
@@ -9,7 +28,7 @@ bug fix/以下のバグを修正しました
 - LOWVRAM/MEDVRAM使用時に正常に動作しない
 - bug when LOWVRAM/MEDVRAM
 
-update 2023.08.31
+### update 2023.08.31
 
 - ほぼすべてのtxt2imgタブの設定を使えるようになりました
 - Almost all txt2img tab settings are now available in generation    
@@ -25,25 +44,29 @@ Merging LoRA into the model (supported within a few days)/モデルへのLoRAの
 Cannot be done:できないこと
 Creating LoRA from model differences (TBD)/モデル差分からLoRA作成(未定)  
 
-update 2023.06.28.2000(JST)
+### update 2023.07.07.2000(JST)
+- add new feature:[Random merge](#random-merge)
+- add new feature:[Adjust detail/colors](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_en.md#adjust)
+
+### update 2023.06.28.2000(JST)
 - add Image Generation Parameters(prompt,seed,etc.)  
 for Vlad fork users, use this panel
 
-update 2023.06.27.2030
+### update 2023.06.27.2030
 - Add new calcmode "trainDifference"[detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#trainDifference) (Thanks [SwiftIllusion](https://github.com/SwiftIllusion))
 - Add Z axis for XY plot
 - Add Analysis tab for caclrating the difference of models (thanks [Mohamed-Desouki](https://github.com/Mohamed-Desouki))
 
-update 2023.06.24.0300(JST)
+### update 2023.06.24.0300(JST)
 - VAE bake feature added
 - support inpainting/pix2pix  
 Thanks [wkpark](https://github.com/wkpark)
 
-update 2023.05.02.1900(JST)
+### update 2023.05.02.1900(JST)
 - bug fix : Resolved conflict with wildcard in dynamic prompt
 - new feature : restore face and tile option added
 
-update 2023.04.19.2030(JST)
+### update 2023.04.19.2030(JST)
 - New feature, optimization using cosine similarity method updated [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#cosine)
 - New feature, tensor merge added [detail here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/calcmode_en.md#tensor)
 - New XY plot type : calcmode,prompt

@@ -1,5 +1,6 @@
 import random
 import gc
+import re
 from tracemalloc import Statistic
 import cv2
 import numpy as np
@@ -32,7 +33,7 @@ def freezetime():
 
 def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,ex_blocks,ex_elems,
                     s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                     genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
                     lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
@@ -58,7 +59,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                  useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,
+                  useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,ex_blocks,ex_elems,
                   txt2imgparams,gensets_s,lucks]
 
     from scripts.mergers.components import paramsnames
@@ -154,7 +155,7 @@ def caster(news,hear):
 
 def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,
-                  calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,
+                  calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,ex_blocks,ex_elems,
                   gensets,gensets_s,lucks):
     global hear
     esettings = " ".join(esettings)
@@ -367,6 +368,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     # plot start
 
     xyzimage=[]
+    stocker = Stocker()
     for z in zs:
         ycount = 0
         xyimage = []
@@ -397,9 +399,14 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 if type(fine_in) == list:fine_in = ",".join([str(x) for x in fine_in])
 
                 print(f"{bcolors.OKGREEN}XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount}){bcolors.ENDC}")
-                if not (((xtype=="seed") or (xtype=="prompt")) and xcount > 0):
+                
+                if "stock" in esettings: stocker.check_alpha(useblocks,alpha,weights_a_in,calcmode)
+
+                if (((xtype=="seed") or (xtype=="prompt")) and xcount > 0) or (stocker.now and stocker.stock is not None):
+                    print("Merge is skipped")
+                else:
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
-                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,deepprint = deepprint,lucks = lucks,main=mainmodel) 
+                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,optv,ex_blocks,ex_elems,deepprint,lucks,main=mainmodel) 
                     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
                     if "save model" in esettings:
                         savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
@@ -412,7 +419,14 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 if xcount == 0: statid = modelid
 
-                image_temp = simggen(*gensets_s,currentmodel,id_sets,modelid,*gensets)
+                if stocker.now and stocker.stock is not None:
+                    image_temp = stocker.stock
+                    print("Stocked image used")
+                else:
+                    image_temp = simggen(*gensets_s,currentmodel,id_sets,modelid,*gensets)
+                    if stocker.now and stocker.stock is None:
+                        stocker.stock = image_temp
+
                 gc.collect()
                 devices.torch_gc()
 
@@ -687,9 +701,9 @@ def alldealer(mens,types):
 
 def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
 
-    color_active = ImageColor.getcolor(opts.grid_text_active_color, 'RGB')
-    color_inactive = ImageColor.getcolor(opts.grid_text_inactive_color, 'RGB')
-    color_background = ImageColor.getcolor(opts.grid_background_color, 'RGB')
+    color_active = ImageColor.getcolor(getattr(opts,"grid_text_inactive_color","#000000"), 'RGB')
+    color_inactive = ImageColor.getcolor(getattr(opts,"grid_text_inactive_color","#999999"), 'RGB')
+    color_background = ImageColor.getcolor(getattr(opts,"grid_background_color","#ffffff"), 'RGB')
 
     def wrap(drawing, text, font, line_length):
         lines = ['']
@@ -788,3 +802,19 @@ def mainmodeldealer(xyz):
         if "B" in xyz:abc[1] = False       
         if "C" in xyz:abc[2] = False
     return abc
+
+
+class Stocker:
+    def __init__(self):
+        self.stocked = False
+        self.stock = None
+        self.now = False
+
+    def check_alpha(self,useblocks, alpha,weights_a_in,calcmode):
+        now = False
+        if "cosine" not in calcmode:
+            if useblocks:
+                if re.fullmatch(r"^(0,)+$", weights_a_in): now = True
+            else:
+                if float(alpha) == 0: now = True
+        self.now = now

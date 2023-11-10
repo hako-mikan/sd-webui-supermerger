@@ -1,6 +1,3 @@
-- [Elemental](#elementalmerge)
-- [Adjust](#adjust)
-
 # Elemental Merge
 - 階層マージを越えた階層マージです
 
@@ -65,41 +62,6 @@ elemental用のXY plotを複数用意しています。入力例はsample.txtに
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample5-1.jpg)
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample5-2.jpg)
 
-# Adjust
-モデルの描き込み量や色調を補正します。LoRAとは異なる仕組みを用いています。U-Netの入出力に当たる部分を調整することで画像の描き込みや色調を調節します。
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample0.jpg)
-## 使い方
-Elemental, AdjustのAdjust欄で設定します。空欄の場合無視されます。
-入力は7つの数値をカンマで区切って入力して下さい。  
-```
-0,0,0,0,0,0
-```
-が基本であり、ここから数値をずらすと効果が現れます。
-### 各設定値
-7つの数値は  
-1. 描き込み量/ノイズ 
-2. 描き込み量/ノイズ
-3. 描き込み量/ノイズ
-4. コントラスト/描き込み
-5. 色調1
-6. 色調2
-7. 色調3
-
-に対応します。 
-描き込み量が増えると必然的にノイズも増えることになるので気を付けてください。また、Hires.fix使用時では出力が違って見える場合があるので想定される設定で試すことをおすすめします。
-数値は大体5までの値を入れるとちょうど良いはずですがそこはモデルにも依存します。正の値を入力すると描き込みが増えたりします。色調に関しては三種類あり、概ねカラーバランスに対応しているようです。
-
-#### 1,2,3 描き込み量/ノイズ
-1.はU-Netの入り口に相当する部分です。ここを調節すると画像の描き込み量が調節できます。ここはOUTに比べて構図が変わりやすいです。マイナスにするとフラットに、そして少しぼけた感じに。プラスにすると描き込みが増えノイジーになります。通常の生成でノイジーでもhires.fixできれいになることがあるので注意してください。2,3はOUTに相当する部分です。
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample1.jpg)
-
-#### 4.コントラスト/描き込み量
-ここを調節するとコントラストや明るさがかわり、同時に描き込み量も変わります。サンプルを見てもらった方が早いですね。
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample3.jpg)
-
-#### 5,6,7 色調
-色調を補正できます。概ねカラーバランスに対応するようです。
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample5.jpg)
 
 ### 要素一覧
 基本的にはattnが顔や服装の情報を担っているようです。特にIN07,OUT03,OUT04,OUT05層の影響度が強いようです。階層によって影響度が異なることが多いので複数の層の同じ要素を同時に変化させることは意味が無いように思えます。

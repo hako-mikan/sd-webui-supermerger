@@ -1,4 +1,3 @@
-from linecache import clearcache
 import random
 import os
 import gc
@@ -9,23 +8,25 @@ import re
 import torch
 import tqdm
 import datetime
+
 import csv
 import json
-import gradio as gr
 import launch
 import torch.nn as nn
 import scipy.ndimage
 from copy import deepcopy
-from scipy.ndimage.filters import median_filter as filter
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
+from functools import partial
+from torch import Tensor, lerp
+from torch.nn.functional import cosine_similarity, relu, softplus
 from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
-from modules.sd_models import  load_model,checkpoints_loaded,unload_model_weights
+from modules.sd_models import  load_model,unload_model_weights
 from modules.generation_parameters_copypaste import create_override_settings_dict
-from scripts.mergers.model_util import VAE_PARAMS_CH, filenamecutter,savemodel
+from scripts.mergers.model_util import filenamecutter,savemodel
 from math import ceil
 import sys
 from multiprocessing import cpu_count
@@ -66,48 +67,23 @@ TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automa
 TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","adjust","pinpoint adjust","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
+EXCLUDE_CHOICES = ["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11",
+                                  "M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11",
+                                  "Adjust","VAE"]           
+CHCKPOINT_DICT_SKIP_ON_MERGE = ["cond_stage_model.transformer.text_model.embeddings.position_ids"]
+
 #type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
 #id sets "image", "PNG info","XY grid"
 
 hear = False
 hearm = False
-non4 = [None]*4
-
-def caster(news,hear):
-    if hear: print(news)
-
-def casterr(*args,hear=hear):
-    if hear:
-        names = {id(v): k for k, v in currentframe().f_back.f_locals.items()}
-        print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
-
-def cachedealer(start):
-    if start:
-        global orig_cache
-        orig_cache = shared.opts.sd_checkpoint_cache
-        shared.opts.sd_checkpoint_cache = 0
-    else:
-        shared.opts.sd_checkpoint_cache = orig_cache
-
-def clearcache():
-    global modelcache
-    del modelcache
-    modelcache = {}
-    gc.collect()
-    devices.torch_gc()
-
-def getcachelist():
-    output = []
-    for key in modelcache.keys():
-        if hasattr(key, "model_name"):
-            output.append(key.model_name)
-    return ",".join(output)
+NON4 = [None]*4
 
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
-                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,
+                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,ex_blocks,ex_elems,
                        esettings,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                        genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
@@ -116,17 +92,17 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
                        *txt2imgparams):
 
     lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
-    deepprint  = True if "print change" in esettings else False
+    deepprint  = "print change" in esettings
 
     cachedealer(True)
 
     result,currentmodel,modelid,theta_0,metadata = smerge(
                         weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,deepprint,lucks
+                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,ex_blocks,ex_elems,deepprint,lucks
                         )
 
     if "ERROR" in result or "STOPPED" in result: 
-        return result,"not loaded",*non4
+        return result,"not loaded",*NON4
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
 
@@ -151,6 +127,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
                         genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
                         currentmodel,id_sets,modelid,
                         *txt2imgparams,debug = debug)
+
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
@@ -200,12 +177,22 @@ BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8'
 RANDMAP = [0,50,100] #alpha,beta,elements
 
 statistics = {"sum":{},"mean":{},"max":{},"min":{}}
+
+################################################
+##### Main Merging Code
+
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,deepprint,lucks,main = [False,False,False]):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,opt_value,ex_blocks,ex_elems,deepprint,lucks,main = [False,False,False]):
+    
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge,statistics
     stopmerge = False
+    
+    debug = "debug" in save_sets
+    uselerp = "use old calc method" not in save_sets
+
     unload_model_weights(sd_models.model_data.sd_model)
+
     # for from file
     if type(useblocks) is str:
         useblocks = True if useblocks =="True" else False
@@ -237,11 +224,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         weights_b = wpreseter(weights_b,wpresets)
 
     # mode select booleans
-    save = True if SAVEMODES[0] in save_sets else False
     usebeta = MODES[2] in mode or MODES[3] in mode or "tensor" in calcmode
     metadata = {"format": "pt"}
 
-    if calcmode == "trainDifference" and "Add" not in mode:
+    if (calcmode == "trainDifference" or calcmode == "extract") and "Add" not in mode:
         print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
         mode = "Add"
     if model_c == "" or model_c is None:
@@ -254,16 +240,13 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine,opt_value,ex_blocks,ex_elems].copy()
 
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
     model_c = namefromhash(model_c)
 
     caster(mergedmodel,False)
-
-    result_is_inpainting_model = False
-    result_is_instruct_pix2pix_model = False
 
     #elementals
     if len(deep) > 0:
@@ -273,7 +256,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     #format check
     if model_a =="" or model_b =="" or ((not MODES[0] in mode) and model_c=="") : 
-        return "ERROR: Necessary model is not selected",*non4
+        return "ERROR: Necessary model is not selected",*NON4
     
     #for MBW text to list
     if useblocks:
@@ -282,27 +265,15 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         base_alpha  = float(weights_a_t[0])    
         weights_a = [float(w) for w in weights_a_t[1].split(',')]
         caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
-        if not (len(weights_a) == 25 or len(weights_a) == 19):return f"ERROR: weights alpha value must be 20 or 26.",*non4
+        if not (len(weights_a) == 25 or len(weights_a) == 19):return f"ERROR: weights alpha value must be 20 or 26.",*NON4
         if usebeta:
             base_beta = float(weights_b_t[0]) 
             weights_b = [float(w) for w in weights_b_t[1].split(',')]
             caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
-            if not(len(weights_b) == 25 or len(weights_b) == 19): return f"ERROR: weights beta value must be 20 or 26.",*non4
+            if not(len(weights_b) == 25 or len(weights_b) == 19): return f"ERROR: weights beta value must be 20 or 26.",*NON4
         
     caster("model load start",hearm)
-
-    print(f"  model A  \t: {model_a}")
-    print(f"  model B  \t: {model_b}")
-    print(f"  model C  \t: {model_c}")
-    print(f"  alpha,beta\t: {base_alpha,base_beta}")
-    print(f"  weights_alpha\t: {weights_a}")
-    print(f"  weights_beta\t: {weights_b}")
-    print(f"  mode\t\t: {mode}")
-    print(f"  MBW \t\t: {useblocks}")
-    print(f"  CalcMode \t: {calcmode}")
-    print(f"  Elemental \t: {deep}")
-    print(f"  Weights Seed\t: {lucks['ceed']}")
-    print(f"  Adjust \t: {fine}")
+    printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks['ceed'],fine,ex_blocks,ex_elems)
 
     theta_1=load_model_weights_m(model_b,2,cachetarget).copy()
 
@@ -326,8 +297,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         if len(weights_b) == 19: weights_b = weights_b + [0]
 
     if MODES[1] in mode:#Add
-        if stopmerge: return "STOPPED", *non4
-        if calcmode == "trainDifference":
+        if stopmerge: return "STOPPED", *NON4
+        if calcmode == "trainDifference" or calcmode == "extract":
             theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
         else:
             theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
@@ -340,7 +311,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         theta_1[key] = torch.zeros_like(theta_1[key])
             del theta_2
 
-    if stopmerge: return "STOPPED", *non4
+    if stopmerge: return "STOPPED", *NON4
     
     if  "tensor" in calcmode or "self" in calcmode:
         theta_t = load_model_weights_m(model_a,1,cachetarget).copy()
@@ -354,60 +325,28 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
         theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
     else:
-        if calcmode != "trainDifference":
+        if not (calcmode == "trainDifference" or calcmode == "extract"):
             theta_2 = {}
 
     alpha = base_alpha
     beta = base_beta
 
-    re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
-    re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
-    re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
-
-    chckpoint_dict_skip_on_merge = ["cond_stage_model.transformer.text_model.embeddings.position_ids"]
-    count_target_of_basealpha = 0
-
-    if calcmode =="cosineA": #favors modelA's structure with details from B
-        if stopmerge: return "STOPPED", *non4
-        sim = torch.nn.CosineSimilarity(dim=0)
-        sims = np.array([], dtype=np.float64)
-        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
-            # skip VAE model parameters to get better results
-            if "first_stage_model" in key: continue
-            if "model" in key and key in theta_1:
-                theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
-                theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
-                simab = sim(theta_0_norm, theta_1_norm)
-                sims = np.append(sims,simab.numpy())
-        sims = sims[~np.isnan(sims)]
-        sims = np.delete(sims, np.where(sims<np.percentile(sims, 1 ,method = 'midpoint')))
-        sims = np.delete(sims, np.where(sims>np.percentile(sims, 99 ,method = 'midpoint')))
-
-    if calcmode =="cosineB": #favors modelB's structure with details from A
-        if stopmerge: return "STOPPED", *non4
-        sim = torch.nn.CosineSimilarity(dim=0)
-        sims = np.array([], dtype=np.float64)
-        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
-            # skip VAE model parameters to get better results
-            if "first_stage_model" in key: continue
-            if "model" in key and key in theta_1:
-                simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
-                dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
-                magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
-                combined_similarity = (simab + magnitude_similarity) / 2.0
-                sims = np.append(sims, combined_similarity.numpy())
-        sims = sims[~np.isnan(sims)]
-        sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
-        sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
+    ex_elems = ex_elems.split(",")
 
     keyratio = []
     key_and_alpha = {}
 
+    ##### Stage 0/2 in Cosine
+    if "cosine" in calcmode:
+        sim, sims = precosine("A" in calcmode,theta_0,theta_1)
+
+    ##### Stage 1/2
+
     for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
-        if stopmerge: return "STOPPED", *non4
+        if stopmerge: return "STOPPED", *NON4
         if not ("model" in key and key in theta_1): continue
         if not ("weight" in key or "bias" in key): continue
-        if calcmode == "trainDifference":
+        if calcmode == "trainDifference" or calcmode == "extract":
             if key not in theta_2:
                 continue
         else:
@@ -417,9 +356,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         weight_index = -1
         current_alpha = alpha
         current_beta = beta
-
-        if key in chckpoint_dict_skip_on_merge:
-            continue
 
         a = list(theta_0[key].shape)
         b = list(theta_1[key].shape)
@@ -441,35 +377,17 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         block,blocks26 = blockfromkey(key,isxl)
         if block == "Not Merge": continue
+        if (ex_blocks or ex_elems) and excluder(blocks26,ex_blocks,ex_elems,key): continue
         weight_index = BLOCKIDXLL.index(blocks26) if isxl else BLOCKID.index(blocks26)
 
         if useblocks:
             if weight_index > 0: 
                 current_alpha = weights_a[weight_index - 1] 
-                if usebeta: current_beta = weights_b[weight_index - 1] 
+                if usebeta:
+                    current_beta = weights_b[weight_index - 1] 
 
         if len(deep) > 0:
-            skey = key + BLOCKID[weight_index]
-            for d in deep:
-                if d.count(":") != 2 :continue
-                dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
-                dbs = blocker(dbs,BLOCKID)
-                dbs,dws = dbs.split(" "), dws.split(" ")
-                dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
-                dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
-                flag = dbn
-                for db in dbs:
-                    if db in skey:
-                        flag = not dbn
-                if flag:flag = dwn
-                else:continue
-                for dw in dws:
-                    if dw in skey:
-                        flag = not dwn
-                if flag:
-                    dr = eratiodealer(dr,randomer,weight_index,num,lucks)
-                    if deepprint :print(dbs,dws,key,dr)
-                    current_alpha = dr
+            current_alpha = elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha)
 
         keyratio.append([key,current_alpha, current_beta])
         #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
@@ -483,22 +401,30 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
             if MODES[1] in mode:#Add
                 caster(f"{num}, {block}, {model_a}+{current_alpha}+*({model_b}-{model_c}),{key}",hear)
-                theta_0_a = theta_0_a + current_alpha * theta_1[key]
+  
             elif MODES[2] in mode:#Triple
                 caster(f"{num}, {block}, {model_a}+{1-current_alpha-current_beta}+{model_b}*{current_alpha}+ {model_c}*{current_beta}",hear)
                 theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key]
+
             elif MODES[3] in mode:#Twice
                 caster(f"{num}, {block}, {key},{model_a} +  {1-current_alpha} + {model_b}*{current_alpha}",hear)
                 caster(f"{num}, {block}, {key}({model_a}+{model_b}) +{1-current_beta}+{model_c}*{current_beta}",hear)
-                theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
-                theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
+                if uselerp:
+                    theta_0_a = torch.lerp(torch.lerp(theta_0_a.to(torch.float32), theta_1[key].to(torch.float32), current_alpha), theta_2[key].to(torch.float32), current_beta).to(theta_0_a.dtype)
+                else:
+                    theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
+                    theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
+
             else:#Weight
                 if current_alpha == 1:
                     caster(f"{num}, {block}, {key} alpha = 1,{model_a}={model_b}",hear)
                     theta_0_a = theta_1[key]
                 elif current_alpha !=0:
                     caster(f"{num}, {block}, {key}, {model_a}*{1-current_alpha}+{model_b}*{current_alpha}",hear)
-                    theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
+                    if uselerp:
+                        theta_0_a = torch.lerp(theta_0_a.to(torch.float32), theta_1[key].to(torch.float32), current_alpha).to(theta_0_a.dtype)
+                    else:
+                        theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
 
             if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
                 theta_0[key][:, 0:4, :, :] = theta_0_a
@@ -507,56 +433,15 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             
             del theta_0_a, a, b
 
-        elif calcmode == "cosineA": #favors modelA's structure with details from B
-            # skip VAE model parameters to get better results
+        elif "cosine" in calcmode:
             if "first_stage_model" in key: continue
-            if "model" in key and key in theta_0:
-                # Normalize the vectors before merging
-                theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
-                theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
-                simab = sim(theta_0_norm, theta_1_norm)
-                dot_product = torch.dot(theta_0_norm.view(-1), theta_1_norm.view(-1))
-                magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
-                combined_similarity = (simab + magnitude_similarity) / 2.0
-                k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-                k = k - abs(current_alpha)
-                k = k.clip(min=0,max=1.0)
-                caster(f"{num}, {block}, model A[{key}] {1-k} +  (model B)[{key}]*{k}",hear)
-                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
-
-        elif calcmode == "cosineB": #favors modelB's structure with details from A
-            # skip VAE model parameters to get better results
-            if "first_stage_model" in key: continue
-            if "model" in key and key in theta_0:
-                simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
-                dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
-                magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
-                combined_similarity = (simab + magnitude_similarity) / 2.0
-                k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-                k = k - current_alpha
-                k = k.clip(min=0,max=1.0)
-                caster(f"{num}, {block}, model A[{key}] *{1-k} + (model B)[{key}]*{k}",hear)
-                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+            cosine(calcmode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp)
 
         elif calcmode == "trainDifference":
-            # Check if theta_1[key] is equal to theta_2[key]
             if torch.allclose(theta_1[key].float(), theta_2[key].float(), rtol=0, atol=0):
                 theta_2[key] = theta_0[key]
                 continue
-
-            diff_AB = theta_1[key].float() - theta_2[key].float()
-
-            distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
-            distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
-
-            sum_distances = distance_A0 + distance_A1
-
-            scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
-            sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
-            scale = sign_scale * torch.abs(scale)
-
-            new_diff = scale * torch.abs(diff_AB)
-            theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
+            traindiff(key,current_alpha,theta_0,theta_1,theta_2)
 
         elif calcmode == "smoothAdd":
             caster(f"{num}, {block}, model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
@@ -571,97 +456,24 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         elif calcmode == "smoothAdd MT":
             key_and_alpha[key] = current_alpha
 
-        elif calcmode == "tensor":
+        elif "tensor" in calcmode:
             dim = theta_0[key].dim()
             if dim == 0 : continue
-            if current_alpha+current_beta <= 1 :
-                talphas = int(theta_0[key].shape[0]*(current_beta))
-                talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
-                if dim == 1:
-                    theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+            tensormerge("2" not in calcmode,key,dim,theta_0,theta_1,current_alpha,current_beta)
 
-                elif dim == 2:
-                    theta_0[key][talphas:talphae,:] = theta_1[key][talphas:talphae,:].clone()
-
-                elif dim == 3:
-                    theta_0[key][talphas:talphae,:,:] = theta_1[key][talphas:talphae,:,:].clone()
-
-                elif dim == 4:
-                    theta_0[key][talphas:talphae,:,:,:] = theta_1[key][talphas:talphae,:,:,:].clone()
-
-            else:
-                talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
-                talphae = int(theta_0[key].shape[0]*(current_beta))
-                theta_t = theta_1[key].clone()
-                if dim == 1:
-                    theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
-
-                elif dim == 2:
-                    theta_t[talphas:talphae,:] = theta_0[key][talphas:talphae,:].clone()
-
-                elif dim == 3:
-                    theta_t[talphas:talphae,:,:] = theta_0[key][talphas:talphae,:,:].clone()
-
-                elif dim == 4:
-                    theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
-                theta_0[key] = theta_t
-
-        elif calcmode == "tensor2":
-            dim = theta_0[key].dim()
-            if dim == 0 : continue
-            if current_alpha+current_beta <= 1 :
-                talphas = int(theta_0[key].shape[0]*(current_beta))
-                talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
-                if dim > 1:
-                    if theta_0[key].shape[1] > 100:
-                        talphas = int(theta_0[key].shape[1]*(current_beta))
-                        talphae = int(theta_0[key].shape[1]*(current_alpha+current_beta))
-                if dim == 1:
-                    theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
-
-                elif dim == 2:
-                    theta_0[key][:,talphas:talphae] = theta_1[key][:,talphas:talphae].clone()
-
-                elif dim == 3:
-                    theta_0[key][:,talphas:talphae,:] = theta_1[key][:,talphas:talphae,:].clone()
-
-                elif dim == 4:
-                    theta_0[key][:,talphas:talphae,:,:] = theta_1[key][:,talphas:talphae,:,:].clone()
-
-            else:
-                talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
-                talphae = int(theta_0[key].shape[0]*(current_beta))
-                theta_t = theta_1[key].clone()
-                if dim > 1:
-                    if theta_0[key].shape[1] > 100:
-                        talphas = int(theta_0[key].shape[1]*(current_alpha+current_beta-1))
-                        talphae = int(theta_0[key].shape[1]*(current_beta))
-                if dim == 1:
-                    theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
-
-                elif dim == 2:
-                    theta_t[:,talphas:talphae] = theta_0[key][:,talphas:talphae].clone()
-
-                elif dim == 3:
-                    theta_t[:,talphas:talphae,:] = theta_0[key][:,talphas:talphae,:].clone()
-
-                elif dim == 4:
-                    theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
-                theta_0[key] = theta_t
+        elif "extract" == calcmode:
+            theta_0[key] = extract_super(theta_0[key],theta_1[key],theta_2[key],current_alpha,current_beta,opt_value)
 
         elif calcmode == "self":
             theta_0[key] = theta_0[key].clone() * current_alpha
 
+        ##### Adjust
         if any(item in key for item in FINETUNES) and fine:
             index = FINETUNES.index(key)
             if 5 > index : 
                 theta_0[key] =theta_0[key]* fine[index] 
             else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
 
-        # statistics["sum"][key] = [torch.sum(theta_0[key]).item()] if key not in statistics["sum"].keys() else statistics["sum"][key] + [torch.sum(theta_0[key]).item()]
-        # statistics["mean"][key] = [torch.mean(theta_0[key]).item()] if key not in statistics["mean"].keys() else statistics["mean"][key] + [torch.mean(theta_0[key]).item()]
-        # statistics["max"][key] = [torch.max(theta_0[key]).item()] if key not in statistics["max"].keys() else statistics["max"][key] + [torch.max(theta_0[key]).item()]
-        # statistics["min"][key] = [torch.min(theta_0[key]).item()] if key not in statistics["min"].keys() else statistics["min"][key] + [torch.min(theta_0[key]).item()]
 
     if calcmode == "smoothAdd MT":
         # setting threads to higher than 8 doesn't significantly affect the time for merging
@@ -670,21 +482,21 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         theta_0, theta_1, stopped = multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear)
         if stopped:
-            return "STOPPED", *non4
+            return "STOPPED", *NON4
 
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
 
     for key in tqdm(theta_1.keys(), desc="Stage 2/2"):
-        if key in chckpoint_dict_skip_on_merge:
+        if key in CHCKPOINT_DICT_SKIP_ON_MERGE:
             continue
         if "model" in key and key not in theta_0:
             theta_0.update({key:theta_1[key]})
 
     del theta_1
-
-    if calcmode == "trainDifference":
+    if calcmode == "trainDifference" or calcmode == "extract":
         del theta_2
 
+    ##### BakeVAE
     bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
     if bake_in_vae_filename is not None:
         print(f"Baking in VAE from {bake_in_vae_filename}")
@@ -744,8 +556,203 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     return "",currentmodel,modelid,theta_0,metadata
 
-######################################################################
-############ sub functions
+################################################
+##### cosineA/B
+def precosine(calcmode,theta_0,theta_1):
+    if calcmode: #favors modelA's structure with details from B
+        if stopmerge: return "STOPPED", *NON4
+        sim = torch.nn.CosineSimilarity(dim=0)
+        sims = np.array([], dtype=np.float64)
+        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
+            # skip VAE model parameters to get better results
+            if "first_stage_model" in key: continue
+            if "model" in key and key in theta_1:
+                theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
+                theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
+                simab = sim(theta_0_norm, theta_1_norm)
+                sims = np.append(sims,simab.numpy())
+        sims = sims[~np.isnan(sims)]
+        sims = np.delete(sims, np.where(sims<np.percentile(sims, 1 ,method = 'midpoint')))
+        sims = np.delete(sims, np.where(sims>np.percentile(sims, 99 ,method = 'midpoint')))
+    else: #favors modelB's structure with details from A
+        if stopmerge: return "STOPPED", *NON4
+        sim = torch.nn.CosineSimilarity(dim=0)
+        sims = np.array([], dtype=np.float64)
+        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
+            # skip VAE model parameters to get better results
+            if "first_stage_model" in key: continue
+            if "model" in key and key in theta_1:
+                simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
+                dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
+                magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
+                combined_similarity = (simab + magnitude_similarity) / 2.0
+                sims = np.append(sims, combined_similarity.numpy())
+        sims = sims[~np.isnan(sims)]
+        sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
+        sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
+    return sim, sims
+
+def cosine(mode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp):
+    if "A" in mode: #favors modelA's structure with details from B
+        # skip VAE model parameters to get better results
+        if "model" in key and key in theta_0:
+            # Normalize the vectors before merging
+            theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
+            theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
+            simab = sim(theta_0_norm, theta_1_norm)
+            dot_product = torch.dot(theta_0_norm.view(-1), theta_1_norm.view(-1))
+            magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
+            combined_similarity = (simab + magnitude_similarity) / 2.0
+            k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
+            k = k - abs(current_alpha)
+            k = k.clip(min=0,max=1.0)
+            caster(f"{num}, {block}, model A[{key}] {1-k} +  (model B)[{key}]*{k}",hear)
+            if uselerp:
+                theta_0[key] = lerp(theta_1[key].to(torch.float32), theta_0[key].to(torch.float32),k).to(theta_0[key].dtype)
+            else:
+                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+
+    else: #favors modelB's structure with details from A
+        # skip VAE model parameters to get better results
+        if "model" in key and key in theta_0:
+            simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
+            dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
+            magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
+            combined_similarity = (simab + magnitude_similarity) / 2.0
+            k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
+            k = k - current_alpha
+            k = k.clip(min=0,max=1.0)
+            caster(f"{num}, {block}, model A[{key}] *{1-k} + (model B)[{key}]*{k}",hear)
+            if uselerp:
+                theta_0[key] = lerp(theta_1[key].to(torch.float32), theta_0[key].to(torch.float32),k).to(theta_0[key].dtype)
+            else:
+                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+
+################################################
+##### Traindiff
+def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
+            # Check if theta_1[key] is equal to theta_2[key]
+    diff_AB = theta_1[key].float() - theta_2[key].float()
+
+    distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
+    distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
+
+    sum_distances = distance_A0 + distance_A1
+
+    scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
+    sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
+    scale = sign_scale * torch.abs(scale)
+
+    new_diff = scale * torch.abs(diff_AB)
+    theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
+
+################################################
+##### Extract
+def extract_super(base: Tensor | None, a: Tensor, b: Tensor, alpha: float, beta: float, smoothness: float) -> Tensor:
+    assert base is None or base.shape == a.shape
+    assert a.shape == b.shape
+    assert 0 <= alpha <= 1
+    assert 0 <= beta <= 1
+    assert 0 <= smoothness <= 1
+    dtype = base.dtype if base is not None else a.dtype
+    base = base.float() if base is not None else 0
+    a = a.float() - base
+    b = b.float() - base
+    r = relu if smoothness == 0 else partial(softplus, beta=1 / smoothness)
+    c = r(cosine_similarity(a, b, -1)).unsqueeze(-1)
+    m = lerp(c, 1 - c, beta)
+    result = base + lerp(a * m, b * m, alpha)
+    return result.to(dtype)
+
+def extract(a: Tensor, b: Tensor, p: float, smoothness: float) -> Tensor:
+    assert a.shape == b.shape
+    assert 0 <= p <= 1
+    assert 0 <= smoothness <= 1
+    
+    r = relu if smoothness == 0 else partial(softplus, beta=1 / smoothness)
+    c = r(cosine_similarity(a, b, dim=-1)).unsqueeze(dim=-1).repeat_interleave(b.shape[-1], -1)
+    m = torch.lerp(c, torch.ones_like(c) - c, p)
+    return a * m
+
+################################################
+##### Tensor Merge
+def tensormerge(mode,key,dim, theta_0,theta_1,current_alpha,current_beta):
+    if mode:
+        if current_alpha+current_beta <= 1 :
+            talphas = int(theta_0[key].shape[0]*(current_beta))
+            talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
+            if dim == 1:
+                theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+
+            elif dim == 2:
+                theta_0[key][talphas:talphae,:] = theta_1[key][talphas:talphae,:].clone()
+
+            elif dim == 3:
+                theta_0[key][talphas:talphae,:,:] = theta_1[key][talphas:talphae,:,:].clone()
+
+            elif dim == 4:
+                theta_0[key][talphas:talphae,:,:,:] = theta_1[key][talphas:talphae,:,:,:].clone()
+
+        else:
+            talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
+            talphae = int(theta_0[key].shape[0]*(current_beta))
+            theta_t = theta_1[key].clone()
+            if dim == 1:
+                theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+
+            elif dim == 2:
+                theta_t[talphas:talphae,:] = theta_0[key][talphas:talphae,:].clone()
+
+            elif dim == 3:
+                theta_t[talphas:talphae,:,:] = theta_0[key][talphas:talphae,:,:].clone()
+
+            elif dim == 4:
+                theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
+            theta_0[key] = theta_t
+
+    else:
+        if current_alpha+current_beta <= 1 :
+            talphas = int(theta_0[key].shape[0]*(current_beta))
+            talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
+            if dim > 1:
+                if theta_0[key].shape[1] > 100:
+                    talphas = int(theta_0[key].shape[1]*(current_beta))
+                    talphae = int(theta_0[key].shape[1]*(current_alpha+current_beta))
+            if dim == 1:
+                theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+
+            elif dim == 2:
+                theta_0[key][:,talphas:talphae] = theta_1[key][:,talphas:talphae].clone()
+
+            elif dim == 3:
+                theta_0[key][:,talphas:talphae,:] = theta_1[key][:,talphas:talphae,:].clone()
+
+            elif dim == 4:
+                theta_0[key][:,talphas:talphae,:,:] = theta_1[key][:,talphas:talphae,:,:].clone()
+
+        else:
+            talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
+            talphae = int(theta_0[key].shape[0]*(current_beta))
+            theta_t = theta_1[key].clone()
+            if dim > 1:
+                if theta_0[key].shape[1] > 100:
+                    talphas = int(theta_0[key].shape[1]*(current_alpha+current_beta-1))
+                    talphae = int(theta_0[key].shape[1]*(current_beta))
+            if dim == 1:
+                theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+
+            elif dim == 2:
+                theta_t[:,talphas:talphae] = theta_0[key][:,talphas:talphae].clone()
+
+            elif dim == 3:
+                theta_t[:,talphas:talphae,:] = theta_0[key][:,talphas:talphae,:].clone()
+
+            elif dim == 4:
+                theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
+            theta_0[key] = theta_t
+
+################################################
+##### Multi Thread SmoothAdd
 
 def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear):  
     lock_theta_0 = Lock()
@@ -795,11 +802,41 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
 
     return theta_0, theta_1, False
 
+################################################
+##### Elementals
+def elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha):
+    skey = key + BLOCKID[weight_index]
+    for d in deep:
+        if d.count(":") != 2 :continue
+        dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
+        dbs = blocker(dbs,BLOCKID)
+        dbs,dws = dbs.split(" "), dws.split(" ")
+        dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
+        dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
+        flag = dbn
+        for db in dbs:
+            if db in skey:
+                flag = not dbn
+        if flag:flag = dwn
+        else:continue
+        for dw in dws:
+            if dw in skey:
+                flag = not dwn
+        if flag:
+            dr = eratiodealer(dr,randomer,weight_index,num,lucks)
+            if deepprint :print(dbs,dws,key,dr)
+            return dr
+        else:
+            return current_alpha
+
 def forkforker(filename):
     try:
         return sd_models.read_state_dict(filename,map_location = "cpu")
     except:
         return sd_models.read_state_dict(filename)
+
+################################################
+##### Load Model
 
 def load_model_weights_m(model,abc,cachetarget):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
@@ -856,6 +893,10 @@ def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,usebl
     return currentmodel
 
 path_root = scripts.basedir()
+
+
+################################################
+##### Logging
 
 def rwmergelog(mergedname = "",settings= [],id = 0):
     # for compatible
@@ -978,6 +1019,10 @@ def longhashfromname(name):
     checkpoint_info.calculate_shorthash()
     return checkpoint_info.sha256
 
+
+################################################
+##### Random
+
 RANCHA = ["R","U","X"]
 
 def randdealer(w:str,randomer,ab,lucks,deep):
@@ -1017,6 +1062,10 @@ def eratiodealer(dr,randomer,block,num,lucks):
             return round((float(low[block])-float(up[block]))* randomer[num+add] + float(up[block]),lucks["round"])
     else:
         return float(dr)
+
+
+################################################
+##### Generate Image
 
 def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
             genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
@@ -1165,6 +1214,10 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     shared.state.end()
     return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),p
 
+
+################################################
+##### Block Ids
+
 def blocker(blocks,blockids):
     blocks = blocks.split(" ")
     output = ""
@@ -1232,6 +1285,9 @@ def blockfromkey(key,isxl):
 
     return "Not Merge", "Not Merge"
 
+################################################
+##### Adjust
+
 def fineman(fine,isxl):
     if fine.find(",") != -1:
         tmp = [t.strip() for t in fine.split(",")]
@@ -1278,6 +1334,22 @@ FINETUNES = [
 "model.diffusion_model.out.2.bias",
 ]
 
+################################################
+##### Adjust
+def excluder(block, ex_blocks,ex_elems, key):
+    out = False
+    if block in ex_blocks:out = True
+    if "Adjust" in ex_blocks and key in FINETUNES:out = True
+    for ke in ex_elems:
+        if ke != "" and ke in key:out = True
+    if "VAE" in ex_blocks and "first_stage_model"in key: out = True
+    if "print" in ex_blocks and out:
+        print("Exclude",block,ex_blocks,ex_elems,key)
+    return out
+
+################################################
+##### Reset Broken CliP IDs
+
 def resetclip(theta):
     idkey = "cond_stage_model.transformer.text_model.embeddings.position_ids"
     broken = []
@@ -1291,3 +1363,54 @@ def resetclip(theta):
         if broken != []: print("Clip IDs broken and fixed: ",broken)
         
         theta[idkey] = correct
+
+
+################################################
+##### cache
+def cachedealer(start):
+    if start:
+        global orig_cache
+        orig_cache = shared.opts.sd_checkpoint_cache
+        shared.opts.sd_checkpoint_cache = 0
+    else:
+        shared.opts.sd_checkpoint_cache = orig_cache
+
+def clearcache():
+    global modelcache
+    del modelcache
+    modelcache = {}
+    gc.collect()
+    devices.torch_gc()
+
+def getcachelist():
+    output = []
+    for key in modelcache.keys():
+        if hasattr(key, "model_name"):
+            output.append(key.model_name)
+    return ",".join(output)
+
+################################################
+##### print
+
+def printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks,fine,ex_blocks,ex_elems):
+    print(f"  model A  \t: {model_a}")
+    print(f"  model B  \t: {model_b}")
+    print(f"  model C  \t: {model_c}")
+    print(f"  alpha,beta\t: {base_alpha,base_beta}")
+    print(f"  weights_alpha\t: {weights_a}")
+    print(f"  weights_beta\t: {weights_b}")
+    print(f"  mode\t\t: {mode}")
+    print(f"  MBW \t\t: {useblocks}")
+    print(f"  CalcMode \t: {calcmode}")
+    print(f"  Elemental \t: {deep}")
+    print(f"  Weights Seed\t: {lucks}")
+    print(f"  Exclude \t: {ex_blocks,ex_elems}")
+    print(f"  Adjust \t: {fine}")
+
+def caster(news,hear):
+    if hear: print(news)
+
+def casterr(*args,hear=hear):
+    if hear:
+        names = {id(v): k for k, v in currentframe().f_back.f_locals.items()}
+        print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
