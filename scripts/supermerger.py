@@ -1,16 +1,22 @@
-import argparse
+from cProfile import label
 import gc
 import os
 import os.path
 import re
 import json
 import shutil
+from tqdm import tqdm
+import torch
+from statistics import mean
+import csv
+import torch.nn as nn
+import torch.nn.functional as F
 from importlib import reload
 from pprint import pprint
 import gradio as gr
 from modules import (devices, script_callbacks, sd_hijack, sd_models,sd_vae, shared)
 from modules.scripts import basedir
-from modules.sd_models import checkpoints_loaded
+from modules.sd_models import checkpoints_loaded, load_model,unload_model_weights
 from modules.shared import opts
 from modules.sd_samplers import samplers
 from modules.ui import create_output_panel, create_refresh_button
@@ -24,11 +30,13 @@ reload(scripts.mergers.xyplot)
 reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
-from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
+from scripts.mergers.mergers import (TYPESEG,EXCLUDE_CHOICES, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
 from scripts.mergers.xyplot import freezetime, nulister
 from scripts.mergers.model_util import filenamecutter, savemodel
 
 path_root = basedir()
+
+CALCMODES  = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","extract","tensor","tensor2","self"]
 
 class ResizeHandleRow(gr.Row):
     """Same as gr.Row but fits inside gradio forms"""
@@ -41,7 +49,23 @@ class ResizeHandleRow(gr.Row):
     def get_block_name(self):
         return "row"
 
+from typing import Union
+def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
+    self.network_current_names = ()
+    self.network_weights_backup = None
+    self.network_bias_backup = None
+    
+
+def fix_network_reset_cached_weight():
+    try:
+        import networks as net
+        net.network_reset_cached_weight = network_reset_cached_weight
+    except:
+        pass
+
 def on_ui_tabs():
+    fix_network_reset_cached_weight()
+
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
     if os.path.isfile(userfilepath):
@@ -65,7 +89,7 @@ def on_ui_tabs():
     with gr.Blocks() as supermergerui:
         with gr.Tab("Merge"):
             with ResizeHandleRow(equal_height=False):
-                with gr.Column(variant="compact", scale = 3):
+                with gr.Column(variant="compact"):
                     gr.HTML(value="<p>Merge models and load it for generation</p>")
 
                     with gr.Row():
@@ -83,8 +107,8 @@ def on_ui_tabs():
                         model_c = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model C",interactive=True)
                         create_refresh_button(model_c, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
 
-                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calculation Mode",choices = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","tensor","tensor2","self"], value = "normal") 
+                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha")
+                    calcmode = gr.Radio(label = "Calculation Mode",choices = CALCMODES, value = "normal") 
                     with gr.Row(variant="compact"):
                         with gr.Column(scale = 1):
                             useblocks =  gr.Checkbox(label="use MBW", info="use Merge Block Weights")
@@ -96,11 +120,10 @@ def on_ui_tabs():
 
                     with gr.Accordion("Options", open=False):
                         with gr.Row(variant="compact"):
-                            with gr.Column(scale = 3):
-                                save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune","Reset CLIP ids","debug"], value=["safetensors"], show_label=False, label="save settings")
-                            with gr.Column(min_width = 50, scale = 1):
-                                components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
-
+                            save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata","prune","Reset CLIP ids","use old calc method","debug"], value=["safetensors"], show_label=False, label="save settings")
+                        with gr.Row():
+                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+                            opt_value = gr.Slider(label="option", minimum=-1.0, maximum=2, step=0.001, value=0.3, interactive=True)
                         with gr.Row(variant="compact"):
                             with gr.Column(min_width = 50):
                                 with gr.Row():
@@ -120,115 +143,6 @@ def on_ui_tabs():
                         components.gen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Gen",variant='primary')
                         stopmerge = gr.Button(elem_id="stopmerge", elem_classes=["compact_button"], value="Stop")
 
-                    with gr.Accordion("Generation Parameters",open = False):
-                        gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
-                        prompt = gr.Textbox(label="prompt",lines=1,value="")
-                        neg_prompt = gr.Textbox(label="neg_prompt",lines=1,value="")
-                        with gr.Row():
-                            sampler = gr.Dropdown(label='Sampling method', elem_id=f"sampling", choices=[" ",*[x.name for x in samplers]], value=" ", type="index")
-                            steps = gr.Slider(minimum=0.0, maximum=150, step=1, label='Steps',value=0, elem_id="Steps")
-                            cfg = gr.Slider(minimum=0.0, maximum=30, step=0.5, label='CFG scale', value=0, elem_id="cfg")
-                        with gr.Row():
-                            width = gr.Slider(minimum=0, maximum=2048, step=8, label="Width", value=0, elem_id="txt2img_width")
-                            height = gr.Slider(minimum=0, maximum=2048, step=8, label="Height", value=0, elem_id="txt2img_height")
-                            seed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed', value=0, elem_id="seed")
-                        batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
-                        genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value")    
-                        with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
-                            hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
-                            hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
-                            denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
-                            hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
-                        with gr.Row():
-                            setdefault = gr.Button(elem_id="setdefault", value="set to default",variant='primary')
-                            resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
-                            resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
-
-                    with gr.Accordion("Elemental Merge",open = False):
-                        with gr.Row():
-                            components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
-                        with gr.Row():
-                            deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
-
-                    with gr.Accordion("Adjust settings", open=False):
-                        with gr.Row(variant="compact"):
-                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,Brightness,COL1,COL2,COL3", visible=True, value="", lines=1)
-                            finetune_write = gr.Button(value="↑", elem_classes=["tool"])
-                            finetune_read = gr.Button(value="↓", elem_classes=["tool"])
-                            finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
-                        with gr.Row(variant="compact"):
-                            with gr.Column(scale=1, min_width=100):
-                                detail1 = gr.Slider(label="IN", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
-                            with gr.Column(scale=1, min_width=100):
-                                detail2 = gr.Slider(label="OUT", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
-                            with gr.Column(scale=1, min_width=100):
-                                detail3 = gr.Slider(label="OUT2", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
-                        with gr.Row(variant="compact"):
-                            with gr.Column(scale=1, min_width=100):
-                                contrast = gr.Slider(label="Contrast", minimum=-10, maximum=10, step=0.01, value=0, info="Contrast/Detail")
-                            with gr.Column(scale=1, min_width=100):
-                                bri = gr.Slider(label="Brightness", minimum=-10, maximum=10, step=0.01, value=0, info="Dark(Minius)-Bright(Plus)")
-                        with gr.Row(variant="compact"):
-                            with gr.Column(scale=1, min_width=100):
-                                col1 = gr.Slider(label="Cyan-Red", minimum=-10, maximum=10, step=0.01, value=0, info="Cyan(Minius)-Red(Plus)")
-                            with gr.Column(scale=1, min_width=100):
-                                col2 = gr.Slider(label="Magenta-Green", minimum=-10, maximum=10, step=0.01, value=0, info="Magenta(Minius)-Green(Plus)")
-                            with gr.Column(scale=1, min_width=100):
-                                col3 = gr.Slider(label="Yellow-Blue", minimum=-10, maximum=10, step=0.01, value=0, info="Yellow(Minius)-Blue(Plus)")
-
-                    with gr.Accordion("XYZ Plot", open=False):
-                        with gr.Row():
-                            x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
-                            x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
-                        xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
-                        y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")
-                        ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
-                        z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")
-                        zgrid = gr.Textbox(label="Z grid (Disabled if blank)",lines=3,value="",visible =False)
-                        esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change"],type="value",interactive=True)
-                        with gr.Row():
-                            components.gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
-                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
-                            components.s_reserve1 = gr.Button(value="Reserve XY Plot",variant='primary')
-
-                        with gr.Column(visible = False, variant="compact") as row_inputers:
-                            with gr.Row(variant="compact"):
-                                inputer = gr.Textbox(label="Selected", lines=1, value="", show_copy_button=True)
-                            with gr.Row(variant="compact"):
-                                addtox = gr.Button(value="↑ Add to Sequence X")
-                                addtoy = gr.Button(value="↑ Add to Sequence Y")
-                        with gr.Row(visible = False) as row_blockids:
-                            blockids = gr.CheckboxGroup(label = "block IDs",choices=BLOCKID[:-1],type="value",interactive=True)
-                        with gr.Row(visible = False) as row_calcmode:
-                            calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB","trainDifference", "smoothAdd","smoothAdd MT","tensor","tensor2","self"],type="value",interactive=True)
-                        with gr.Row(visible = False) as row_checkpoints:
-                            checkpoints = gr.CheckboxGroup(label = "checkpoints",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
-                            create_refresh_button(checkpoints, sd_models.list_models, lambda: {"choices": [x.model_name for x in sd_models.checkpoints_list.values()]}, "refresh_checkpoint_xyz")
-                        with gr.Row(visible = False) as row_esets:
-                            pass
-
-                    components.dtrue =  gr.Checkbox(value = True, visible = False)
-                    components.dfalse =  gr.Checkbox(value = False,visible = False)
-                    dummy_t =  gr.Textbox(value = "",visible = False)
-
-                    with gr.Accordion("Let the Dice roll",open = False,visible=True):
-                        with gr.Row():
-                            gr.HTML(value="<p>R:0~1, U: -0.5~1.5</p>")
-                        with gr.Row():
-                            luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
-                        with gr.Row():
-                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta","save E-list"],value=["alpha"],type="value",interactive=True)
-                        with gr.Row():
-                            luckseed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed for Random Ratio', value=-1, elem_id="luckseed")
-                            luckround = gr.Number(minimum=1, maximum=4294967295, step=1, label='Round', value=3, elem_id="luckround")
-                            luckserial = gr.Number(minimum=1, maximum=4294967295, step=1, label='Num of challenge', value=1, elem_id="luckchallenge")
-                        with gr.Row():  
-                            luckcustom = gr.Textbox(label="custom",value = "U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R")
-                        with gr.Row():  
-                            lucklimits_u = gr.Textbox(label="Upper limit for X",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
-                        with gr.Row(): 
-                            lucklimits_l = gr.Textbox(label="Lower limit for X",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
-                        components.rand_merge = gr.Button(elem_id="runrandmerge", value="Run Rand",variant='primary')
 
                     with gr.Accordion("Merging Block Weights", open=False):
                         with gr.Row():
@@ -326,7 +240,39 @@ def on_ui_tabs():
                             weightstags= gr.Textbox(label="available",lines = 2,value=tagdicter(weights_presets),visible =True,interactive =True)
                             wpresets= gr.TextArea(label="",value=(weights_presets+ADDRAND),visible =True,interactive = True)
 
-                        with gr.Tab("Reservation"):
+                    with gr.Accordion("XYZ Plot", open=False):
+                        with gr.Row():
+                            x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
+                            x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
+                        xgrid = gr.Textbox(label="X Values",lines=3,value="0.25,0.5,0.75")
+                        y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")
+                        ygrid = gr.Textbox(label="Y Values (Disabled if blank)",lines=3,value="",visible =False)
+                        z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")
+                        zgrid = gr.Textbox(label="Z Values (Disabled if blank)",lines=3,value="",visible =False)
+                        esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change","0 stock"],type="value",interactive=True)
+                        with gr.Row():
+                            components.gengrid = gr.Button(elem_id="model_merger_merge", value="Run XYZ Plot",variant='primary')
+                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XYZ Plot",variant='primary')
+                            components.s_reserve1 = gr.Button(value="Reserve XYZ Plot",variant='primary')
+
+                        with gr.Column(visible = False, variant="compact") as row_inputers:
+                            with gr.Row(variant="compact"):
+                                inputer = gr.Textbox(label="Selected", lines=1, value="", show_copy_button=True)
+                            with gr.Row(variant="compact"):
+                                addtox = gr.Button(value="↑ Add to X Values")
+                                addtoy = gr.Button(value="↑ Add to Y Values")
+                                addtoz = gr.Button(value="↑ Add to Y Values")
+                        with gr.Row(visible = False) as row_blockids:
+                            blockids = gr.CheckboxGroup(label = "block IDs",choices=BLOCKID[:-1],type="value",interactive=True)
+                        with gr.Row(visible = False) as row_calcmode:
+                            calcmodes = gr.CheckboxGroup(label = "calcmode",choices=CALCMODES,type="value",interactive=True)
+                        with gr.Row(visible = False) as row_checkpoints:
+                            checkpoints = gr.CheckboxGroup(label = "checkpoints",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
+                            create_refresh_button(checkpoints, sd_models.list_models, lambda: {"choices": [x.model_name for x in sd_models.checkpoints_list.values()]}, "refresh_checkpoint_xyz")
+                        with gr.Row(visible = False) as row_esets:
+                            pass
+                    
+                        with gr.Accordion("Reservation", open=False):
                             with gr.Row():
                                 components.s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
                                 s_reloadreserve = gr.Button(value="Reloat List",variant='primary')
@@ -338,13 +284,102 @@ def on_ui_tabs():
                                     headers=["No.","status","xtype","xmenber","ytype","ymenber","ztype","zmenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
                                     row_count=5,)
 
+                    components.dtrue =  gr.Checkbox(value = True, visible = False)
+                    components.dfalse =  gr.Checkbox(value = False,visible = False)
+                    dummy_t =  gr.Textbox(value = "",visible = False)
+
+                    with gr.Accordion("Elemental Merge",open = False):
+                        with gr.Row():
+                            components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                        with gr.Row():
+                            deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
+
+                    with gr.Accordion("Adjust", open=False) as acc_ad:
+                        with gr.Row(variant="compact"):
+                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,Brightness,COL1,COL2,COL3", visible=True, value="", lines=1)
+                            finetune_write = gr.Button(value="↑", elem_classes=["tool"])
+                            finetune_read = gr.Button(value="↓", elem_classes=["tool"])
+                            finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
+                        with gr.Row(variant="compact"):
+                            with gr.Column(scale=1, min_width=100):
+                                detail1 = gr.Slider(label="IN", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                            with gr.Column(scale=1, min_width=100):
+                                detail2 = gr.Slider(label="OUT", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                            with gr.Column(scale=1, min_width=100):
+                                detail3 = gr.Slider(label="OUT2", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                        with gr.Row(variant="compact"):
+                            with gr.Column(scale=1, min_width=100):
+                                contrast = gr.Slider(label="Contrast", minimum=-10, maximum=10, step=0.01, value=0, info="Contrast/Detail")
+                            with gr.Column(scale=1, min_width=100):
+                                bri = gr.Slider(label="Brightness", minimum=-10, maximum=10, step=0.01, value=0, info="Dark(Minius)-Bright(Plus)")
+                        with gr.Row(variant="compact"):
+                            with gr.Column(scale=1, min_width=100):
+                                col1 = gr.Slider(label="Cyan-Red", minimum=-10, maximum=10, step=0.01, value=0, info="Cyan(Minius)-Red(Plus)")
+                            with gr.Column(scale=1, min_width=100):
+                                col2 = gr.Slider(label="Magenta-Green", minimum=-10, maximum=10, step=0.01, value=0, info="Magenta(Minius)-Green(Plus)")
+                            with gr.Column(scale=1, min_width=100):
+                                col3 = gr.Slider(label="Yellow-Blue", minimum=-10, maximum=10, step=0.01, value=0, info="Yellow(Minius)-Blue(Plus)")
+                        
+                            finetune.change(fn=lambda x:gr.update(label = f"Adjust : {x}"if x != "" and x !="0,0,0,0,0,0,0,0" else "Adjust"),inputs=[finetune],outputs = [acc_ad])
+
+                    with gr.Accordion("Let the Dice roll",open = False,visible=True):
+                        with gr.Row():
+                            gr.HTML(value="<p>R:0~1, U: -0.5~1.5</p>")
+                        with gr.Row():
+                            luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
+                        with gr.Row():
+                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta","save E-list"],value=["alpha"],type="value",interactive=True)
+                        with gr.Row():
+                            luckseed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed for Random Ratio', value=-1, elem_id="luckseed")
+                            luckround = gr.Number(minimum=1, maximum=4294967295, step=1, label='Round', value=3, elem_id="luckround")
+                            luckserial = gr.Number(minimum=1, maximum=4294967295, step=1, label='Num of challenge', value=1, elem_id="luckchallenge")
+                        with gr.Row():  
+                            luckcustom = gr.Textbox(label="custom",value = "U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R")
+                        with gr.Row():  
+                            lucklimits_u = gr.Textbox(label="Upper limit for X",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+                        with gr.Row(): 
+                            lucklimits_l = gr.Textbox(label="Lower limit for X",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+                        components.rand_merge = gr.Button(elem_id="runrandmerge", value="Run Rand",variant='primary')
+
+                    with gr.Accordion("Generation Parameters",open = False):
+                        gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
+                        prompt = gr.Textbox(label="prompt",lines=1,value="")
+                        neg_prompt = gr.Textbox(label="neg_prompt",lines=1,value="")
+                        with gr.Row():
+                            sampler = gr.Dropdown(label='Sampling method', elem_id=f"sampling", choices=[" ",*[x.name for x in samplers]], value=" ", type="index")
+                            steps = gr.Slider(minimum=0.0, maximum=150, step=1, label='Steps',value=0, elem_id="Steps")
+                            cfg = gr.Slider(minimum=0.0, maximum=30, step=0.5, label='CFG scale', value=0, elem_id="cfg")
+                        with gr.Row():
+                            width = gr.Slider(minimum=0, maximum=2048, step=8, label="Width", value=0, elem_id="txt2img_width")
+                            height = gr.Slider(minimum=0, maximum=2048, step=8, label="Height", value=0, elem_id="txt2img_height")
+                            seed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed', value=0, elem_id="seed")
+                        batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
+                        genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value")    
+                        with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
+                            hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
+                            hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
+                            denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
+                            hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
+                        with gr.Row():
+                            setdefault = gr.Button(elem_id="setdefault", value="set to default",variant='primary')
+                            resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
+                            resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
+
+                    with gr.Accordion("Exclude", open=False) as acc_ex:
+                        with gr.Row():
+                            ex_blocks = gr.CheckboxGroup(choices=EXCLUDE_CHOICES + ["print"], visible = True,interactive=True,type="value")
+                        with gr.Row():
+                            ex_elems = gr.Textbox(label="Elements")
+                        ex_blocks.change(fn=lambda x,y: gr.update(label ="Exclude : " + ",".join(x) +","+ y if x != [] or y != "" else "Exclude"), inputs = [ex_blocks,ex_elems],outputs = [acc_ex] )
+                        ex_elems.change(fn=lambda x,y: gr.update(label ="Exclude : " + ",".join(x) +","+ y if x != [] or y != "" else "Exclude"),inputs=[ex_blocks,ex_elems],outputs = [acc_ex])
+
                     with gr.Accordion("Advanced", open=False):
                         with gr.Row():
                             currentcache = gr.Textbox(label="Current Cache")
                             loadcachelist = gr.Button(elem_id="model_merger_merge", value="Reload Cache List",variant='primary')
                             unloadmodel = gr.Button(value="unload model",variant='primary')
 
-                with gr.Column(variant="compact", scale = 2):
+                with gr.Column(variant="compact"):
                     components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")
                     components.submit_result = gr.Textbox(label="Message")
                     mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
@@ -437,10 +472,7 @@ def on_ui_tabs():
 
         def unload():
             if shared.sd_model == None: return "already unloaded"
-            sd_hijack.model_hijack.undo_hijack(shared.sd_model)
-            shared.sd_model = None
-            gc.collect()
-            devices.torch_gc()
+            load_model,unload_model_weights()
             return "model unloaded"
 
         unloadmodel.click(fn=unload,outputs=[components.submit_result])
@@ -448,7 +480,7 @@ def on_ui_tabs():
         load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
         reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
 
-        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae]
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae,opt_value,ex_blocks,ex_elems]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
@@ -467,7 +499,7 @@ def on_ui_tabs():
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune]
+            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune,opt_value,ex_blocks,ex_elems]
         )
 
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
@@ -477,6 +509,7 @@ def on_ui_tabs():
         loadcachelist.click(fn=getcachelist,inputs=[],outputs=[currentcache])
         addtox.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[xgrid])
         addtoy.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[ygrid])
+        addtoz.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[zgrid])
 
         stopgrid.click(fn=freezetime)
         stopmerge.click(fn=freezemtime)
@@ -762,11 +795,10 @@ def searchhistory(words,searchmode):
     return outs
 
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
-#13  deep,14 calcmode,15 luckseed
-MSETSNUM = 16
+#13  deep,14 calcmode,15 luckseed 16:opt_value 17: exclude_blocks, 18: exclude_elements
+MSETSNUM = 19
 
 def reversparams(id):
-    from modules.shared import opts
     def selectfromhash(hash):
         for model in sd_models.checkpoint_tiles():
             if hash in model:
@@ -783,19 +815,23 @@ def reversparams(id):
     mgs = idsets[3:]
     if mgs[0] == "":mgs[0] = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
     if mgs[1] == "":mgs[1] = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2"
+    def cutter(text):
+        text = text.replace("[","").replace("]","").replace("'", "") 
+        return [x.strip() for x in text.split(",") if x != ""]
     mgs[2] = selectfromhash(mgs[2]) if len(mgs[2]) > 5 else ""
     mgs[3] = selectfromhash(mgs[3]) if len(mgs[3]) > 5 else ""
     mgs[4] = selectfromhash(mgs[4]) if len(mgs[4]) > 5 else ""
     mgs[7] = mgs[7].split(":")[0] # get mode name only
-    mgs[8] = True if mgs[8] =="True" else False
-    mgs[10] = mgs[10].replace("[","").replace("]","").replace("'", "") 
-    mgs[10] = [x.strip() for x in mgs[10].split(",")]
-    mgs[11] = mgs[11].replace("[","").replace("]","").replace("'", "") 
-    mgs[11] = [x.strip() for x in mgs[11].split(",")]
+    mgs[8] = mgs[8] =="True"
+    mgs[10] = cutter(mgs[10])
+    mgs[11] = cutter(mgs[11])
     while len(mgs) < MSETSNUM:
         mgs.append("")
     mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
-    mgs[14] = -1 if mgs[14] == "" else mgs[14] 
+    mgs[14] = -1 if mgs[14] == "" else mgs[14]
+    mgs[16] = 0.3 if mgs[16] == "" else float(mgs[16]) 
+    mgs[17] = cutter(mgs[17])
+    mgs[17] = [x for x in mgs[17] if x in EXCLUDE_CHOICES + ["print"]]
     return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:MSETSNUM]]]
 
 def add_to_seq(seq,maker):
@@ -941,13 +977,6 @@ def loadmodel(model):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
     return sd
-
-from tqdm import tqdm
-import torch
-from statistics import mean
-import csv
-import torch.nn as nn
-import torch.nn.functional as F
 
 ADDRAND = "\n\
 ALL_R	R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R\n\
