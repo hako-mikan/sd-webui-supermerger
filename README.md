@@ -22,6 +22,7 @@ This extension significantly improves the efficiency of model merging by elimina
     - [Merge LoRAs](#merge-loras)
     - [Merge to Checipoint](#merge-to-checkpoint)
     - [Extract from Checkpoints](#extract-from-checkpoints)
+    - [Extract from two LoRAs](#extract-from-two-loras)
 - [Other Tabs](#other-tabs)
 
 # Recent Update
