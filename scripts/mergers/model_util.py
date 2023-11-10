@@ -2,8 +2,10 @@ import os
 import torch
 import safetensors.torch
 import threading
-from modules import shared,sd_models
+from modules import shared, sd_hijack, sd_models
+from modules.sd_models import read_state_dict
 import json
+
 try:
   from modules import sd_models_xl
   xl = True
@@ -51,11 +53,18 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
 
         if shared.sd_model is not None:
             print("load from shared.sd_model..")
+
+            # restore textencoder
+            sd_hijack.model_hijack.undo_hijack(shared.sd_model)
+
             for name,module in shared.sd_model.named_modules():
                 if hasattr(module,"network_weights_backup"):
                     module = network_restore_weights_from_backup(module)
 
+
             state_dict = shared.sd_model.state_dict()
+
+            sd_hijack.model_hijack.hijack(shared.sd_model)
         else:
             return "No current loaded model found"
 
