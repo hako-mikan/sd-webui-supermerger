@@ -1,22 +1,60 @@
 # SuperMerger
-- [AUTOMATIC1111's stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 用の拡張です。
-- このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
-
-# Recent Update
-すべての更新履歴は[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)にあります。  
+- [AUTOMATIC1111's stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 用のモデルマージ拡張
+- マージしたモデルを保存せず直接生成に使用できます
 
 ### English / 日本語
-English: [![jp](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
+English: [![en](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
 
-## Updates
-- [LoRAマージの際のMetadataの扱いが変わりました。](#Metadata)
+# Overview
+このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
+これまでマージしたモデルはいったん保存して気に入らなければ削除するということが必要でしたが、このextentionを使うことでHDDやSSDの消耗を防ぐことができます。
+モデルの保存とロードの時間を節約できるため、比率を変更しながら連続生成することによりモデルマージの効率を大幅に向上させます。
+
+# もくじ
+- [Merge Models](#merge-models)
+    - [Merge Block Weight](#merge-block-weight)
+    - [XYZ Plot](#xyz-plot)
+    - [Adjust](#adjust)
+    - [Let the Dice Roll](#let-the-dice-roll)
+    - [Elemental Merge](#elemental-merge)
+    - [Generation Parameters](#generation-parameters)
+- [LoRA](#lora)
+    - [Merge LoRAs](#merge-loras)
+    - [Merge to Checipoint](#merge-to-checkpoint)
+    - [Extract from Checkpoints](#extract-from-checkpoints)
+- [Other Tabs](#other-tabs)
+
+# Recent Update
+2023.11.10
+- LoRA抽出スクリプトの変更: SDXL,2.Xをサポート
+- SD2.XでのモデルへのLoRAマージをサポート
+- バグフィックス
+- 新しい計算方式extract merge(checkpoint/LoRA)を追加。作成した[subaqua](https://github.com/sbq0)氏に感謝します。
+
+## 計算関数の変更
+いくつかのモードでは、計算に使用する機能が変更され、マージ計算の速度が向上しています。計算結果は同じですが、同じ結果が得られない場合は、オプションの「use old calc method」をチェックしてください。影響を受ける方式は以下の通りです:
+Weight Sum: normal, cosineA, cosineB
+Sum Twice:normal
 
 **注意！** 
 XLモデルのマージには最低64GBのCPUメモリが必要です。64Gのメモリであっても併用しているソフトによってはシステムが不安定になる恐れがあるのでシステムが落ちてもいい状態で作業して下さい。私は久しぶりにブルースクリーンに遭遇しました。
 
-# 概要
-このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
-これまでマージしたモデルはいったん保存して気に入らなければ削除するということが必要でしたが、このextentionを使うことでHDDやSSDの消耗を防ぐことができます。
+## 既知の問題
+他の拡張機能（sd-webui-prompt-all-in-oneなど）を同時にインストールしている場合、起動時にブラウザを自動的に開くオプションを有効にすると、動作が不安定になることがあります。Gradioの問題である可能性が高いので、修正は難しいです。そのオプションを無効にしてお使いください。
+
+すべての更新は[ここ](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  で確認できます。 
+
+# つかいかた
+## Merge Models
+ここでマージされたモデルは、Web-UIの生成モデルとしてロードされます。左上のモデル表示は変わりませんが、マージされたモデルは実際にロードされています。別のモデルが左上のモデル選択から選択されるまで、マージされたモデルはロードされたままになります。
+### Basic Usage
+Select models A/B/(C), the merge mode, and alpha (beta), then press Merge/Merge and Gen to start the merging process. In the case of Merge and Gen, generation is carried out using the prompt and other settings specified in txt2img.The Gen button only generates images, and the Stop button interrupts the merging process.
+モデルA/B/(C)、merge mode、alpha (beta)を選択し、Merge/Merge and Genを押すとマージ処理が始まります。Merge and Genの場合は、txt2imgで指定されたプロンプトやその他の設定を使用して生成が行われます。Genボタンは画像のみを生成し、Stopボタンはマージを中断します。
+
+### Load Settings From:
+マージログから設定を読み込みます。マージが行われるたびにログが更新され、1から始まる連続IDが割り当てられます。"-1"は最後のマージからの設定に対応し、"-2"は最後から二番目のものに対応します。マージログはextension/sd-webui-supermerger/mergehistory.csvに保存されます。Historyタブで閲覧や検索ができます。半角スペースで区切ってand/orで検索できます。
+### Clear Cache
+Web-UIのモデルキャッシュ機能が有効になっている場合、SuperMergerは連続マージを高速化するためにモデルキャッシュを作成します。モデルはWeb-UIのキャッシュ機能とは別にキャッシュされます。使用後にキャッシュを削除するにはこのボタンを使用してください。キャッシュはVRAMではなくRAMに作成されます。
 
 # 各種設定
 ## マージモード
@@ -32,52 +70,95 @@ Weight sumを2回行います。alpha,betaが使用されます。MBWモード�
 ### use MBW
 チェックするとブロックごとのマージ(階層マージ)が有効になります。各ブロックごとの比率は下部のスライダーかプリセットで設定してください。
 
-### 計算手法(calcmode)
-cosineを選択すると、設定されたマージ比率を中心として、コサイン類似度を用いた比較を行い、マージによるロスをなくすような比率を計算し、その比率を用いてマージを行います。
-詳しくは下記を参照して下さい(英語です)  
-考案された[recoilme](https://github.com/recoilme)氏とこの手法を紹介し最適化してくれた[SwiftIllusion](https://github.com/SwiftIllusion)氏に感謝します。  
-https://github.com/hako-mikan/sd-webui-supermerger/issues/33  
-https://github.com/recoilme/losslessmix
 
-### 保存
-save metadataを有効にするとマージ条件をメタデータとして埋め込めます。safetensor形式のみ有効です。埋め込まれた条件はMetadataタブで確認できます。
+### Merge mode
+#### Weight sum $(1-\alpha) A + \alpha B$
+通常のマージです。alphaが使用されます。$\alpha$=0の場合Model A, $\alpha$=1 の時model Bになります。
+#### Add difference $A + \alpha (B-C)$
+差分を加算します。MBWが有効な場合、$\alpha$としてMBWベースが使用されます。
+#### Triple sum $(1-\alpha - \beta) A + \alpha B + \beta C$
+同時に3つのモデルをマージします。$\alpha$と$\beta$が使用されます。3つのモデル選択ウィンドウがあったためこの機能を追加しましたが、実際に効果的に動作するかはわかりません。
+#### sum Twice $(1-\beta)((1-\alpha)A+\alpha B)+\beta C$
+Weight sumを2回行います。$\alpha$と$\beta$が使用されます。
 
-## 各ボタン
-### Merge
-マージした後、生成用モデルとして読み込みます。 __左上のモデル情報とは違うモデルがロードされていることに注意してください。__ 左上のモデル選択画面でモデルを選択しなおすとリセットされます
+### calcmode
+各計算方法の詳細については[リンク先](#calcmode_ja.md)を参照してください。計算方法とマージモードの対応表は以下の通りです。
+| Calcmode  | Description  | Merge Mode  |
+|----|----|----|
+|normal | 通常の計算方法   |  ALL  |
+|cosineA | モデルAを基準にマージ中の損失を最小限にする計算を行います。  | Weight sum    |
+|cosineB | モデルBを基準にマージ中の損失を最小限にする計算を行います。  | Weight sum    |
+|trainDifference   |モデルAに対してファインチューニングするかのように差分を'トレーニング'します。   | Add difference   |
+|smoothAdd  | 中央値フィルタとガウスフィルタの利点を混合した差分の追加  | Add difference   |
+|smoothAdd MT| マルチスレッドを使用して計算を高速化します。   | Add difference    |
+|extract   | モデルB/Cの共通点・非共通点を抽出して追加します.  | Add difference  |
+|tensor| 加算の代わりにテンソルを比率で入れ替えます   | Weight sum |
+|tensor2  |テンソルの次元が大きい場合、２次元目を基準にして入れ替えます | Weight sum |
+|self  | モデル自身に$\alpha$を掛け合わせます |  Weight sum  |
 
-### Gen
-text2imageタブの設定で画像生成を行います
+### use MBW
+階層マーを有効にします。Merge Block Weightで重みを設定してください。これを有効にすると、アルファとベータが無効になります。
 
-### Merge and Gen
-マージしたのち画像を生成します
+### Options
+| 設定         | 説明                                       |
+|-----------------|---------------------------------------------------|
+| save model      | マージ後のモデルを保存します。                    |
+| overwrite       | モデルの上書きを有効にします。                 |
+| safetensors     | safetensors形式で保存します。                      |
+| fp16            | 半精度で保存します。                          |
+| save metadata   | 保存時にメタデータにマージ情報を保存します。(safetensorsのみ)  |
+| prune           | 保存時にモデルから不要なデータを削除します。 |
+| Reset CLIP ids  | CLIP idsをリセットします。                              |
+| use old calc method           | 古い計算関数を使用します|
+| debug           | デバッグ情報をCMDに出力します。                 |
 
-### Set from ID
-マージログから設定を読み込みます。ログはマージが行われるたびに更新され、1から始まる連番のIDが付与されます。IDを生成される画像やPNG infoに記載することも可能で、write merged model ID toから設定してください。-1でSetをすると最後にマージした設定を読み出します。マージログはextention/sd-webui-supermerger/mergehistory.csvに保存されます。他アプリで開いた状態だと読み取りエラーを起こすので注意してください。Historyタブで閲覧や検索が可能です。検索は半角スペースで区切ることでand/or検索が可能です。
+### save merged model ID to
+生成された画像またはPNG情報にマージIDを保存するかどうかを選択できます。
+### Additional Value
+現在、calcmodeで'extract'が選択されている場合にのみ有効です。
+### Custom Name (Optional)
+モデル名を設定できます。設定されていない場合は、自動的に決定されます。
+### Bake in VAE
+モデルを保存するとき、選択されたVAEがモデルに組み込まれます。
 
-## Hires-fix,batch size
-Hires-fixを有効化できます。batch sizeを変更できます。batch sizeはXY plotでは無効化されます。
+### Save current Merge
+現在ロードされているモデルを保存します。PCのスペックやその他の問題により、マージに時間がかかる場合に効果的です。
 
-## Elemental merge
-[こちら](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/elemental_ja.md)を参照して下さい。
+## Merge Block Weight
+これは階層ごとに割合を設定できるマージ技法です。各階層ごは背景の描写、キャラクター、絵柄などに対応している可能性があるため、階層ごごとの割合を変更することで、様々なマージモデルを作成できます。
 
-## Sequential XY Merge and Generation
-連続マージ画像生成を行います。すべてのマージモードで有効です。
-### alpha,beta
-アルファ、ベータを変更します。tensorモードでも有効です。
-### alpha and beta
-アルファ、ベータを同時に変更します。アルファ、ベータの間は半角スペースで区切り、各要素はカンマで区切ってください。数字ひとつの場合はアルファベータ共に同じ値が入力されます。tensorモードでも有効です。  
-例: 0,0.5 0.1,0.3 0.4,0.5
+階層はSDのバージョンによって異なり、以下のような階層があります。
+
+BASEはテキストエンコーダを指し、プロンプトへの反応などに影響します。IN-OUTはU-Netを指し、画像生成を担当します。
+
+Stable diffusion 1.X, 2.X
+|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|  
+|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|
+|BASE|IN00|IN01|IN02|IN03|IN04|IN05|IN06|IN07|IN08|IN09|IN10|IN11|MID|OUT00|OUT01|OUT02|OUT03|OUT04|OUT05|OUT06|OUT07|OUT08|OUT09|OUT10|OUT11|
+
+Stable diffusion XL
+|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|
+|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|
+|BASE|IN00|IN01|IN02|IN03|IN04|IN05|IN06|IN07|IN08|MID|OUT00|OUT01|OUT02|OUT03|OUT04|OUT05|OUT06|OUT07|OUT08|
+
+## XYZ Plot
+## XYZプロット
+連続的にマージ画像を生成します。すべてのマージモードで効果的です。
+### alpha, beta
+alphaとbetaの値を変更します。
+### alpha と beta
+alphaとbetaを同時に変更します。alphaとbetaはスペース1つで区切り、各要素はカンマで区切ってください。1つの数字のみ入力された場合、alphaとbetaに同じ値が入力されます。  
+例: 0, 0.5 0.1, 0.3 0.4, 0.5
 ### MBW
-階層マージを行います。改行で区切った比率を入力してください。プリセットも使用可能ですが、**改行で区切る**ことに注意をして下さい。Triple,Twiceの場合は２行で１セットで入力して下さい。奇数行だとエラーになります。
+階層ごとにマージを実行します。改行で区切った割合を入力してください。プリセットは使用できますが、必ず**改行で区切る**ようにしてください。TripleやTwiceの場合は、2行を1セットで入力してください。奇数行の入力ではエラーになります。
 ### seed
-シードを変更します。-1と入力すると、反対の軸方向には固定されたseedになります。
-### model_A,B,C
-モデルを変更します。モデル選択窓で選択されたモデルは無視されます。
-### pinpoint blocks
-MBWにおいて特定のブロックのみを変化させます。反対の軸はalphaまたはbetaを選んでください。ブロックIDを入力すると、そのブロックのみalpha(beta)が変わります。他のタイプと同様にカンマで区切ります。スペースまたはハイフンで区切ることで複数のブロックを同時に変化させることもできます。最初にNOTをつけることで変化対象が反転します。NOT IN09-OUT02とすると、IN09-OUT02以外が変化します。NOTは最初に入力しないと効果がありません。
+シード値を変更します。-1を入力すると反対軸方向の固定シードになります。
+### model_A, B, C 
+モデルを変更します。モデル選択ウィンドウで選択したモデルは無視されます。
+### pinpoint block
+MBWで特定の階層のみを変更します。反対軸にはalphaかbetaを選択してください。階層Dを入力すると、その階層のalpha (beta)のみが変更されます。他のタイプと同様にカンマで区切って入力してください。スペースやハイフンで区切ることで、同時に複数の階層を変更できます。効果を得るには、必ず先頭にNOTを入力してください。
 #### 入力例
-IN01,OUT10 OUT11, OUT03-OUT06,OUT07-OUT11,NOT M00 OUT03-OUT06
+IN01, OUT10 OUT11, OUT03-OUT06, OUT07-OUT11, NOT M00 OUT03-OUT06
 この場合
 - 1:IN01のみ変化
 - 2:OUT10およびOUT11が変化
@@ -88,10 +169,10 @@ IN01,OUT10 OUT11, OUT03-OUT06,OUT07-OUT11,NOT M00 OUT03-OUT06
 となります。0の打ち忘れに注意してください。
 ![xy_grid-0006-2934360860 0](https://user-images.githubusercontent.com/122196982/214343111-e82bb20a-799b-4026-8e3c-dd36e26841e3.jpg)
 
-ブロックID(大文字のみ有効)
+階層ID (大文字のみ有効)
 BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11
 
-XL モデル  
+XL model
 BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08
 
 ### calcmode
@@ -110,8 +191,47 @@ Reserve XY plotボタンはすぐさまプロットを実行せず、ボタン�
 0.6,0.7,0.8,0.9,1.0  
 というふたつの予約に分割され実行されます。これは要素が多すぎてグリッドが大きくなってしまう場合などに有効でしょう。
 
+## Adjust
+これは、モデルの細部と色調を補正します。LoRAとは異なるメカニズムを採用しています。U-Netの入力と出力のポイントを調整することで、画像の細部と色調を調整できます。
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample0.jpg)
+## 使い方
 
-# Random Merge
+テキストボックスに直接入力するか、スライダーで値を決めてから上ボタンを押してテキストボックスに反映できます。空白のままにしておくと無視されます。 
+カンマで区切った7つの数字を入力してください。
+
+```
+0,0,0,0,0,0,0,0
+```
+これがデフォルトで、これらの値をずらすことで効果が現れます。
+
+### Each setting value
+### 各設定値の意味
+8つの数字は以下に対応しています。
+1. 描き込み/ノイズ  
+2. 描き込み/ノイズ
+3. 描き込み/ノイズ
+4. コントラスト/描き込み  
+5. 明るさ
+6. 色調1 (シアン-赤)
+7. 色調2 (マゼンタ-緑) 
+8. 色調3 (黄-青)
+
+描き込みが増えるほどノイズも必然的に増えることに注意してください。また、Hires.fixを使用する場合、出力が異なる可能性があるので、使用される設定でテストすることをおすすめします。
+
+値は+/-5程度までは問題ないと思われますが、モデルによって異なります。正の値を入力すると描き込みが増えます。色調には3種類あり、おおむねカラーバランスに対応しているようです。
+### 1,2,3 Detail/Noise
+1.はU-Netの入り口に相当する部分です。ここを調節すると画像の描き込み量が調節できます。ここはOUTに比べて構図が変わりやすいです。マイナスにするとフラットに、そして少しぼけた感じに。プラスにすると描き込みが増えノイジーになります。通常の生成でノイジーでもhires.fixできれいになることがあるので注意してください。2,3はOUTに相当する部分です。
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample1.jpg)
+
+### 4. Contrast/Detail
+ここを調節するとコントラストや明るさがかわり、同時に描き込み量も変わります。サンプルを見てもらった方が早いですね。
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample3.jpg)
+
+### 5,6,7,8 Brightness, Color Tone
+明るさと色調を補正できます。概ねカラーバランスに対応するようです。
+![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/asample1.jpg)
+
+## Let the Dice roll
 ランダムにマージ比率を決定します。一度の複数のランダムマージが行えます。比率は各ブロック、各エレメントごとにランダムにすることが可能です。
 ## 使い方
 　Let the Dice rollで使用できます。`Random Mode`を選択し`Run Rand`を押すと`Num of challenge`の回数分ランダムにウェイトが設定されて画像が生成されます。生成はXYZモードで動作するので`STOP`ボタンが有効です。`Seed for Random Ratio`は`-1`に設定して下さい。Num of challengeの回数が2回以上の場合、自動的に-1に設定されます。同じseedを使うと再現性があります。生成数が10を超える場合グリッドは自動的に2次元になります。`Settings`の`alpha`、`beta`はチェックするとランダム化されます。Elementalの場合`beta`は無効化されます。
@@ -141,12 +261,23 @@ Y type : random, 5
 ```
 とすると、3×5のgridができ、5回分ランダムにウェイトが設定されたモデルで生成されます。ランダムかの設定はランダムのパネルで設定して下さい。ここが`off`では正常に動作しません。
 
-### キャッシュについて
-モデルをメモリ上に保存することにより連続マージなどを高速化することができます。
-キャッシュの設定はweb-uiのsettingから行ってください。
+### Settings
+- `round` は丸める小数点以下の桁数を設定します。初期値は3で、0.123のようになります。
+- `save E-list` はElementalのキーと割合をcsv形式で`script/data/`に保存します。
 
-### unloadボタン
-現在ロードされているモデルを消去します。これはkohya-ssのGUIを使用するときなどGPUメモリを開放するときに使用します。消去すると画像の生成はできません。生成する場合にはモデルを選び直して下さい。
+## Elemental Merge
+[こちら](#elemental_ja.md)を参照して下さい。
+
+
+
+## Generation Parameters
+
+ここでは画像生成の条件も設定できます。ここで値を設定すると優先されます。
+## Exclude
+マージする際に除外したいブロックを設定できます。ここで設定したブロックはマージされません。「print」にチェックを入れると、コマンドプロンプト画面でブロックが除外されたか確認できます。「Adjust」にチェックを入れると、Adjustで使用する要素が除外されます。`attn`などの文字列も指定でき、この場合`attn`を含む要素が除外されます。文字列はカンマで区切ってください。
+## unload button
+現在ロードされているモデルを削除します。kohya-ss GUI使用時にGPUメモリを解放するために使用します。モデルが削除されると画像生成ができなくなります。画像生成を行いたい場合は、再度モデルを選択してください。
+
 
 ## LoRA
 LoRA関連の機能です。基本的にはkohya-ssのスクリプトと同じですが、階層マージに対応します。現時点ではV2.X系のマージには対応していません。
@@ -154,37 +285,41 @@ LoRA関連の機能です。基本的にはkohya-ssのスクリプトと同じ�
 注意：LyCORISは構造が特殊なため単独マージのみに対応しています。単独マージの比率は1,0のみ使用可能です。他の値を用いるとsame to Strengthでも階層LoRAの結果と一致しません。
 LoConは整数以外でもそれなりに一致します。
 
-LoCon/LyCoris のモデルへのマージにはweb-ui1.5が必要です。
-|  1.X     | LoRA  | LoCon | LyCORIS |
+LoCon/LyCoris のモデルへのマージにはweb-ui1.5以上が必要です。
+|  1.X,2.X     | LoRA  | LoCon | LyCORIS |
 |----------|-------|-------|---------|
 | Merge to Model |   Yes   | Yes   | Yes     |
 | Merge LoRAs   |    Yes   | Yes    | No     |
+| Apply Block Weight(single)|Yes|Yes|Yes|
 | Extract From Models   | Yes    | No    | No      |
 
 |  XL     | LoRA  | LoCon | LyCORIS |
 |----------|-------|-------|---------|
 | Merge to Model |   Yes   | Yes   | Yes     |
 | Merge LoRAs   |    Yes   | Yes    | No     |
-| Extract From Models   | No    | No    | No      |
+| Extract From Models   | Yes    | No    | No      |
 
-### merge to checkpoint
-モデルにLoRAをマージします。複数のLoRAを同時にマージできます。  
-LoRA名1:マージ比率1:階層,LoRA名2:階層,マージ比率2,LoRA名3:マージ比率3･･･  
-と入力します。LoRA単独でも使用可能です。「:階層」の部分は無くても問題ありません。比率はマイナスを含めどんな値でも入力できます。合計が１にならないといけないという制約もありません(もちろん大きく1を越えると破綻します)。
 
-### Make LoRA
-ふたつのモデルの差分からLoRAを生成します。
-demensionを指定すると指定されたdimensionで作製されます。無指定の場合は128で作製します。
-alphaとbetaによって配合比率を調整することができます。(alpha x Model_A - beta x Model B)　alpha, beta = 1が通常のLoRA作成となります。
-
-#### google colab使用時の問題
-colabで使用する場合に多くのエラーが発生することが報告されています。これは複数の原因によって発生しているようです。  
-まずはメモリの問題です。モデルはfp16モデルを使用することを推奨します。フルモデルを使用した場合8GB以上のメモリが必要になります。これはこのスクリプトが使用する量です。また、インストールされているdiffusersのバージョンが異なるとエラーが発生するようです。version 0.10.2で動作確認されています。
-
-### merge LoRAs
+### Merge LoRAs
 ひとつまたは複数のLoRA同士をマージします。kohya-ss氏の最新のスクリプトを使用しているので、dimensionの異なるLoRA同氏もマージ可能ですが、dimensionの変換の際はLoRAの再計算を行うため、生成される画像が大きく異なる可能性があることに注意してください。  
 
 calculate dimentionボタンで各LoRAの次元を計算して表示・ソート機能が有効化します。計算にはわりと時間がかかって、50程度のLoRAでも数十秒かかります。新しくマージされたLoRAはリストに表示されないのでリロードボタンを押してください。次元の再計算は追加されたLoRAだけを計算します。
+
+### Merge to Checkpoint
+Merge LoRAs into a model. Multiple LoRAs can be merged at the same time.  
+Enter LoRA name1:ratio1:block1,LoRA name2:ratio2:block2,... 
+LoRA can also be used alone. The ":block" part can be omitted. The ratio can be any value, including negative values. There is no restriction that the total must sum to 1 (of course, if it greatly exceeds 1, it will break down).
+To use ":block", use a block preset name from the bottom list of presets, or create your own. Ex:   
+```
+LoRAname1:ratio1
+LoRAname1:ratio1:ALL
+LoRAname1:ratio1:1,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0
+```
+
+### Extract from checkpoints
+ふたつのモデルの差分からLoRAを生成します。
+demensionを指定すると指定されたdimensionで作製されます。無指定の場合は128で作製します。
+alphaとbetaによって配合比率を調整することができます。$(\alpha A - \beta B)$　alpha, beta = 1が通常のLoRA作成となります。
 
 ### Metadata
 #### create new
@@ -198,14 +333,31 @@ calculate dimentionボタンで各LoRAの次元を計算して表示・ソート
 #### use first LoRA
 最初のLoRAの情報をそのままコピーします
 
-### 通常マージとsame to Strengthの違い
+### Get Ratios from Prompt
+プロンプト欄からLoRAの比率設定を読み込みます。これはLoRA Block Weightの設定も含まれ、そのままマージが行えます。
+
+### Difference between Normal Merge and SAME TO STRENGTH
 same to Strengthオプションを使用しない場合は、kohya-ss氏の作製したスクリプトのマージと同じ結果になります。この場合、下図のようにWeb-ui上でLoRAを適用した場合と異なる結果になります。これはLoRAをU-netに組み込む際の数式が関係しています。kohya-ss氏のスクリプトでは比率をそのまま掛けていますが、適用時の数式では比率が２乗されてしまうため、比率を1以外の数値に設定すると、あるいはマイナスに設定するとStrength（適用時の強度）と異なる結果となります。same to Strengthオプションを使用すると、マージ時には比率の平方根を駆けることで、適用時にはStrengthと比率が同じ意味を持つように計算しています。また、マイナスが効果が出るようにも計算しています。追加学習をしない場合などはsame to Strengthオプションを使用しても問題ないと思いますが、マージしたLoRAに対して追加学習をする場合はだれも使用しない方がいいかもしれません。  
 
 下図は通常適用/same to Strengthオプション/通常マージの各場合の生成画像です。figma化とukiyoE LoRAのマージを使用しています。通常マージの場合はマイナス方向でも２乗されてプラスになっていることが分かります。
 ![xyz_grid-0014-1534704891](https://user-images.githubusercontent.com/122196982/218322034-b7171298-5159-4619-be1d-ac684da92ed9.jpg)
 
-階層別マージについては下記を参照してください
+## Other tabs
+## Analysis
+2つのモデルの違いを分析してください。比較したいモデルを選んでください、モデルAとモデルBを。
+### Mode
 
-https://github.com/bbc-mc/sdweb-merge-block-weighted-gui
+ASimilalityモードは、qkvから計算されたテンソルを比較します。他のモードは各要素のコサイン類似度から計算します。ASimilalityモード以外では計算された差が小さくなるようです。ASimilalityモードは出力画像の違いに近い結果を与えるため、一般的にはこのモードを使用すべきです。
+このAsimilality分析は、[Asimilality script](https://huggingface.co/JosephusCheung/ASimilarityCalculatior)を拡張して作成されました。
 
-このスクリプトではweb-ui、mbw-merge、kohya-ssのスクリプトを一部使用しています
+### Block Method
+ASimilalityモード以外のモードで各階層の比率を計算する方法です。Meanは平均を表し、minは最小値を表し、attn2は階層の計算結果としてattn2の値を出力します。
+
+## History
+マージ履歴を検索することができます。検索機能は「and」と「or」の両方の検索に対応しています。
+
+## Elements
+モデルに含まれるElementのリスト、階層の割り当て、およびテンソルのサイズを取得できます。
+
+## 謝辞
+このスクリプトは[kohya](https://github.com/kohya-ss)氏,[bbc-mc](https://github.com/bbc-mc)氏のスクリプト一部使用しています。また、拡張の開発に貢献した全ての方々にも感謝します。

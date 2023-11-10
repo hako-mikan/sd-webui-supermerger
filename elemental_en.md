@@ -1,6 +1,3 @@
-- [Elemental](#elemental)
-- [Adjust](#adjust)
-
 # Elemental Merge
 - This is a block-by-block merge that goes beyond block-by-block  merge.
 
@@ -63,42 +60,6 @@ Separate the files with a new line or comma. Use alpha for the opposite axis and
 The following image shows the result of running sample5 of sample.txt.
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample5-1.jpg)
 ![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/sample5-2.jpg)
-
-# Adjust
-This corrects the amount of detail and color tone in your model. It employs a different mechanism from LoRA. By adjusting the input and output points of U-Net, the details and color tones of the image can be adjusted.
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample0.jpg)
-## How to use
-Set it in the Adjust field of Elemental, Adjust. It will be ignored if left blank.
-Input seven numbers separated by commas.  
-```
-0,0,0,0,0,0,0
-```
-This is the default, and effects appear as you shift these values.
-### Each setting value
-The seven numbers correspond to 
-1. Detail/Noise 
-2. Detail/Noise 
-3. Detail/Noise 
-4. Contrast/Detail 
-5. Color Tone 1
-6. Color Tone 2
-7. Color Tone 3
-
-Please be aware that as the level of detail increases, so inevitably does the noise. Also, when using Hires.fix, the output may look different, so I recommend testing it with the expected settings.
-The values should be good up to about 5/-5, but it depends on the model. Entering a positive value will increase the level of detail. There are three types of color tones, which seem to correspond roughly to color balance.
-
-#### 1,2,3 Detail/Noise
-1 corresponds to the input of the U-Net. Adjusting this allows you to control the level of detail in the image. The composition changes more easily here than in OUT. Making it negative will make it flatter and slightly blurred. Making it positive will increase the detail and make it noisier. Be aware that even if it's noisy in the regular generation, it may become cleaner with hires.fix. 2 and 3 correspond to the OUT part.
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample1.jpg)
-
-#### 4. Contrast/Detail
-Adjusting this will change the contrast and brightness, as well as the level of detail. It's faster to see the sample.
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample3.jpg)
-
-#### 5,6,7 Color Tone
-You can correct the color tone. It seems to correspond roughly to the color balance.
-![](https://raw.githubusercontent.com/hako-mikan/sd-webui-supermerger/images/fsample5.jpg)
-
 
 ### List of elements
 Basically, it seems that attn is responsible for the face and clothing information. The IN07, OUT03, OUT04, and OUT05 layers seem to have a particularly strong influence. It does not seem to make sense to change the same element in multiple Blocks at the same time, since the degree of influence often differs depending on the Blocks.
