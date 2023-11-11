@@ -261,7 +261,7 @@ def on_ui_tabs():
                             with gr.Row(variant="compact"):
                                 addtox = gr.Button(value="↑ Add to X Values")
                                 addtoy = gr.Button(value="↑ Add to Y Values")
-                                addtoz = gr.Button(value="↑ Add to Y Values")
+                                addtoz = gr.Button(value="↑ Add to Z Values")
                         with gr.Row(visible = False) as row_blockids:
                             blockids = gr.CheckboxGroup(label = "block IDs",choices=BLOCKID[:-1],type="value",interactive=True)
                         with gr.Row(visible = False) as row_calcmode:
