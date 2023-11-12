@@ -3,7 +3,7 @@
 - Merge models can be loaded directly for generation without saving
 
 ### English / 日本語
-日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README_ja.md)
+日本語: [![jp](https://img.shields.io/badge/lang-日本語-green.svg)](README_ja.md)
 
 # Overview
 This extension allows merged models to be loaded as models for image generation without saving them.
@@ -24,6 +24,8 @@ This extension significantly improves the efficiency of model merging by elimina
     - [Extract from Checkpoints](#extract-from-checkpoints)
     - [Extract from two LoRAs](#extract-from-two-loras)
 - [Other Tabs](#other-tabs)
+- [Calcomode](calcmode_en.md)
+- [Elemental Merge](elemental_en.md)
 
 # Recent Update
 2023.11.10

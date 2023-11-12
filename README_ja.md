@@ -3,7 +3,7 @@
 - マージしたモデルを保存せず直接生成に使用できます
 
 ### English / 日本語
-English: [![en](https://img.shields.io/badge/lang-English-green.svg)](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/README.md)
+English: [![en](https://img.shields.io/badge/lang-English-green.svg)](README.md)
 
 # Overview
 このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
@@ -23,6 +23,10 @@ English: [![en](https://img.shields.io/badge/lang-English-green.svg)](https://gi
     - [Merge to Checipoint](#merge-to-checkpoint)
     - [Extract from Checkpoints](#extract-from-checkpoints)
 - [Other Tabs](#other-tabs)
+
+- [Calcomode](calcmode_ja.md)
+- [Elemental Merge](elemental_ja.md)
+
 
 # Recent Update
 2023.11.10
