@@ -260,7 +260,7 @@ Y type: random, 5
 With this configuration, a 3x5 grid will be created, and the model will generate images using weights randomly set for 5 iterations. Please make sure to set the randomization option on the random panel. It will not function properly if it is set to `off`.
 
 ## Elemental Merge
-see [here](#elemental_en.md)
+see [here](elemental_en.md)
 
 ## Generation Parameters
 You can also set the conditions for image generation here. If values are set here, they will take priority.
@@ -314,7 +314,7 @@ If you specify a demension, it will be created with the specified dimension. If 
 The blend ratio can be adjusted by alpha and beta. $(\alpha A - \beta B)$ alpha, beta = 1 is the normal LoRA creation.
 
 ### Extract from two LoRAs
-see [here](#calcmode_en.md#extractlora)
+see [here](calcmode_en.md#extractlora)
 
 ### Metadata
 #### create new

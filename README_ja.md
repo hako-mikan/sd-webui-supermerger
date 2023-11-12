@@ -266,7 +266,7 @@ Y type : random, 5
 - `save E-list` はElementalのキーと割合をcsv形式で`script/data/`に保存します。
 
 ## Elemental Merge
-[こちら](#elemental_ja.md)を参照して下さい。
+[こちら](elemental_ja.md)を参照して下さい。
 
 
 
@@ -322,7 +322,7 @@ demensionを指定すると指定されたdimensionで作製されます。無�
 alphaとbetaによって配合比率を調整することができます。$(\alpha A - \beta B)$　alpha, beta = 1が通常のLoRA作成となります。
 
 ### Extract from tow LoRAs
-[こちら](#calcmode_ja.md#extractlora)を参照して下さい。
+[こちら](calcmode_ja.md#extractlora)を参照して下さい。
 
 ### Metadata
 #### create new
