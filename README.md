@@ -267,8 +267,8 @@ see [here](elemental_en.md)
 ## Generation Parameters
 You can also set the conditions for image generation here. If values are set here, they will take priority.
 
-## Exclude
-When merging, you can set blocks that you want to exclude. Blocks set here will not be merged. If you check 'print', you can confirm whether a block has been excluded on the Command Prompt screen. If you check 'Adjust', the elements used in Adjust will be excluded. You can also specify things like `attn`, and in this case, elements containing `attn` will be excluded. Separate the strings with commas.
+## Include/Exclude
+When merging, you can set blocks that you want to include/exclude. Only the selected blocks will be merged / will not be merged. If you check 'print', you can confirm whether a block has been include/excluded on the Command Prompt screen. If you check 'Adjust', the elements used in Adjust will be included/excluded. You can also specify things like `attn`, and in this case, elements containing `attn` will be included/excluded. Separate the strings with commas.
 
 ## unload button
 Deletes the currently loaded model. This is used to free up GPU memory when using kohya-ss GUI. Once the model is deleted, you will not be able to generate images. If you want to generate images, please re-select models.
