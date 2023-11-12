@@ -183,7 +183,7 @@ This method is designed to extract **either similar or dissimilar features** fro
 In this configuration, we use a base model (**Model A**) along with two derived models (**Model B** and **Model C**), both developed from **Model A**. The differential models in focus are "**Model B - Model A**" and "**Model C - Model A**". Both derivatives share **Model A** as their common ancestor, ideally the most recent one, to reduce false similarities.
 
 ### <a id="extractlora">Using Two Differential Models(extract from two LoRAs)</a>
-Alternatively, when working with LoRA networks, **Model A** should be blank. We directly utilize two differential models: **Model B** and **Model C**. This approach implicitly assumes a shared base model, much like **Model A** in the three-model setup. 
+The extraction of common and distinct characteristics of two LoRAs will be carried out. This process is based on the assumption that the LoRAs are trained on a shared foundational model. However, the results may be unpredictable when applying this method to LoRAs that have been trained from different sources.
 
 ### Key Parameters
 - **alpha (α)**: Controls the focus of feature extraction between **Model B** (**α = 0**) and **Model C** (**α = 1**).
