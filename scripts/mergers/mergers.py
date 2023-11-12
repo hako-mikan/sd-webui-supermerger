@@ -63,8 +63,13 @@ def freezemtime():
 
 mergedmodel=[]
 FINETUNEX = ["IN","OUT","OUT2","CONT","BRI","COL1","COL2","COL3"]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed", "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)","calcmode","prompt","random"]
-TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks","elemental","add elemental","pinpoint element","effective","adjust","pinpoint adjust","calcmode","prompt","random"]
+TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed",
+                    "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)",
+                    "include blocks", "exclude blocks","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)",
+                    "calcmode","prompt","random"]
+TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta",
+                "model_A","model_B","model_C","pinpoint blocks","include blocks","exclude blocks","elemental","add elemental","pinpoint element",
+                "effective","adjust","pinpoint adjust","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
 EXCLUDE_CHOICES = ["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11",
@@ -83,7 +88,7 @@ NON4 = [None]*4
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
-                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,ex_blocks,ex_elems,
+                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,
                        esettings,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                        genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
@@ -98,7 +103,7 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     result,currentmodel,modelid,theta_0,metadata = smerge(
                         weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,ex_blocks,ex_elems,deepprint,lucks
+                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,deepprint,lucks
                         )
 
     if "ERROR" in result or "STOPPED" in result: 
@@ -182,7 +187,7 @@ statistics = {"sum":{},"mean":{},"max":{},"min":{}}
 ##### Main Merging Code
 
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,opt_value,ex_blocks,ex_elems,deepprint,lucks,main = [False,False,False]):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,deepprint,lucks,main = [False,False,False]):
     
     caster("merge start",hearm)
     global hear,mergedmodel,stopmerge,statistics
@@ -240,7 +245,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #for save log and save current model
     mergedmodel =[weights_a,weights_b,
                             hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine,opt_value,ex_blocks,ex_elems].copy()
+                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine,opt_value,inex,ex_blocks,ex_elems].copy()
 
     model_a = namefromhash(model_a)
     model_b = namefromhash(model_b)
@@ -273,7 +278,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if not(len(weights_b) == 25 or len(weights_b) == 19): return f"ERROR: weights beta value must be 20 or 26.",*NON4
         
     caster("model load start",hearm)
-    printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks['ceed'],fine,ex_blocks,ex_elems)
+    printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks['ceed'],fine,inex,ex_blocks,ex_elems)
 
     theta_1=load_model_weights_m(model_b,2,cachetarget).copy()
 
@@ -377,7 +382,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         block,blocks26 = blockfromkey(key,isxl)
         if block == "Not Merge": continue
-        if (ex_blocks or ex_elems) and excluder(blocks26,ex_blocks,ex_elems,key): continue
+        if inex != "Off" and (ex_blocks or (ex_elems != [""])) and excluder(blocks26,inex,ex_blocks,ex_elems,key): continue
         weight_index = BLOCKIDXLL.index(blocks26) if isxl else BLOCKID.index(blocks26)
 
         if useblocks:
@@ -404,7 +409,11 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
   
             elif MODES[2] in mode:#Triple
                 caster(f"{num}, {block}, {model_a}+{1-current_alpha-current_beta}+{model_b}*{current_alpha}+ {model_c}*{current_beta}",hear)
-                theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key]
+                #
+                if uselerp and current_alpha + current_beta != 0:
+                    theta_0_a =lerp(theta_0_a.to(torch.float32),lerp(theta_1[key].to(torch.float32),theta_2[key].to(torch.float32),current_beta/(current_alpha + current_beta)),current_alpha + current_beta).to(theta_0_a.dtype)
+                else:
+                    theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key] 
 
             elif MODES[3] in mode:#Twice
                 caster(f"{num}, {block}, {key},{model_a} +  {1-current_alpha} + {model_b}*{current_alpha}",hear)
@@ -530,8 +539,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             "mode": mode,
             "mbw": useblocks,
             "elemental_merge": deep,
-            "calcmode" : calcmode
-        }
+            "calcmode" : calcmode,
+            f"{inex}":ex_blocks + ex_elems
+            }
         metadata["sd_merge_recipe"] = json.dumps(merge_recipe)
         metadata["sd_merge_models"] = {}
 
@@ -1335,16 +1345,18 @@ FINETUNES = [
 ]
 
 ################################################
-##### Adjust
-def excluder(block, ex_blocks,ex_elems, key):
-    out = False
-    if block in ex_blocks:out = True
-    if "Adjust" in ex_blocks and key in FINETUNES:out = True
+##### Include/Exclude
+def excluder(block:str,inex:bool,ex_blocks:list,ex_elems:list, key:str):
+    if ex_blocks == [] and ex_elems == [""]:
+        return False
+    out = True if inex == "Include" else False
+    if block in ex_blocks:out = not out
+    if "Adjust" in ex_blocks and key in FINETUNES:out = not out
     for ke in ex_elems:
-        if ke != "" and ke in key:out = True
-    if "VAE" in ex_blocks and "first_stage_model"in key: out = True
-    if "print" in ex_blocks and out:
-        print("Exclude",block,ex_blocks,ex_elems,key)
+        if ke != "" and ke in key:out = not out
+    if "VAE" in ex_blocks and "first_stage_model"in key:out = not out
+    if "print" in ex_blocks and (out ^ (inex == "Include")):
+        print("Include" if inex else "Exclude",block,ex_blocks,ex_elems,key)
     return out
 
 ################################################
@@ -1392,7 +1404,7 @@ def getcachelist():
 ################################################
 ##### print
 
-def printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks,fine,ex_blocks,ex_elems):
+def printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks,fine,inex,ex_blocks,ex_elems):
     print(f"  model A  \t: {model_a}")
     print(f"  model B  \t: {model_b}")
     print(f"  model C  \t: {model_c}")
@@ -1404,7 +1416,7 @@ def printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,
     print(f"  CalcMode \t: {calcmode}")
     print(f"  Elemental \t: {deep}")
     print(f"  Weights Seed\t: {lucks}")
-    print(f"  Exclude \t: {ex_blocks,ex_elems}")
+    print(f"  {inex} \t: {ex_blocks,ex_elems}")
     print(f"  Adjust \t: {fine}")
 
 def caster(news,hear):

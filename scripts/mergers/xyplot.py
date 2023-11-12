@@ -12,7 +12,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageColor, PngImagePlugin
 from modules import images, sd_models, devices
 from modules.sd_models import load_model
 from modules.shared import opts
-from scripts.mergers.mergers import TYPES,FINETUNEX,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font
+from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font
 from scripts.mergers.model_util import savemodel
 from scripts.mergers.bcolors import bcolors
 
@@ -33,7 +33,7 @@ def freezetime():
 
 def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,ex_blocks,ex_elems,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,inex,ex_blocks,ex_elems,
                     s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                     genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
                     lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
@@ -59,7 +59,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                  useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,ex_blocks,ex_elems,
+                  useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,inex,ex_blocks,ex_elems,
                   txt2imgparams,gensets_s,lucks]
 
     from scripts.mergers.components import paramsnames
@@ -155,7 +155,7 @@ def caster(news,hear):
 
 def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,
-                  calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,ex_blocks,ex_elems,
+                  calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,inex,ex_blocks,ex_elems,
                   gensets,gensets_s,lucks):
     global hear
     esettings = " ".join(esettings)
@@ -208,8 +208,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     castall(hear)
     None5 = [None,None,None,None,None]
     if xmen =="": return "ERROR: parameter X is empty",*None5
-    if ymen =="" and not ytype=="none": return "ERROR: parameter Y is empty",*None5
-    if zmen =="" and not ztype=="none": return "ERROR: parameter Z is empty",*None5
+    if ymen =="" and not ytype=="none":
+        print("Parameter Y is empty, disable Y")
+        ytype = "none"
+    if zmen =="" and not ztype=="none":
+        print("Parameter Z is empty, disable Z")
+        ztype = "none"
     if model_a ==[] and "model_A" not in XYZ:return f"ERROR: model_A is not selected",*None5
     if model_b ==[] and "model_B" not in XYZ:return f"ERROR: model_B is not selected",*None5
     if model_c ==[] and usebeta and "model_C" not in XYZ:return "ERROR: model_C is not selected",*None5
@@ -322,9 +326,20 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if " " in z:return z.split(" ")[0],z.split(" ")[1]
         return z,z
 
+    def excluder(w):
+        if "NOT" in w:
+            outs = EXCLUDE_CHOICES.copy()
+            w = w.split(" ")
+            for x in w:
+                if x in outs:
+                    outs.remove(x)
+            return outs
+        else:
+            return w.split(" ")
+
     def xydealer(w,wt,awt,bwt):
         wta = awt + bwt
-        nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,fine
+        nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,fine,inex,ex_blocks
         if "prompt" in wt:
             gensets[1] = w
             return
@@ -353,6 +368,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             deep = deep  +","+ w if "add" in wt else w
         if "calcmode" in wt:calcmode = w
         if "adjust" == wt:fine = w
+        if "clude" in wt:
+            inex = wt.split(" ")[0]
+            ex_blocks = excluder(w)
     
     def elementdealer(xyzval,xyztype):
         t = "pinpoint element" if "pinpoint element" in xyztype else "effective"
@@ -406,7 +424,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     print("Merge is skipped")
                 else:
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
-                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,optv,ex_blocks,ex_elems,deepprint,lucks,main=mainmodel) 
+                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,optv,inex,ex_blocks,ex_elems,deepprint,lucks,main=mainmodel) 
                     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
                     if "save model" in esettings:
                         savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
@@ -456,7 +474,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "mbw alpha and beta" in ytype: ys_t = [f"alpha:({y[0]}),beta({y[1]})" for y in ys ]
 
         xs_t[0]=xtype+" = "+xs_t[0] #draw X label
-        if ytype!=TYPES[0] or "model" in ytype:ys_t[0]=ytype+" = "+ys[0]  #draw Y label
+        if ytype!=TYPES[0] or "model" in ytype:ys_t[0]=ytype+" = "+str(ys[0])  #draw Y label
 
         if ys_t==[""]:ys_t = [" "]
 
