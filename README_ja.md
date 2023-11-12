@@ -321,6 +321,9 @@ LoRAname1:ratio1:1,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0
 demensionを指定すると指定されたdimensionで作製されます。無指定の場合は128で作製します。
 alphaとbetaによって配合比率を調整することができます。$(\alpha A - \beta B)$　alpha, beta = 1が通常のLoRA作成となります。
 
+### Extract from tow LoRAs
+[こちら](#calcmode_ja.md#extractlora)を参照して下さい。
+
 ### Metadata
 #### create new
 新しく最小限のMetadataを作製します。dim,alpha,basemodelのversion,filename,networktypeのみが作製されます。

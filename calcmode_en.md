@@ -175,40 +175,28 @@ _Note also compared with either the Median/Guassin filters individually how you 
 >Sometimes you may want to use this smooth Add difference as an alternative to the regular, even without the risk of burning.
 >In these cases you could increase the Alpha up to 2, as smooth Add at 1 is a lower impact change individually than regular Add, but this of course depends on your desired outcome.
 
-### extract
-### xFed Feature Extraction method
+## <a id="extract">Extracting (Dis)Similar Features from Differential Models</a>
+### _Available modes :_ Add difference
+This method is designed to extract **either similar or dissimilar features** from two differential models that are built upon a common base model.
 
-xFed is a cutting-edge tool designed for the extraction of similar or dissimilar features from differential models of the same machine learning architecture. It is particularly useful for isolating elements learned uniquely by models, such as "red object", "green object", or "apple", when trained on different datasets or with different learning objectives.
+### Using Three Models
+In this configuration, we use a base model (**Model A**) along with two derived models (**Model B** and **Model C**), both developed from **Model A**. The differential models in focus are "**Model B - Model A**" and "**Model C - Model A**". Both derivatives share **Model A** as their common ancestor, ideally the most recent one, to reduce false similarities.
 
-#### How to Use
+### <a id="extractlora">Using Two Differential Models(extract from two LoRAs)</a>
+Alternatively, when working with LoRA networks, **Model A** should be blank. We directly utilize two differential models: **Model B** and **Model C**. This approach implicitly assumes a shared base model, much like **Model A** in the three-model setup. 
 
-1. **Prepare Your Models**: Before using xFed, you need to have the weights of your base model(model A) and the two differential models (B and C) that have been fine-tuned or adapted from the base model. 
+### Key Parameters
+- **alpha (α)**: Controls the focus of feature extraction between **Model B** (**α = 0**) and **Model C** (**α = 1**).
+- **beta (β)**: Controls the nature of feature extraction, with **β = 0** for **similar features** and **β = 1** for **dissimilar features**.
+- **smoothness(Option value)**: Adjusts cosine similarity rectification, typically around **0.3**.
 
-2. **Select Model Weights**:
-    - **Model_A**: Use the dropdown to select the path to the base model weights tensor.
-    - **Model_B**: Use the dropdown to select the path to model B's weights tensor.
-    - **Model_C**: Use the dropdown to select the path to model C's weights tensor.
-
-3. **Configure Parameters**:
-    - **α (alpha)**: Adjust the slider to set the value of α. Setting α to 0 will extract components from B that are (dis)similar to C, while setting α to 1 will do the reverse.
-    - **β (beta)**: Adjust the slider to toggle between extracting similar and dissimilar features. B β of 0 extracts similar features, and a β of 1 extracts dissimilar features.
-    - **option (smoothness)**: Adjust the slider to set the smoothness level, which affects the rectification of cosine similarity from the interval [-1, 1] to [0, 1].
-
-### Notes
-- The alpha (α), beta (β), and smoothness (σ) parameters allow fine-grained control over the feature extraction process, enabling you to tailor the results to your specific needs.
-
-### Example Configuration
-
-- **Checkpoint Name**: `extracted_features_red_apple`
-- **Model A**: `base_model`
-- **Model B**: `red_apple_model`
-- **Model C**: `green_apple_model`
-- **α**: `0.0`
-- **β**: `0.5`
-- **σ**: `0.0`
-
-With this configuration, if α is set to 0, β is set to 0.5, and σ is set to 0, the result will be equivalent to `Model A + (a - Model A) * 0.5`. This would extract features that are midway between the model A and model B, emphasizing features learned exclusively by model B.
-
+### Usage Scenarios
+- **α = 0, β = 0**: Extracts features in **Model B** that are similar to those in **Model C**.
+- **α = 0, β = 0.5**: Represents a balanced extraction between similarity and dissimilarity for features from:
+  - **Full-parameter models**: $\frac{\text{A} + \text{lerp}(\text{B}, \text{C}, \alpha)}{2}$
+  - **LoRA networks**: $\frac{\text{lerp}(\text{B}, \text{C}, \alpha)}{2}$
+- **α = 0, β = 1**: Extracts features in **Model B** that are dissimilar to those in **Model C**.
+- **α = 1**: Reverses the focus between **Models B and C**.
 
 ## tensor
 ### Available modes : weight sum only

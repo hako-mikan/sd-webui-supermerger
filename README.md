@@ -314,7 +314,7 @@ If you specify a demension, it will be created with the specified dimension. If 
 The blend ratio can be adjusted by alpha and beta. $(\alpha A - \beta B)$ alpha, beta = 1 is the normal LoRA creation.
 
 ### Extract from two LoRAs
-
+see [here](#calcmode_en.md#extractlora)
 
 ### Metadata
 #### create new
