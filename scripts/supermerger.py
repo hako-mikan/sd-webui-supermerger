@@ -188,6 +188,9 @@ def on_ui_tabs():
                                             resetweight = gr.Button(elem_classes=["reset"], value="Set")
                                             addweight = gr.Button(elem_classes=["reset"], value="Add")
                                             mulweight = gr.Button(elem_classes=["reset"], value="Mul")
+                                        with gr.Row():
+                                            lower = gr.Slider(label="Slider Lower Limit", minimum=-2, maximum=3, step=0.1, value=0)
+                                            upper = gr.Slider(label="Slider Upper Limit", minimum=-2, maximum=3, step=0.1, value=1)
 
                             with gr.Row():
                                 with gr.Column(scale=1, min_width=100):
@@ -269,9 +272,9 @@ def on_ui_tabs():
                         with gr.Row(visible = False) as row_checkpoints:
                             checkpoints = gr.CheckboxGroup(label = "checkpoints",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
                             create_refresh_button(checkpoints, sd_models.list_models, lambda: {"choices": [x.model_name for x in sd_models.checkpoints_list.values()]}, "refresh_checkpoint_xyz")
-                        with gr.Row(visible = False) as row_esets:
-                            pass
-                    
+                        with gr.Row(visible = False) as row_blocks:
+                            gr.HTML(value="<p>BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11<br>,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11,Adjust,VAE,print</p>")
+
                         with gr.Accordion("Reservation", open=False):
                             with gr.Row():
                                 components.s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
@@ -365,13 +368,16 @@ def on_ui_tabs():
                             resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
                             resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
 
-                    with gr.Accordion("Exclude", open=False) as acc_ex:
+                    with gr.Accordion("Include/Exclude", open=False) as acc_ex:
+                        with gr.Row():
+                            inex = gr.Radio(label="Mode", choices=["Off","Include","Exclude"], value="Off")
                         with gr.Row():
                             ex_blocks = gr.CheckboxGroup(choices=EXCLUDE_CHOICES + ["print"], visible = True,interactive=True,type="value")
                         with gr.Row():
                             ex_elems = gr.Textbox(label="Elements")
-                        ex_blocks.change(fn=lambda x,y: gr.update(label ="Exclude : " + ",".join(x) +","+ y if x != [] or y != "" else "Exclude"), inputs = [ex_blocks,ex_elems],outputs = [acc_ex] )
-                        ex_elems.change(fn=lambda x,y: gr.update(label ="Exclude : " + ",".join(x) +","+ y if x != [] or y != "" else "Exclude"),inputs=[ex_blocks,ex_elems],outputs = [acc_ex])
+                        inex.change(fn=lambda i, x,y: gr.update(label =f"{i} : " + ",".join(x) +","+ y if x != [] or y != "" else "Include/Exclude"), inputs = [inex,ex_blocks,ex_elems],outputs = [acc_ex])
+                        ex_blocks.change(fn=lambda i, x,y: gr.update(label =f"{i} : " + ",".join(x) +","+ y if x != [] or y != "" else "Include/Exclude"), inputs = [inex,ex_blocks,ex_elems],outputs = [acc_ex])
+                        ex_elems.change(fn=lambda i, x,y: gr.update(label =f"{i} : " + ",".join(x) +","+ y if x != [] or y != "" else "Include/Exclude"),inputs=[inex,ex_blocks,ex_elems],outputs = [acc_ex])
 
                     with gr.Accordion("Advanced", open=False):
                         with gr.Row():
@@ -388,7 +394,6 @@ def on_ui_tabs():
     
         with gr.Tab("LoRA", elem_id="tab_lora"):
             pluslora.on_ui_tabs()
-
                     
         with gr.Tab("Analysis", elem_id="tab_analysis"):
             with gr.Tab("Models"):
@@ -480,7 +485,7 @@ def on_ui_tabs():
         load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
         reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
 
-        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae,opt_value,ex_blocks,ex_elems]
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae,opt_value,inex,ex_blocks,ex_elems]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
@@ -499,7 +504,7 @@ def on_ui_tabs():
 
         s_reverse.click(fn = reversparams,
             inputs =mergeid,
-            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune,opt_value,ex_blocks,ex_elems]
+            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune,opt_value,inex,ex_blocks,ex_elems]
         )
 
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
@@ -519,6 +524,10 @@ def on_ui_tabs():
         calcmodes.change(fn=lambda x:",".join(x),inputs=[calcmodes],outputs=[inputer])
 
         menbers = [base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
+        menbers_plus = menbers + [resetval]
+
+        lower.change(fn = lambda x: [gr.update(minimum = x) for i in range(len(menbers_plus))],inputs = [lower],outputs = menbers_plus)
+        upper.change(fn = lambda x: [gr.update(maximum = x) for i in range(len(menbers_plus))],inputs = [upper],outputs = menbers_plus)
 
         setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
         setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
@@ -703,9 +712,9 @@ def on_ui_tabs():
 
         isxl.change(fn=changexl,inputs=[isxl], outputs=menbers)
 
-        x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
-        y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
-        z_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_esets,row_calcmode])
+        x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_blocks,row_calcmode])
+        y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_blocks,row_calcmode])
+        z_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_blocks,row_calcmode])
         x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
 
         import subprocess
@@ -795,8 +804,8 @@ def searchhistory(words,searchmode):
     return outs
 
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
-#13  deep,14 calcmode,15 luckseed 16:opt_value 17: exclude_blocks, 18: exclude_elements
-MSETSNUM = 19
+#13  deep,14 calcmode,15 luckseed 16:opt_value 17 include/exclude 18: exclude_blocks, 19: exclude_elements
+MSETSNUM = 20
 
 def reversparams(id):
     def selectfromhash(hash):
@@ -830,8 +839,9 @@ def reversparams(id):
     mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
     mgs[14] = -1 if mgs[14] == "" else mgs[14]
     mgs[16] = 0.3 if mgs[16] == "" else float(mgs[16]) 
-    mgs[17] = cutter(mgs[17])
-    mgs[17] = [x for x in mgs[17] if x in EXCLUDE_CHOICES + ["print"]]
+    mgs[17] = "Off" if mgs[17] == "" else mgs[17]
+    mgs[18] = cutter(mgs[18])
+    mgs[18] = [x for x in mgs[18] if x in EXCLUDE_CHOICES + ["print"]]
     return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:MSETSNUM]]]
 
 def add_to_seq(seq,maker):
@@ -850,14 +860,14 @@ def makerand(num):
     text = text[:-1]
     return text
 
-#0 row_blockids, 1 row_checkpoints, 2 row_inputers,3 ygrid, 4 zgrid, 5 row_esets, 6 row_calcmode
+#0 row_blockids, 1 row_checkpoints, 2 row_inputers,3 ygrid, 4 zgrid, 5 row_blocks, 6 row_calcmode
 def showxy(x,y,z):
     flags =[False]*7
     t = TYPESEG
     txy = t[x] + t[y] + t[z]
     if "model" in txy : flags[1] = flags[2] = True
     if "pinpoint" in txy : flags[0] = flags[2] = True
-    if "effective" in txy or "element" in txy : flags[5] = True
+    if "clude" in txy in txy : flags[5] = True
     if "calcmode" in txy : flags[6] = True
     if not "none" in t[y] : flags[3] = flags[2] = True
     if not "none" in t[z] : flags[4] = flags[2] = True
