@@ -28,10 +28,10 @@ This extension significantly improves the efficiency of model merging by elimina
 - [Elemental Merge](elemental_en.md)
 
 # Recent Update
-2023.11.10
+2023.11.12
 - change LoRA extract script: support SDXL,2.X
 - support LoRA merge to checkpoint in SD2.X
-- add new feature: Exclude
+- add new feature: Include/Exclude
 - Bugfix
 - Add new calcmode `extract(checkpoint/LoRA)`, Thanks [subaqua](https://github.com/sbq0)!
 ## Change in Calculation Functions
