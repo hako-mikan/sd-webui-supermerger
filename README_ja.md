@@ -34,7 +34,8 @@ English: [![en](https://img.shields.io/badge/lang-English-green.svg)](https://gi
 ## 計算関数の変更
 いくつかのモードでは、計算に使用する機能が変更され、マージ計算の速度が向上しています。計算結果は同じですが、同じ結果が得られない場合は、オプションの「use old calc method」をチェックしてください。影響を受ける方式は以下の通りです:
 Weight Sum: normal, cosineA, cosineB
-Sum Twice:normal
+Sum Twice:normal  
+提案した[wkpark](https://github.com/wkpark)氏に感謝します。
 
 **注意！** 
 XLモデルのマージには最低64GBのCPUメモリが必要です。64Gのメモリであっても併用しているソフトによってはシステムが不安定になる恐れがあるのでシステムが落ちてもいい状態で作業して下さい。私は久しぶりにブルースクリーンに遭遇しました。
@@ -42,7 +43,7 @@ XLモデルのマージには最低64GBのCPUメモリが必要です。64Gの�
 ## 既知の問題
 他の拡張機能（sd-webui-prompt-all-in-oneなど）を同時にインストールしている場合、起動時にブラウザを自動的に開くオプションを有効にすると、動作が不安定になることがあります。Gradioの問題である可能性が高いので、修正は難しいです。そのオプションを無効にしてお使いください。
 
-すべての更新は[ここ](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  で確認できます。 
+すべての更新は[ここ](changelog.md)  で確認できます。 
 
 # つかいかた
 ## Merge Models
@@ -82,7 +83,7 @@ Weight sumを2回行います。alpha,betaが使用されます。MBWモード�
 Weight sumを2回行います。$\alpha$と$\beta$が使用されます。
 
 ### calcmode
-各計算方法の詳細については[リンク先](#calcmode_ja.md)を参照してください。計算方法とマージモードの対応表は以下の通りです。
+各計算方法の詳細については[リンク先](calcmode_ja.md)を参照してください。計算方法とマージモードの対応表は以下の通りです。
 | Calcmode  | Description  | Merge Mode  |
 |----|----|----|
 |normal | 通常の計算方法   |  ALL  |

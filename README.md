@@ -36,7 +36,7 @@ This extension significantly improves the efficiency of model merging by elimina
 In several modes, the functions used for calculations have been changed, resulting in faster merge computation speeds.
 The calculation results should be the same, but if you cannot get the same result, please check the "use old calc method" in the options. The methods affected are as follows:  
 Weight Sum: normal, cosineA, cosineB  
-Sum Twice:normal
+Sum Twice:normal  
 I am grateful to [wkpark](https://github.com/wkpark) for proposing this method.
 
 **Attention!**
@@ -49,7 +49,7 @@ XLモデルのマージには最低64GBのCPUメモリが必要です。64Gの�
 If you have other extensions (like sd-webui-prompt-all-in-one) installed simultaneously, enabling the option to automatically open the browser upon launch can cause instability in its operation. It's likely an issue with Gradio, so it might be difficult to fix. Please disable that option and use it.  
 他の拡張機能（sd-webui-prompt-all-in-oneなど）を同時にインストールしている場合、起動時にブラウザを自動的に開くオプションを有効にすると、動作が不安定になることがあります。Gradioの問題である可能性が高いので、修正は難しいです。そのオプションを無効にしてお使いください。
 
-All updates can be found [here](https://github.com/hako-mikan/sd-webui-supermerger/blob/main/changelog.md)  
+All updates can be found [here](changelog.md)  
 
 # How to Use
 ## Merge Models
@@ -74,7 +74,7 @@ Merge 3 models at the same time. alpha and beta are used. I added this function 
 Weight sum twice, alpha and beta are used. 
 
 ### calcmode
-You can set the calculation method. Please refer to the [linked destination](#calcmode_en.md) for details on each calculation method. Refer to the table below for the correspondence between the calculation method and Merge Mode.
+You can set the calculation method. Please refer to [here](calcmode_en.md) for details on each calculation method. Refer to the table below for the correspondence between the calculation method and Merge Mode.
 | Calcmode  | Description  | Merge Mode  |
 |----|----|----|
 |normal | Normal calculation method   |  ALL  |
