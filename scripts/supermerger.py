@@ -1,4 +1,3 @@
-from cProfile import label
 import gc
 import os
 import os.path
@@ -14,7 +13,7 @@ import torch.nn.functional as F
 from importlib import reload
 from pprint import pprint
 import gradio as gr
-from modules import (devices, script_callbacks, sd_hijack, sd_models,sd_vae, shared)
+from modules import (script_callbacks, sd_models,sd_vae, shared)
 from modules.scripts import basedir
 from modules.sd_models import checkpoints_loaded, load_model,unload_model_weights
 from modules.shared import opts
@@ -66,8 +65,17 @@ def fix_network_reset_cached_weight():
 def on_ui_tabs():
     fix_network_reset_cached_weight()
 
+    def getxyzpresetlist():
+        try:
+            with open(xyzpath, 'r') as file:
+                data = json.load(file)
+        except FileNotFoundError:
+            data = {}
+        return list(data.keys())
+
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
+    xyzpath = os.path.join(path_root,"xyzpresets.json")
     if os.path.isfile(userfilepath):
         try:
             with open(userfilepath) as f:
@@ -257,6 +265,19 @@ def on_ui_tabs():
                             components.gengrid = gr.Button(elem_id="model_merger_merge", value="Run XYZ Plot",variant='primary')
                             stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XYZ Plot",variant='primary')
                             components.s_reserve1 = gr.Button(value="Reserve XYZ Plot",variant='primary')
+                        
+                        with gr.Row():
+                            xyzpresetname = gr.Textbox(label="Preset Name")
+                            xyzmode = gr.Radio(label="Set Mode", choices=["Save", "Overwrite", "Delete"],value = "Save")
+                            xyzpresets = gr.Dropdown(label="Presets",choices=getxyzpresetlist())
+                            
+                        with gr.Row():
+                            savexyzpreset_b = gr.Button(value="Set XYZ Plot as Preset",variant='primary')
+                            openxyzpreset = gr.Button(value="Open XYZ Preset file",variant='primary')
+                            loadxyzpreset_b = gr.Button(value="Load XYZ Plot",variant='primary')
+
+                            openxyzpreset.click(fn=lambda:subprocess.Popen(['start', xyzpath], shell=True))
+
 
                         with gr.Column(visible = False, variant="compact") as row_inputers:
                             with gr.Row(variant="compact"):
@@ -541,7 +562,7 @@ def on_ui_tabs():
             "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
         }
         mode.change(fn=lambda mode,calcmode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] or calcmode in ["tensor", "tensor2"] else False)], inputs=[mode,calcmode], outputs=[mode, base_beta], show_progress=False)
-        calcmode.change(fn=lambda calcmode: gr.update(interactive=True) if calcmode in ["tensor", "tensor2"] else gr.update(), inputs=[calcmode], outputs=base_beta, show_progress=False)
+        calcmode.change(fn=lambda calcmode: gr.update(interactive=True) if calcmode in ["tensor", "tensor2","extract"] else gr.update(), inputs=[calcmode], outputs=base_beta, show_progress=False)
         useblocks.change(fn=lambda mbw: gr.update(visible=False if mbw else True), inputs=[useblocks], outputs=[alpha_group])
 
         def save_current_merge(custom_name, save_settings):
@@ -738,6 +759,51 @@ def on_ui_tabs():
         s_reloadtags.click(fn=tagdicter,inputs=[wpresets],outputs=[weightstags])
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
+
+        def savexyzpreset_f(xtype, xvals, ytype, yvals, ztype, zvals, name, mode):
+            new_data = {"xtype": TYPESEG[xtype], "xvalues": xvals,
+                                "ytype": TYPESEG[ytype], "yvalues": yvals,
+                                "ztype": TYPESEG[ztype], "zvalues": zvals
+                                }
+            print(xtype, xvals, ytype, yvals, ztype, zvals, name)
+            try:
+                with open(xyzpath, 'r') as file:
+                    data = json.load(file)
+            except FileNotFoundError:
+                data = {}
+
+            if "Delete" == mode:
+                if name in data:del data[name]
+            elif "Save" == mode:
+                if name in data:
+                    print(f"Preset name {name} already exists.")
+                else:
+                    data[name] = new_data
+            else:
+                data[name] = new_data
+
+            with open(xyzpath, 'w') as file:
+                json.dump(data, file, indent=4)
+            
+            return gr.update(choices = list(data.keys()))
+
+        def loadxyzpreset_f(name):
+                try:
+                    with open(xyzpath, 'r') as file:
+                        data = json.load(file)
+                except FileNotFoundError:
+                    return None
+
+                preset_data = data.get(name)
+                if not preset_data:
+                    return [gr.update(value = x) for x in ["alpha","","none","","none",""]]
+
+                sets = [("xtype"),"xvalues","ytype","yvalues","ztype","zvalues"]
+
+                return [gr.update(value = preset_data.get(x)) for x in sets]
+        
+        savexyzpreset_b.click(fn=savexyzpreset_f,inputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid,xyzpresetname,xyzmode],outputs=[xyzpresets])
+        loadxyzpreset_b.click(fn=loadxyzpreset_f,inputs=[xyzpresets],outputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid])
 
     return (supermergerui, "SuperMerger", "supermerger"),
 
