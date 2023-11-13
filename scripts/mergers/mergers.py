@@ -658,20 +658,19 @@ def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
 
 ################################################
 ##### Extract
-def extract_super(base: Tensor | None, a: Tensor, b: Tensor, alpha: float, beta: float, smoothness: float) -> Tensor:
+def extract_super(base: Tensor | None, a: Tensor, b: Tensor, alpha: float, beta: float, gamma: float) -> Tensor:
     assert base is None or base.shape == a.shape
     assert a.shape == b.shape
     assert 0 <= alpha <= 1
     assert 0 <= beta <= 1
-    assert 0 <= smoothness <= 1
+    assert 0 <= gamma
     dtype = base.dtype if base is not None else a.dtype
     base = base.float() if base is not None else 0
     a = a.float() - base
     b = b.float() - base
-    r = relu if smoothness == 0 else partial(softplus, beta=1 / smoothness)
-    c = r(cosine_similarity(a, b, -1)).unsqueeze(-1)
-    m = lerp(c, 1 - c, beta)
-    result = base + lerp(a * m, b * m, alpha)
+    c = cosine_similarity(a, b, -1).clamp(-1, 1).unsqueeze(-1)
+    d = ((c + 1) / 2) ** gamma
+    result = base + lerp(a, b, alpha) * lerp(d, 1 - d, beta)
     return result.to(dtype)
 
 def extract(a: Tensor, b: Tensor, p: float, smoothness: float) -> Tensor:
