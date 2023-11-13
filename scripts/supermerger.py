@@ -765,7 +765,6 @@ def on_ui_tabs():
                                 "ytype": TYPESEG[ytype], "yvalues": yvals,
                                 "ztype": TYPESEG[ztype], "zvalues": zvals
                                 }
-            print(xtype, xvals, ytype, yvals, ztype, zvals, name)
             try:
                 with open(xyzpath, 'r') as file:
                     data = json.load(file)
