@@ -177,26 +177,27 @@ _Note also compared with either the Median/Guassin filters individually how you 
 
 ## <a id="extract">Extracting (Dis)Similar Features from Differential Models</a>
 ### _Available modes :_ Add difference
-This method is designed to extract **either similar or dissimilar features** from two differential models that are built upon a common base model.
+This method is designed to extract **either similar or dissimilar features** from *two differential models* that are built upon a common base model.
 
-### Using Three Models
-In this configuration, we use a base model (**Model A**) along with two derived models (**Model B** and **Model C**), both developed from **Model A**. The differential models in focus are "**Model B - Model A**" and "**Model C - Model A**". Both derivatives share **Model A** as their common ancestor, ideally the most recent one, to reduce false similarities.
+### Using Three Full-Parameter Models
+In this setup, we use a base model (**Model A**) along with two derived models (**Model B** and **Model C**), both developed from **Model A**. *The two differential models* in focus are "**Model B - Model A**" and "**Model C - Model A**". Both derivatives share **Model A** as their common ancestor, ideally the most recent one, to reduce false similarities.
 
-### <a id="extractlora">Using Two Differential Models(extract from two LoRAs)</a>
-The extraction of common and distinct characteristics of two LoRAs will be carried out. This process is based on the assumption that the LoRAs are trained on a shared foundational model. However, the results may be unpredictable when applying this method to LoRAs that have been trained from different sources.
+### <a id="extractlora">Using Two LoRA Networks</a>
+In this setup, we directly use *the two differential models*: **LoRA B** and **LoRA C**. Both models are assumed to be trained on a common base model, similar to **Model A** in the three-model setup. However, if **LoRA B** and **LoRA C** derive from different base models, the results may be unpredictable due to underlying model discrepancies.
 
 ### Key Parameters
-- **alpha (α)**: Controls the focus of feature extraction between **Model B** (**α = 0**) and **Model C** (**α = 1**).
-- **beta (β)**: Controls the nature of feature extraction, with **β = 0** for **similar features** and **β = 1** for **dissimilar features**.
-- **smoothness(Option value)**: Adjusts cosine similarity rectification, typically around **0.3**.
+- **alpha (*α*)**: Controls the focus of feature extraction between **Model (LoRA)B** (***α* = 0**) and **Model (LoRA)C** (***α* = 1**).
+- **beta (*β*)**: Controls the nature of feature extraction, with ***β* = 0** for **similar features** and ***β* = 1** for **dissimilar features**.
+- **gamma (*γ*)**: Adjusts the selectivity in identifying feature (dis)similarity. **High *γ* (e.g., *γ* = 10)** emphasizes recognizing *more similar* features as similar. Conversely, **low *γ* (e.g., *γ* = 0.1)** emphasizes recognizing *more dissimilar* features as dissimilar.
 
 ### Usage Scenarios
-- **α = 0, β = 0**: Extracts features in **Model B** that are similar to those in **Model C**.
-- **α = 0, β = 0.5**: Represents a balanced extraction between similarity and dissimilarity for features from:
+- ***α* = 0, *β* = 0**: Extracts features in **Model B** that are similar to those in **Model C**.
+- ***α* = 0, *β* = 0.5**: Represents a balanced extraction between similarity and dissimilarity for features from:
   - **Full-parameter models**: $\frac{\text{A} + \text{lerp}(\text{B}, \text{C}, \alpha)}{2}$
   - **LoRA networks**: $\frac{\text{lerp}(\text{B}, \text{C}, \alpha)}{2}$
-- **α = 0, β = 1**: Extracts features in **Model B** that are dissimilar to those in **Model C**.
-- **α = 1**: Reverses the focus between **Models B and C**.
+- ***α* = 0, *β* = 1**: Extracts features in **Model B** that are dissimilar to those in **Model C**.
+- ***α* = 1**: Reverses the focus between **Model B** and **Model C**.
+
 
 ## tensor
 ### Available modes : weight sum only
