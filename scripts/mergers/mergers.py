@@ -837,6 +837,7 @@ def elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha)
             return dr
         else:
             return current_alpha
+    return current_alpha
 
 def forkforker(filename):
     try:
