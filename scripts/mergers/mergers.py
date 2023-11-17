@@ -46,6 +46,8 @@ modelcache = collections.OrderedDict()
 
 from inspect import currentframe
 
+SELFKEYS = ["to_out","proj_out","norm"]
+
 module_path = os.path.dirname(os.path.abspath(sys.modules[__name__].__file__))
 scriptpath = os.path.dirname(module_path)
 
@@ -65,10 +67,10 @@ mergedmodel=[]
 FINETUNEX = ["IN","OUT","OUT2","CONT","BRI","COL1","COL2","COL3"]
 TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed",
                     "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)",
-                    "include blocks", "exclude blocks","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)",
+                    "include blocks", "exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)",
                     "calcmode","prompt","random"]
 TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta",
-                "model_A","model_B","model_C","pinpoint blocks","include blocks","exclude blocks","elemental","add elemental","pinpoint element",
+                "model_A","model_B","model_C","pinpoint blocks","include blocks","exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element",
                 "effective","adjust","pinpoint adjust","calcmode","prompt","random"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
@@ -195,6 +197,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     
     debug = "debug" in save_sets
     uselerp = "use old calc method" not in save_sets
+    device = "cuda" if "use cuda" in save_sets else "cpu"
 
     unload_model_weights(sd_models.model_data.sd_model)
 
@@ -280,7 +283,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     caster("model load start",hearm)
     printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks['ceed'],fine,inex,ex_blocks,ex_elems)
 
-    theta_1=load_model_weights_m(model_b,2,cachetarget).copy()
+    theta_1=load_model_weights_m(model_b,2,cachetarget,device).copy()
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
@@ -304,9 +307,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if MODES[1] in mode:#Add
         if stopmerge: return "STOPPED", *NON4
         if calcmode == "trainDifference" or calcmode == "extract":
-            theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
+            theta_2 = load_model_weights_m(model_c,3,cachetarget,device).copy()
         else:
-            theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
+            theta_2 = load_model_weights_m(model_c,3,cachetarget,device).copy()
             for key in tqdm(theta_1.keys()):
                 if 'model' in key:
                     if key in theta_2:
@@ -319,16 +322,16 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if stopmerge: return "STOPPED", *NON4
     
     if  "tensor" in calcmode or "self" in calcmode:
-        theta_t = load_model_weights_m(model_a,1,cachetarget).copy()
+        theta_t = load_model_weights_m(model_a,1,cachetarget,device).copy()
         theta_0 ={}
         for key in theta_t:
             theta_0[key] = theta_t[key].clone()
         del theta_t
     else:
-        theta_0=load_model_weights_m(model_a,1,cachetarget).copy()
+        theta_0=load_model_weights_m(model_a,1,cachetarget,device).copy()
 
     if MODES[2] in mode or MODES[3] in mode:#Tripe or Twice
-        theta_2 = load_model_weights_m(model_c,3,cachetarget).copy()
+        theta_2 = load_model_weights_m(model_c,3,cachetarget,device).copy()
     else:
         if not (calcmode == "trainDifference" or calcmode == "extract"):
             theta_2 = {}
@@ -474,7 +477,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_0[key] = extract_super(theta_0[key],theta_1[key],theta_2[key],current_alpha,current_beta,opt_value)
 
         elif calcmode == "self":
-            theta_0[key] = theta_0[key].clone() * current_alpha
+            if any(selfkey in key for selfkey in SELFKEYS):continue
+            if current_alpha == 0: continue
+            theta_0[key] = (theta_0[key].clone()) +current_alpha
 
         ##### Adjust
         if any(item in key for item in FINETUNES) and fine:
@@ -839,27 +844,28 @@ def elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha)
             return current_alpha
     return current_alpha
 
-def forkforker(filename):
+def forkforker(filename,device):
     try:
-        return sd_models.read_state_dict(filename,map_location = "cpu")
+        return sd_models.read_state_dict(filename,map_location = device)
     except:
         return sd_models.read_state_dict(filename)
 
 ################################################
 ##### Load Model
 
-def load_model_weights_m(model,abc,cachetarget):
+def load_model_weights_m(model,abc,cachetarget,device):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     sd_model_name = checkpoint_info.model_name
 
     if checkpoint_info in modelcache:
         print(f"Loading weights [{sd_model_name}] from cache")
-        return modelcache[checkpoint_info]
+        return {k: v.to(device) for k, v in modelcache[checkpoint_info].items()}
     else:
         print(f"Loading weights [{sd_model_name}] from file")
-        state_dict = forkforker(checkpoint_info.filename)
+        state_dict = forkforker(checkpoint_info.filename,device)
         if orig_cache >= abc:
             modelcache[checkpoint_info] = state_dict
+            modelcache[checkpoint_info] = {k: v.to("cpu") for k, v in modelcache[checkpoint_info].items()}
         dontdelete = []
         for model in cachetarget:
             dontdelete.append(sd_models.get_closet_checkpoint_match(model))

@@ -172,6 +172,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     fine = fine.split(",") if fine else [0]*8
 
     deep_ori = deep
+    ex_blocks_ori = ex_blocks.copy()
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint 9:deep]
     xtype = TYPES[xtype]
     ytype = TYPES[ytype]
@@ -369,8 +370,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if "calcmode" in wt:calcmode = w
         if "adjust" == wt:fine = w
         if "clude" in wt:
-            inex = wt.split(" ")[0]
-            ex_blocks = excluder(w)
+            if "add" in wt:
+                inex = wt.split(" ")[1].capitalize()
+                ex_blocks = ex_blocks_ori + excluder(w)
+            else:
+                inex = wt.split(" ")[0].capitalize()
+                ex_blocks = excluder(w)
     
     def elementdealer(xyzval,xyztype):
         t = "pinpoint element" if "pinpoint element" in xyztype else "effective"
@@ -424,7 +429,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     print("Merge is skipped")
                 else:
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
-                                                                                        useblocks,"","",id_sets,False,deep_in,fine_in,bake_in_vae,optv,inex,ex_blocks,ex_elems,deepprint,lucks,main=mainmodel) 
+                                                                                        useblocks,"",save_sets,id_sets,False,deep_in,fine_in,bake_in_vae,optv,inex,ex_blocks,ex_elems,deepprint,lucks,main=mainmodel) 
                     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
                     if "save model" in esettings:
                         savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
