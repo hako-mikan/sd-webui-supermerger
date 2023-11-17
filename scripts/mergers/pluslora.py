@@ -72,6 +72,12 @@ def on_ui_tabs():
     else:
         sml_lbwpresets=LWEIGHTSPRESETS
 
+    try:
+        import diffusers
+        d_ver = diffusers.__version__
+    except:
+        d_ver = None
+
     with gr.Blocks(analytics_enabled=False) :
         sml_submit_result = gr.Textbox(label="Message")
         with gr.Row(equal_height=False):
@@ -119,7 +125,7 @@ def on_ui_tabs():
         sml_deselectall.click(fn = lambda x:gr.update(value =[]),outputs = [sml_loras])
 
         with gr.Row():
-            changediffusers = gr.Button(elem_id="change diffusers version", value="change diffusers version",variant='primary')
+            changediffusers = gr.Button(elem_id=f"change_diffusers_version", value=f"change diffusers version(now:{d_ver})",variant='primary')
             dversion = gr.Textbox(label="diffusers version",lines=1,visible =True,interactive  = True)  
         components.sml_loranames = [sml_loras, sml_loranames, hidenb]
 
@@ -457,7 +463,7 @@ def merge_lora_models(models, ratios, sets, locon):
 
     return merged_sd
 
-def merge_lora_models_dim(models, ratios, new_rank, sets, isv2):
+def merge_lora_models_dim(models, ratios, new_rank, sets):
     merged_sd = {}
     fugou = 1
     isv2 = False
@@ -489,7 +495,7 @@ def merge_lora_models_dim(models, ratios, new_rank, sets, isv2):
             else:
                 weight = merged_sd[lora_module_name]
 
-            ratio = ratios[blockfromkey(key, LBLCOKS26), isv2]
+            ratio = ratios[blockfromkey(key, LBLCOKS26,isv2)]
             if "same to Strength" in sets:
                 ratio, fugou = (ratio ** 0.5, 1) if ratio > 0 else (abs(ratio) ** 0.5, -1)
             # print(lora_module_name, ratio)
