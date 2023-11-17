@@ -28,7 +28,7 @@ This extension significantly improves the efficiency of model merging by elimina
 - [Elemental Merge](elemental_en.md)
 
 # Recent Update
-2023.11.18.0000(JSY)
+2023.11.18.0000(JST)
 - add new option:use cuda
 If you have enough GPU memory, merge speed will be 50x. 
 - 新しいオプション(use cuda)が追加されました
