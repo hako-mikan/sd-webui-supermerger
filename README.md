@@ -28,6 +28,12 @@ This extension significantly improves the efficiency of model merging by elimina
 - [Elemental Merge](elemental_en.md)
 
 # Recent Update
+2023.11.18.0000(JSY)
+- add new option:use cuda
+If you have enough GPU memory, merge speed will be 50x. 
+- 新しいオプション(use cuda)が追加されました
+GPUメモリに余裕がある場合マージスピードを50倍以上にできます。
+
 2023.11.12
 - change LoRA extract script: support SDXL,2.X
 - support LoRA merge to checkpoint in SD2.X
