@@ -35,7 +35,7 @@ from scripts.mergers.model_util import filenamecutter, savemodel
 
 path_root = basedir()
 
-CALCMODES  = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","extract","tensor","tensor2","self"]
+CALCMODES  = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","extract","tensor","tensor2","self","plus random"]
 
 class ResizeHandleRow(gr.Row):
     """Same as gr.Row but fits inside gradio forms"""
