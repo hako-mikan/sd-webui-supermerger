@@ -479,7 +479,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         elif calcmode == "self":
             if any(selfkey in key for selfkey in SELFKEYS):continue
             if current_alpha == 0: continue
-            theta_0[key] = (theta_0[key].clone()) +current_alpha
+            theta_0[key] = (theta_0[key].clone()) * current_alpha
+
+        elif calcmode == "plus random":
+            if any(selfkey in key for selfkey in SELFKEYS):continue
+            if current_alpha == 0: continue
+            theta_0[key] +=  torch.randn_like(theta_0[key].clone()) * current_alpha
 
         ##### Adjust
         if any(item in key for item in FINETUNES) and fine:
