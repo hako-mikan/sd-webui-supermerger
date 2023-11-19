@@ -694,12 +694,13 @@ def pluslora(lnames,loraratios,settings,output,model,precision,metasets):
                 keychanger[skey.split("model_",1)[1]] = key
 
     if is15:
-        orig_checkpoint = shared.sd_model.sd_checkpoint_info
+        if shared.sd_model is not None:
+            orig_checkpoint = shared.sd_model.sd_checkpoint_info
+        else:
+            orig_checkpoint = None
         checkpoint_info = sd_models.get_closet_checkpoint_match(model)
         if orig_checkpoint != checkpoint_info:
             sd_models.load_model(checkpoint_info=checkpoint_info)
-        else:
-            orig_checkpoint = None
         theta_0 = newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger)
         if orig_checkpoint: sd_models.load_model(checkpoint_info=orig_checkpoint)
 
