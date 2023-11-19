@@ -65,7 +65,7 @@ def fix_network_reset_cached_weight():
 def on_ui_tabs():
     fix_network_reset_cached_weight()
 
-    def getxyzpresetlist(xyzpath):
+    def getxyzpresetlist():
         if not os.path.exists(xyzpath):
             return []
 
