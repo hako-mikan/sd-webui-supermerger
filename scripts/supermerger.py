@@ -65,12 +65,16 @@ def fix_network_reset_cached_weight():
 def on_ui_tabs():
     fix_network_reset_cached_weight()
 
-    def getxyzpresetlist():
+    def getxyzpresetlist(xyzpath):
+        if not os.path.exists(xyzpath):
+            return []
+
         try:
             with open(xyzpath, 'r') as file:
                 data = json.load(file)
-        except FileNotFoundError:
-            data = {}
+        except json.JSONDecodeError:
+            return []
+
         return list(data.keys())
 
     weights_presets=""
