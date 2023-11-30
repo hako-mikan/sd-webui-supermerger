@@ -2,8 +2,10 @@
 - [AUTOMATIC1111's stable-diffusion-webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 用のモデルマージ拡張
 - マージしたモデルを保存せず直接生成に使用できます
 
-### English / 日本語
-English: [![en](https://img.shields.io/badge/lang-English-green.svg)](README.md)
+[<img src="https://img.shields.io/badge/lang-Egnlish-red.svg?style=plastic" height="25" />](#readme_md)
+[<img src="https://img.shields.io/badge/言語-日本語-green.svg?style=plastic" height="25" />](#overview)
+[<img src="https://img.shields.io/badge/Support-%E2%99%A5-magenta.svg?logo=github&style=plastic" height="25" />](https://github.com/sponsors/hako-mikan)
+
 
 # Overview
 このextentionではモデルをマージした際、保存せずに画像生成用のモデルとして読み込むことができます。
