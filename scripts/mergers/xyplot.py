@@ -426,7 +426,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 if "stock" in esettings: stocker.check_alpha(useblocks,alpha,weights_a_in,calcmode)
 
                 if (((xtype=="seed") or (xtype=="prompt")) and xcount > 0) or (stocker.now and stocker.stock is not None):
-                    print(f"{bcolors.WARNING} Merging is skipped){bcolors.ENDC}")
+                    print("Merge is skipped")
                 else:
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
                                                                                         useblocks,"",save_sets,id_sets,False,deep_in,fine_in,bake_in_vae,optv,inex,ex_blocks,ex_elems,deepprint,lucks,main=mainmodel) 
