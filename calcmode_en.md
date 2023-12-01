@@ -189,6 +189,7 @@ In this setup, we directly use *the two differential models*: **LoRA B** and **L
 - **alpha (*α*)**: Controls the focus of feature extraction between **Model (LoRA)B** (***α* = 0**) and **Model (LoRA)C** (***α* = 1**).
 - **beta (*β*)**: Controls the nature of feature extraction, with ***β* = 0** for **similar features** and ***β* = 1** for **dissimilar features**.
 - **gamma (*γ*)**: Adjusts the selectivity in identifying feature (dis)similarity. **High *γ* (e.g., *γ* = 10)** emphasizes recognizing *more similar* features as similar. Conversely, **low *γ* (e.g., *γ* = 0.1)** emphasizes recognizing *more dissimilar* features as dissimilar.
+**gamma** can be set in the option items of model merging as option(gamma), and in the case of LoRA, it can be set as gamma(smooth).
 
 ### Usage Scenarios
 - ***α* = 0, *β* = 0**: Extracts features in **Model B** that are similar to those in **Model C**.
