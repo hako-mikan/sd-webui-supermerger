@@ -89,7 +89,8 @@ def on_ui_tabs():
                     sml_filename = gr.Textbox(label="filename(option)",lines=1,visible =True,interactive  = True)  
                 sml_metasettings = gr.Radio(value = "create new",choices = ["create new","create new without output_name", "merge","save all", "use first lora"], label="metadata")
                 with gr.Row(equal_height=False):
-                    precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
+                    save_precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
+                    calc_precision = gr.Radio(label = "calc precision(fp16:cuda only)" ,choices=["float","fp16","bf16"],value = "float",type="value")
                     device = gr.Radio(label = "device",choices=["cuda","cpu"],value = "cuda",type="value")
             with gr.Column(equal_height=False):
                 sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * A - beta * B)",variant='primary')
@@ -137,25 +138,25 @@ def on_ui_tabs():
 
         sml_merge.click(
             fn=lmerge,
-            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,precision,sml_metasettings,alpha,beta,smooth,gr.Checkbox(value = True,visible = False)],
+            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,save_precision,calc_precision,sml_metasettings,alpha,beta,smooth,gr.Checkbox(value = True,visible = False),device],
             outputs=[sml_submit_result]
         )
 
         sml_extract.click(
             fn=lmerge,
-            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,precision,sml_metasettings,alpha,beta,smooth,gr.Checkbox(value = False,visible = False)],
+            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_dim,save_precision,calc_precision,sml_metasettings,alpha,beta,smooth,gr.Checkbox(value = False,visible = False),device],
             outputs=[sml_submit_result]
         )
 
         sml_makelora.click(
             fn=makelora,
-            inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings,alpha,beta,precision,sml_metasettings,device],
+            inputs=[sml_model_a,sml_model_b,sml_dim,sml_filename,sml_settings,alpha,beta,save_precision,calc_precision,sml_metasettings,device],
             outputs=[sml_submit_result]
         )
 
         sml_cpmerge.click(
             fn=pluslora,
-            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,precision,sml_metasettings],
+            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,save_precision,calc_precision,sml_metasettings],
             outputs=[sml_submit_result]
         )
 
@@ -242,7 +243,7 @@ def on_ui_tabs():
 ##############################################################
 ####### make LoRA from checkpoint
 
-def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision,metasets,device):
+def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_precision,metasets,device):
     print("make LoRA start")
     if model_a == "" or model_b =="":
       return "ERROR: No model Selected"
@@ -277,7 +278,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision,metasets,d
         v2=is_sd2,
         v_parameterization=True,
         sdxl=is_sdxl,
-        save_precision='fp16',
+        save_precision=save_precision,
         model_org=fullpathfromname(model_a),
         model_tuned=fullpathfromname(model_b),
         save_to=saveto,
@@ -297,7 +298,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,precision,metasets,d
 ##############################################################
 ####### merge LoRAs
 
-def lmerge(loranames,loraratioss,settings,filename,dim,precision,metasets,alpha,beta,smooth,merge):
+def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_precision,metasets,alpha,beta,smooth,merge,device):
     try:
         import lora
         loras_on_disk = [lora.available_loras.get(name, None) for name in loranames]
@@ -333,7 +334,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision,metasets,alpha,
         for i,n in enumerate(lnames):
             if len(n) ==2:
                 ratio = [float(n[1])]*26
-            if len(n) ==3:
+            elif len(n) ==3:
                 if n[2].strip() in ldict:
                     ratio = [float(r)*float(n[1]) for r in ldict[n[2]].split(",")]
                     ratio = to26(ratio)
@@ -342,7 +343,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision,metasets,alpha,
                 ratio = [float(x) for x in n[2:]]
                 ratio = to26(ratio)
             else:
-                print("ERROR,Number of Blocks must be 12,17,20,26")
+                print("ERROR:Number of Blocks must be 12,17,20,26")
                 ratio = [float(n[1])]*26
             c_lora = lora.available_loras.get(n[0], None) 
             ln.append(c_lora.filename)
@@ -374,39 +375,44 @@ def lmerge(loranames,loraratioss,settings,filename,dim,precision,metasets,alpha,
             if "LyCORIS" in ld:
                 if len(ld) !=1:
                     return "multiple merge of LyCORIS is not supported"
-                sd = lycomerge(ln[0], lr[0])
+                sd = lycomerge(ln[0], lr[0], calc_precision)
             elif dim > 0:
                 print("change demension to ", dim)
-                sd = merge_lora_models_dim(ln, lr, dim,settings)
+                sd = merge_lora_models_dim(ln, lr, dim,settings,device,calc_precision)
             elif auto and ld.count(ld[0]) != len(ld):
                 print("change demension to ",dmax)
-                sd = merge_lora_models_dim(ln, lr, dmax,settings)
+                sd = merge_lora_models_dim(ln, lr, dmax,settings,device,calc_precision)
             else:
-                sd = merge_lora_models(ln, lr, settings, False)
+                sd = merge_lora_models(ln, lr, settings, False, calc_precision)
 
             if os.path.isfile(filename) and not "overwrite" in settings:
                 _err_msg = f"Output file ({filename}) existed and was not saved"
                 print(_err_msg)
                 return _err_msg
         else:
-            a = merge_lora_models(ln[0:1], lr[0:1], settings, False)
-            b = merge_lora_models(ln[1:2], lr[1:2], settings, False)
+            a = merge_lora_models(ln[0:1], lr[0:1], settings, False, calc_precision)
+            b = merge_lora_models(ln[1:2], lr[1:2], settings, False, calc_precision)
             sd = extract_two(a,b,alpha,beta,smooth)
         
         # マージ後のメタデータを取得
-        metadata = create_merge_metadata( sd, lm, loraname, precision,metasets )
+        metadata = create_merge_metadata( sd, lm, loraname, save_precision,metasets )
 
-        save_to_file(filename,sd,sd, str_to_dtype(precision), metadata)
+        save_to_file(filename,sd,sd, str_to_dtype(save_precision), metadata)
+        sd = None
+        del sd
+        gc.collect()
+        torch.cuda.empty_cache()
+
         return "saved : "+filename
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         traceback.print_exc()
         return exc_value
 
-def merge_lora_models(models, ratios, sets, locon):
+def merge_lora_models(models, ratios, sets, locon, calc_precision):
     base_alphas = {}                          # alpha for merged model
     base_dims = {}
-    merge_dtype = torch.float
+    merge_dtype = str_to_dtype(calc_precision)
     merged_sd = {}
     fugou = 1
     for model, ratios in zip(models, ratios):
@@ -452,6 +458,7 @@ def merge_lora_models(models, ratios, sets, locon):
                 merged_sd[key] = merged_sd[key] + lora_sd[key] * scale
             else:
                 merged_sd[key] = lora_sd[key] * scale
+        del lora_sd
 
     # set alpha to sd
     for lora_module_name, alpha in base_alphas.items():
@@ -463,13 +470,14 @@ def merge_lora_models(models, ratios, sets, locon):
 
     return merged_sd
 
-def merge_lora_models_dim(models, ratios, new_rank, sets):
+def merge_lora_models_dim(models, ratios, new_rank, sets, device, calc_precision):
     merged_sd = {}
     fugou = 1
     isv2 = False
+    merge_dtype = str_to_dtype(calc_precision)
     for model, ratios in zip(models, ratios):
-        merge_dtype = torch.float
-        lora_sd, medadata, isv2 = load_state_dict(model, merge_dtype)
+
+        lora_sd, medadata, isv2 = load_state_dict(model, merge_dtype, device)
 
         # merge
         print(f"merging {model}: {ratios}")
@@ -491,7 +499,7 @@ def merge_lora_models_dim(models, ratios, new_rank, sets):
 
             # make original weight if not exist
             if lora_module_name not in merged_sd:
-                weight = torch.zeros((out_dim, in_dim, 1, 1) if conv2d else (out_dim, in_dim), dtype=merge_dtype)
+                weight = torch.zeros((out_dim, in_dim, 1, 1) if conv2d else (out_dim, in_dim), dtype=merge_dtype, device=device)
             else:
                 weight = merged_sd[lora_module_name]
 
@@ -507,6 +515,13 @@ def merge_lora_models_dim(models, ratios, new_rank, sets):
                 weight = weight + ratio * (up_weight.squeeze(3).squeeze(2) @ down_weight.squeeze(3).squeeze(2)).unsqueeze(2).unsqueeze(3) * scale * fugou
 
             merged_sd[lora_module_name] = weight
+            
+        lora_sd = None
+        del lora_sd
+        torch.cuda.empty_cache()
+    
+    for key in merged_sd.keys():
+        merged_sd[key] = merged_sd[key].to(torch.float)
 
     # extract from merged weights
     print("extract new lora...")
@@ -542,6 +557,10 @@ def merge_lora_models_dim(models, ratios, new_rank, sets):
             merged_lora_sd[lora_module_name + '.lora_up.weight'] = up_weight.to("cpu").contiguous()
             merged_lora_sd[lora_module_name + '.lora_down.weight'] = down_weight.to("cpu").contiguous()
             merged_lora_sd[lora_module_name + '.alpha'] = torch.tensor(new_rank)
+
+    del merged_sd
+    gc.collect()
+    torch.cuda.empty_cache()
 
     return merged_lora_sd
 
@@ -588,8 +607,9 @@ def extract_two(a,b,pa,pb,ps):
 
     return merged_sd
 
-def lycomerge(filename,ratios):
-    sd, metadata, isv2 = load_state_dict(filename, torch.float)
+def lycomerge(filename,ratios,calc_precision):
+    merge_dtype = str_to_dtype(calc_precision)
+    sd, metadata, isv2 = load_state_dict(filename, merge_dtype)
 
     if len(ratios) == 17:
       r0 = 1
@@ -634,9 +654,11 @@ def lycomerge(filename,ratios):
 
 ##############################################################
 ####### merge to checkpoint
-def pluslora(lnames,loraratios,settings,output,model,precision,metasets):
+def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precision,metasets):
     if model == []: return "ERROR: No model Selected"
     if lnames == "":return "ERROR: No LoRA Selected"
+
+    add = ""
 
     print("Plus LoRA start")
     import lora
@@ -702,8 +724,12 @@ def pluslora(lnames,loraratios,settings,output,model,precision,metasets):
         if orig_checkpoint != checkpoint_info:
             sd_models.load_model(checkpoint_info=checkpoint_info)
         theta_0 = newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger)
-        if orig_checkpoint: sd_models.load_model(checkpoint_info=orig_checkpoint)
-
+        
+        try:
+            if orig_checkpoint: sd_models.load_model(checkpoint_info=orig_checkpoint)
+        except:
+            add = "Reloading model failed, reload model from the model selecting box"
+            print(add)
     else:
         for name,filename, lwei in zip(names,filenames, lweis):
             print(f"loading: {name}")
@@ -762,12 +788,12 @@ def pluslora(lnames,loraratios,settings,output,model,precision,metasets):
                         
                     theta_0[keychanger[msd_key]] = torch.nn.Parameter(weight)
     #usemodelgen(theta_0,model)
-    settings.append(precision)
+    settings.append(save_precision)
     settings.append("safetensors")
     result = savemodel(theta_0,dname,output,settings)
     del theta_0
     gc.collect()
-    return result
+    return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
     import networks as nets
@@ -962,19 +988,19 @@ def load_state_header(file_name, dtype):
       sd[key] = sd[key].to(dtype)
   return sd
 
-def load_state_dict(file_name, dtype):
+def load_state_dict(file_name, dtype, device = "cpu"):
     if os.path.splitext(file_name)[1] == ".safetensors":
-        sd = load_file(file_name)
+        sd = load_file(file_name,device=device)
         metadata = load_metadata_from_safetensors(file_name)
     else:
-        sd = torch.load(file_name, map_location="cpu")
+        sd = torch.load(file_name, map_location=device)
         metadata = {}
 
     isv2 = False
 
     for key in list(sd.keys()):
         if type(sd[key]) == torch.Tensor:
-            sd[key] = sd[key].to(dtype)
+            sd[key] = sd[key].to(dtype = dtype, device = device)
             if "resblocks" in key:
                 isv2 = True
     

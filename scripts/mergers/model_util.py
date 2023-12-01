@@ -3,7 +3,7 @@ import torch
 import safetensors.torch
 import threading
 from modules import shared, sd_hijack, sd_models
-from modules.sd_models import read_state_dict
+from modules.sd_models import load_model
 import json
 
 try:
@@ -27,6 +27,7 @@ def to_half(sd):
     return sd
 
 def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
+    other_dict = {}
     if state_dict is None:
         if shared.sd_model and shared.sd_model.sd_checkpoint_info:
             metadata = shared.sd_model.sd_checkpoint_info.metadata.copy()
@@ -61,8 +62,11 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
                 if hasattr(module,"network_weights_backup"):
                     module = network_restore_weights_from_backup(module)
 
-
             state_dict = shared.sd_model.state_dict()
+            for key in list(state_dict.keys()):
+                if key in POPKEYS:
+                    other_dict[key] = state_dict[key]
+                    del state_dict[key]
 
             sd_hijack.model_hijack.hijack(shared.sd_model)
         else:
@@ -125,6 +129,11 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
       print(f"ERROR: Couldn't saved:{fname},ERROR is {e}")
       return f"ERROR: Couldn't saved:{fname},ERROR is {e}"
     print("Done!")
+    if other_dict:
+        for key in other_dict.keys():
+            state_dict[key] = other_dict[key]
+        del other_dict
+        load_model(checkpoint_info, already_loaded_state_dict=state_dict)
     return "Merged model saved in "+fname
 
 def filenamecutter(name,model_a = False):
@@ -169,3 +178,18 @@ def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
     self.network_current_names = ()
     self.network_weights_backup = None
     self.network_bias_backup = None
+
+POPKEYS=[
+"betas",
+"alphas_cumprod",
+"alphas_cumprod_prev",
+"sqrt_alphas_cumprod",
+"sqrt_one_minus_alphas_cumprod",
+"log_one_minus_alphas_cumprod",
+"sqrt_recip_alphas_cumprod",
+"sqrt_recipm1_alphas_cumprod",
+"posterior_variance",
+"posterior_log_variance_clipped",
+"posterior_mean_coef1",
+"posterior_mean_coef2",
+]
