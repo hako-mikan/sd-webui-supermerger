@@ -590,7 +590,7 @@ def precosine(calcmode,theta_0,theta_1):
                 theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
                 theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
                 simab = sim(theta_0_norm, theta_1_norm)
-                sims = np.append(sims,simab.numpy())
+                sims = np.append(sims,simab.cpu().numpy())
         sims = sims[~np.isnan(sims)]
         sims = np.delete(sims, np.where(sims<np.percentile(sims, 1 ,method = 'midpoint')))
         sims = np.delete(sims, np.where(sims>np.percentile(sims, 99 ,method = 'midpoint')))
@@ -606,7 +606,7 @@ def precosine(calcmode,theta_0,theta_1):
                 dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
                 magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
                 combined_similarity = (simab + magnitude_similarity) / 2.0
-                sims = np.append(sims, combined_similarity.numpy())
+                sims = np.append(sims, combined_similarity.cpu().numpy())
         sims = sims[~np.isnan(sims)]
         sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
