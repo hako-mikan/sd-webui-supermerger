@@ -491,7 +491,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             index = FINETUNES.index(key)
             if 5 > index : 
                 theta_0[key] =theta_0[key]* fine[index] 
-            else :theta_0[key] =theta_0[key] + torch.tensor(fine[5])
+            else :theta_0[key] =theta_0[key] + torch.tensor(fine[5]).to(theta_0[key].device)
 
 
     if calcmode == "smoothAdd MT":
