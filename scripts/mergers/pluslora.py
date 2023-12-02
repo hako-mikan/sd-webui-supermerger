@@ -1,4 +1,4 @@
-reimport gc
+import gc
 import hashlib
 import json
 import math
@@ -13,7 +13,7 @@ import numpy as np
 import safetensors.torch
 import scripts.mergers.components as components
 import torch
-from modules import extra_networks, scripts, sd_models
+from modules import extra_networks, scripts, sd_models, lowvram
 from modules.ui import create_refresh_button
 from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
@@ -156,7 +156,7 @@ def on_ui_tabs():
 
         sml_cpmerge.click(
             fn=pluslora,
-            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,save_precision,calc_precision,sml_metasettings],
+            inputs=[sml_loranames,sml_loraratios,sml_settings,sml_filename,sml_model_a,save_precision,calc_precision,sml_metasettings,device],
             outputs=[sml_submit_result]
         )
 
@@ -654,7 +654,7 @@ def lycomerge(filename,ratios,calc_precision):
 
 ##############################################################
 ####### merge to checkpoint
-def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precision,metasets):
+def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precision,metasets,device):
     if model == []: return "ERROR: No model Selected"
     if lnames == "":return "ERROR: No LoRA Selected"
 
@@ -695,7 +695,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
     print(f"Loading {model}")
-    theta_0 = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+    theta_0 = sd_models.read_state_dict(checkpoint_info.filename,map_location=device)
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_0.keys()
     isv2 = "cond_stage_model.model.transformer.resblocks.0.attn.out_proj.weight" in theta_0.keys()
@@ -705,6 +705,8 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
         is15 = True
     except:
         is15 = False
+
+
 
     keychanger = {}
     for key in theta_0.keys():
@@ -841,6 +843,7 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
     return theta_0
 
 def plusweights(weight, module, bias = None):
+    print(weight.device)
     with torch.no_grad():
         updown = module.calc_updown(weight.to(dtype=torch.float))
         if len(weight.shape) == 4 and weight.shape[1] == 9:
@@ -1263,6 +1266,7 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
         for key in MINIMUM_METADATA:
             if key in lmetas[0].keys():
                 metadata[key] = lmetas[0][key]
+        
     else:
         # 複数マージの場合はマージしたタグと主要メタデータを保存
         metadata = lmetas[0]
