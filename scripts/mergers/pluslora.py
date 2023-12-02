@@ -722,14 +722,11 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
             orig_checkpoint = None
         checkpoint_info = sd_models.get_closet_checkpoint_match(model)
         if orig_checkpoint != checkpoint_info:
-            sd_models.load_model(checkpoint_info=checkpoint_info)
+            sd_models.reload_model_weights(info=checkpoint_info)
         theta_0 = newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger)
         
-        try:
-            if orig_checkpoint: sd_models.load_model(checkpoint_info=orig_checkpoint)
-        except:
-            add = "Reloading model failed, reload model from the model selecting box"
-            print(add)
+        if orig_checkpoint:
+            sd_models.reload_model_weights(checkpoint_info=orig_checkpoint)
     else:
         for name,filename, lwei in zip(names,filenames, lweis):
             print(f"loading: {name}")
