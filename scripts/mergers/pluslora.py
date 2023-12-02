@@ -843,7 +843,6 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
     return theta_0
 
 def plusweights(weight, module, bias = None):
-    print(weight.device)
     with torch.no_grad():
         updown = module.calc_updown(weight.to(dtype=torch.float))
         if len(weight.shape) == 4 and weight.shape[1] == 9:
