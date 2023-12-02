@@ -1,4 +1,4 @@
-import gc
+reimport gc
 import hashlib
 import json
 import math
@@ -726,7 +726,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
         theta_0 = newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger)
         
         if orig_checkpoint:
-            sd_models.reload_model_weights(checkpoint_info=orig_checkpoint)
+            sd_models.reload_model_weights(info=orig_checkpoint)
     else:
         for name,filename, lwei in zip(names,filenames, lweis):
             print(f"loading: {name}")
