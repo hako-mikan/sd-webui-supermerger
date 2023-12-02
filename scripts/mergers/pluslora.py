@@ -1263,10 +1263,9 @@ def create_merge_metadata( sd, lmetas, lname, lprecision, metasets ):
         # 単なるweightマージならそのままコピー
         metadata = lmetas[0]
     elif "new" in metasets:
-        new = {}
         for key in MINIMUM_METADATA:
             if key in lmetas[0].keys():
-                new[key] = lmetas[0][key]
+                metadata[key] = lmetas[0][key]
     else:
         # 複数マージの場合はマージしたタグと主要メタデータを保存
         metadata = lmetas[0]
