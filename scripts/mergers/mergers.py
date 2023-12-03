@@ -843,11 +843,10 @@ def elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha)
                 flag = not dwn
         if flag:
             dr = eratiodealer(dr,randomer,weight_index,num,lucks)
-            if deepprint :print(dbs,dws,key,dr)
-            return dr
-        else:
-            return current_alpha
+            if deepprint :print(" ", dbs,dws,key,dr)
+            current_alpha = dr
     return current_alpha
+
 
 def forkforker(filename,device):
     try:
