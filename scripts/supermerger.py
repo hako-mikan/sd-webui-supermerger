@@ -132,7 +132,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Options", open=False):
                         with gr.Row(variant="compact"):
-                            save_sets = gr.CheckboxGroup(["use cuda","save model", "overwrite","safetensors","fp16","save metadata","prune","Reset CLIP ids","use old calc method","debug"], value=["safetensors"], show_label=False, label="save settings")
+                            save_sets = gr.CheckboxGroup(["use cuda","save model", "overwrite","safetensors","fp16","save metadata","copy config","prune","Reset CLIP ids","use old calc method","debug"], value=["safetensors"], show_label=False, label="save settings")
                         with gr.Row():
                             components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
                             opt_value = gr.Slider(label="option(gamma)", minimum=-1.0, maximum=2, step=0.001, value=0.3, interactive=True)
