@@ -120,6 +120,13 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
     if "prune" in savesets:
         state_dict = prune_model(state_dict, isxl)
 
+    # for safetensors contiguous error
+    print("Check contiguous...")
+    for key in state_dict.keys():
+        v = state_dict[key]
+        v = v.contiguous()
+        state_dict[key] = v
+
     try:
       if ext == ".safetensors":
           safetensors.torch.save_file(state_dict, fname, metadata=metadata)
