@@ -20,7 +20,7 @@ from tqdm import tqdm
 from functools import partial
 from torch import Tensor, lerp
 from torch.nn.functional import cosine_similarity, relu, softplus
-from modules import shared, processing, sd_models, sd_vae, images, sd_samplers,scripts,devices
+from modules import shared, processing, sd_models, sd_vae, images, sd_samplers, scripts,devices, extras
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
@@ -87,6 +87,8 @@ hear = False
 hearm = False
 NON4 = [None]*4
 
+informer = sd_models.get_closet_checkpoint_match
+
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
@@ -129,6 +131,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     debug = "debug" in save_sets
 
+    if ("copy config" in save_sets) and ("(" not in result): extras.create_config(result.replace("Merged model saved in ",""), 0, informer(model_a), informer(model_b), informer(model_b))
+
     if imggen :
         images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                         genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
@@ -138,6 +142,9 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
         return result,currentmodel,*images[:4]
     else:
         return result,currentmodel
+
+def checkpointer_infomer(name):
+    return sd_models.get_closet_checkpoint_match(name)
 
 # XXX hack. fake checkpoint_info
 def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
@@ -846,7 +853,6 @@ def elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha)
             if deepprint :print(" ", dbs,dws,key,dr)
             current_alpha = dr
     return current_alpha
-
 
 def forkforker(filename,device):
     try:
