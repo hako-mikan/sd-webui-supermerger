@@ -706,8 +706,6 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     except:
         is15 = False
 
-
-
     keychanger = {}
     for key in theta_0.keys():
         if "model" in key:
@@ -715,7 +713,10 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
             if "conditioner_embedders_" in skey:
                 keychanger[skey.split("conditioner_embedders_",1)[1]] = key
             else:
-                keychanger[skey.split("model_",1)[1]] = key
+                if "wrapped" in skey:
+                    keychanger[skey.split("wrapped_",1)[1]] = key
+                else:
+                    keychanger[skey.split("model_",1)[1]] = key
 
     if is15:
         if shared.sd_model is not None:
@@ -832,7 +833,7 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
                     for x in qvk:
                         if x in name:
                             inkey,outkey = name.replace(x,"") + "_in_proj" ,name.replace(x,"") + "_out_proj"
-                    bkey = keychanger[outkey].replace("wieght","bias")
+                    bkey = keychanger[outkey].replace("weight","bias")
                     if bkey in theta_0.keys():
                         theta_0[keychanger[inkey]] ,theta_0[keychanger[outkey]], theta_0[bkey]= plusweightsqvk(theta_0[keychanger[inkey]],theta_0[keychanger[outkey]], name ,module, net, bias = theta_0[bkey])
                     else:
