@@ -416,7 +416,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
             if MODES[1] in mode:#Add
                 caster(f"{num}, {block}, {model_a}+{current_alpha}+*({model_b}-{model_c}),{key}",hear)
-  
+                theta_0_a = theta_0_a + current_alpha * theta_1[key]
+                
             elif MODES[2] in mode:#Triple
                 caster(f"{num}, {block}, {model_a}+{1-current_alpha-current_beta}+{model_b}*{current_alpha}+ {model_c}*{current_beta}",hear)
                 #
