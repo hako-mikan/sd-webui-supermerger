@@ -34,6 +34,7 @@ from scripts.mergers.xyplot import freezetime, nulister
 from scripts.mergers.model_util import filenamecutter, savemodel
 
 path_root = basedir()
+xyzpath = os.path.join(path_root,"xyzpresets.json")
 
 CALCMODES  = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","extract","tensor","tensor2","self","plus random"]
 
@@ -65,21 +66,9 @@ def fix_network_reset_cached_weight():
 def on_ui_tabs():
     fix_network_reset_cached_weight()
 
-    def getxyzpresetlist():
-        if not os.path.exists(xyzpath):
-            return []
-
-        try:
-            with open(xyzpath, 'r') as file:
-                data = json.load(file)
-        except json.JSONDecodeError:
-            return []
-
-        return list(data.keys())
-
     weights_presets=""
     userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
-    xyzpath = os.path.join(path_root,"xyzpresets.json")
+    
     if os.path.isfile(userfilepath):
         try:
             with open(userfilepath) as f:
@@ -265,24 +254,25 @@ def on_ui_tabs():
                         z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")
                         zgrid = gr.Textbox(label="Z Values (Disabled if blank)",lines=3,value="",visible =False)
                         esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change","0 stock"],type="value",interactive=True)
+
                         with gr.Row():
                             components.gengrid = gr.Button(elem_id="model_merger_merge", value="Run XYZ Plot",variant='primary')
-                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XYZ Plot",variant='primary')
+                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XYZ Plot")
                             components.s_reserve1 = gr.Button(value="Reserve XYZ Plot",variant='primary')
                         
-                        with gr.Row():
-                            xyzpresetname = gr.Textbox(label="Preset Name")
-                            xyzmode = gr.Radio(label="Set Mode", choices=["Save", "Overwrite", "Delete"],value = "Save")
-                            xyzpresets = gr.Dropdown(label="Presets",choices=getxyzpresetlist())
-                            
-                        with gr.Row():
-                            savexyzpreset_b = gr.Button(value="Set XYZ Plot as Preset",variant='primary')
-                            openxyzpreset = gr.Button(value="Open XYZ Preset file",variant='primary')
-                            loadxyzpreset_b = gr.Button(value="Load XYZ Plot",variant='primary')
+                        with gr.Accordion("XYZ presets",open = True):
+                            with gr.Row():
+                                xyzpresets = gr.Dropdown(label="Preset name",allow_custom_value=True,choices=get_xyzpreset_keylist(),scale=10)
+                                refreshxyzpresets_b = gr.Button(value='\U0001f504', elem_classes=["tool"],scale=1)
+                                savexyzpreset_overwrite = gr.CheckboxGroup(label = " ",choices=["Overwrite"],type="index",interactive=True,scale=1)
+                            with gr.Row():
+                                loadxyzpreset_b = gr.Button(value="Load preset",variant='primary')
+                                savexyzpreset_b = gr.Button(value="Save current plot as preset",variant='primary')
+                                deletexyzpreset_b = gr.Button(value="Delete preset",variant='primary')
+                                openxyzpreset = gr.Button(value="Open XYZ Preset file")
 
-                            openxyzpreset.click(fn=lambda:subprocess.Popen(['start', xyzpath], shell=True))
-
-
+                                openxyzpreset.click(fn=lambda:subprocess.Popen(['start', xyzpath], shell=True))
+                                
                         with gr.Column(visible = False, variant="compact") as row_inputers:
                             with gr.Row(variant="compact"):
                                 inputer = gr.Textbox(label="Selected", lines=1, value="", show_copy_button=True)
@@ -764,49 +754,58 @@ def on_ui_tabs():
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
 
-        def savexyzpreset_f(xtype, xvals, ytype, yvals, ztype, zvals, name, mode):
+        def savexyzpreset_f(xtype, xvals, ytype, yvals, ztype, zvals, name, mode_overwrite):
             new_data = {"xtype": TYPESEG[xtype], "xvalues": xvals,
                                 "ytype": TYPESEG[ytype], "yvalues": yvals,
                                 "ztype": TYPESEG[ztype], "zvalues": zvals
                                 }
-            try:
-                with open(xyzpath, 'r') as file:
-                    data = json.load(file)
-            except FileNotFoundError:
-                data = {}
+            data = get_xyzpreset_data()
 
-            if "Delete" == mode:
-                if name in data:del data[name]
-            elif "Save" == mode:
+            if mode_overwrite:
+                data[name] = new_data
+            else:
                 if name in data:
-                    print(f"Preset name {name} already exists.")
+                    gr.Info(f"Supermerger: Preset {name} already exists.")
                 else:
                     data[name] = new_data
-            else:
-                data[name] = new_data
 
             with open(xyzpath, 'w') as file:
                 json.dump(data, file, indent=4)
             
-            return gr.update(choices = list(data.keys()))
+            data_keys = list(data.keys())
+            return gr.update(choices = sorted(data_keys))
+        
+        def deletexyzpreset_f(name):
+            data = get_xyzpreset_data()
+
+            try: del data[name] 
+            except KeyError: gr.Info(f"Supermerger: Preset {name} not found.")
+
+            with open(xyzpath, 'w') as file:
+                json.dump(data, file, indent=4)
+                
+            keys_list = list(data.keys())
+            return gr.update(choices = sorted(keys_list))
 
         def loadxyzpreset_f(name):
-                try:
-                    with open(xyzpath, 'r') as file:
-                        data = json.load(file)
-                except FileNotFoundError:
-                    return None
+                data = get_xyzpreset_data()
 
                 preset_data = data.get(name)
                 if not preset_data:
+                    gr.Info(f"Supermerger: Preset {name} not found.")
                     return [gr.update(value = x) for x in ["alpha","","none","","none",""]]
 
                 sets = [("xtype"),"xvalues","ytype","yvalues","ztype","zvalues"]
 
                 return [gr.update(value = preset_data.get(x)) for x in sets]
         
-        savexyzpreset_b.click(fn=savexyzpreset_f,inputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid,xyzpresetname,xyzmode],outputs=[xyzpresets])
+        def refreshxyzpresets_f(): 
+            return gr.update(choices = get_xyzpreset_keylist())
+        
+        savexyzpreset_b.click(fn=savexyzpreset_f,inputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid,xyzpresets,savexyzpreset_overwrite],outputs=[xyzpresets])
         loadxyzpreset_b.click(fn=loadxyzpreset_f,inputs=[xyzpresets],outputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid])
+        deletexyzpreset_b.click(fn=deletexyzpreset_f,inputs=[xyzpresets],outputs=[xyzpresets])
+        refreshxyzpresets_b.click(fn=refreshxyzpresets_f,outputs=[xyzpresets])
 
     return (supermergerui, "SuperMerger", "supermerger"),
 
@@ -941,6 +940,19 @@ def showxy(x,y,z):
     if not "none" in t[y] : flags[3] = flags[2] = True
     if not "none" in t[z] : flags[4] = flags[2] = True
     return [gr.update(visible = x) for x in flags]
+
+def get_xyzpreset_data():
+    try:
+        with open(xyzpath, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        with open(xyzpath, 'w') as file:
+            json.dump({}, file, indent=4)
+        return {}
+    
+def get_xyzpreset_keylist():
+    keys_list = list(get_xyzpreset_data())
+    return sorted(keys_list)
 
 def text2slider(text, isxl=False):
     vals = [t.strip() for t in text.split(",")]
