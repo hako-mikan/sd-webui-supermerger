@@ -113,6 +113,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
     if "ERROR" in result or "STOPPED" in result: 
         return result,"not loaded",*NON4
     
+    if mode == "Weight sum": model_c = model_a
+    
     checkpoint_info = find_checkpoint_w_config(0,model_a,model_b,model_c)
 
     if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
