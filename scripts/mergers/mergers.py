@@ -26,7 +26,7 @@ from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,unload_model_weights
 from modules.generation_parameters_copypaste import create_override_settings_dict
-from scripts.mergers.model_util import filenamecutter,savemodel
+from scripts.mergers.model_util import filenamecutter,savemodel,find_checkpoint_w_config
 from math import ceil
 import sys
 from multiprocessing import cpu_count
@@ -112,8 +112,10 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     if "ERROR" in result or "STOPPED" in result: 
         return result,"not loaded",*NON4
-
-    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+    
+    if mode == "Weight sum": model_c = model_a
+    
+    checkpoint_info = find_checkpoint_w_config(0,model_a,model_b,model_c)
 
     if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
 
@@ -131,7 +133,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     debug = "debug" in save_sets
 
-    if ("copy config" in save_sets) and ("(" not in result): extras.create_config(result.replace("Merged model saved in ",""), 0, informer(model_a), informer(model_b), informer(model_b))
+    if ("copy config" in save_sets) and ("Merged model saved in " in result): 
+        extras.create_config(result.replace("Merged model saved in ",""), 0, informer(model_a), informer(model_b), informer(model_c))
 
     if imggen :
         images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,

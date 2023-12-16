@@ -2,7 +2,7 @@ import os
 import torch
 import safetensors.torch
 import threading
-from modules import shared, sd_hijack, sd_models
+from modules import shared, sd_hijack, sd_models, sd_models_config
 from modules.sd_models import load_model
 import json
 
@@ -185,6 +185,24 @@ def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
     self.network_current_names = ()
     self.network_weights_backup = None
     self.network_bias_backup = None
+
+#Modified code from modules.extras.create_config
+def find_checkpoint_w_config(config_source, model_a, model_b, model_c):
+    a = sd_models.get_closet_checkpoint_match(model_a)
+    b = sd_models.get_closet_checkpoint_match(model_b)
+    c = sd_models.get_closet_checkpoint_match(model_c)
+
+    def config(x):
+        if x and sd_models_config.find_checkpoint_config_near_filename(x):
+            return x
+        else: return None
+        
+    if config_source == 0:
+        return config(a) or config(b) or config(c) or a
+    elif config_source == 1:
+        return config(b) or a
+    elif config_source == 2:
+        return config(c) or a
 
 POPKEYS=[
 "betas",
