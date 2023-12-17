@@ -104,7 +104,7 @@ def on_ui_tabs():
                 with gr.Row(equal_height=False):
                     alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
                     beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=1)
-                    smooth = gr.Slider(label="gamma(smooth)", minimum=0, maximum=1, step=0.001, value=1)
+                    smooth = gr.Slider(label="gamma(smooth)", minimum=-1, maximum=20, step=0.1, value=1)
         
         sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
         sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True)
