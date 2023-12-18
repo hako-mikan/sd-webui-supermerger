@@ -20,13 +20,13 @@ from tqdm import tqdm
 from functools import partial
 from torch import Tensor, lerp
 from torch.nn.functional import cosine_similarity, relu, softplus
-from modules import shared, processing, sd_models, sd_vae, images, sd_samplers, scripts,devices, extras
+from modules import shared, processing, sd_models, sd_vae, images, sd_samplers, scripts,devices
 from modules.ui import  plaintext_to_html
 from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,unload_model_weights
 from modules.generation_parameters_copypaste import create_override_settings_dict
-from scripts.mergers.model_util import filenamecutter,savemodel
+from scripts.mergers.model_util import filenamecutter,savemodel,find_checkpoint_w_config,copy_config
 from math import ceil
 import sys
 from multiprocessing import cpu_count
@@ -87,12 +87,10 @@ hear = False
 hearm = False
 NON4 = [None]*4
 
-informer = sd_models.get_closet_checkpoint_match
-
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
-                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,
+                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,config_source,
                        esettings,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                        genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
@@ -112,10 +110,17 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     if "ERROR" in result or "STOPPED" in result: 
         return result,"not loaded",*NON4
-
-    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
+    
+    checkpoint_info = deepcopy(sd_models.get_closet_checkpoint_match(model_a))
 
     if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+
+    #Config selection    Webui uses filename to find configs for loading, changing that lets models load with the desired config.
+    shape = theta_0["model.diffusion_model.input_blocks.0.0.weight"].shape
+    if shape[1] not in (8,9): #Don't change config for inpaint or pix2pix
+        c = model_a if MODES[0] in mode and config_source == 0 else model_c 
+        chkptinf_for_config = find_checkpoint_w_config(config_source,model_a,model_b,c)
+        checkpoint_info.filename = chkptinf_for_config.filename 
 
     save = True if SAVEMODES[0] in save_sets else False
 
@@ -131,7 +136,8 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     debug = "debug" in save_sets
 
-    if ("copy config" in save_sets) and ("(" not in result): extras.create_config(result.replace("Merged model saved in ",""), 0, informer(model_a), informer(model_b), informer(model_b))
+    if ("save config" in save_sets) and ("Merged model saved in " in result): 
+        copy_config(checkpoint_info,result.replace("Merged model saved in ",""))
 
     if imggen :
         images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
@@ -387,7 +393,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if a[1] == 8 and b[1] == 4:#If we have an Instruct-Pix2Pix model...
                 result_is_instruct_pix2pix_model = True
             else:
-                assert a.shape[1] == 9 and b.shape[1] == 4, f"Bad dimensions for merged layer {key}: A={a.shape}, B={b.shape}"
+                assert a[1] == 9 and b[1] == 4, f"Bad dimensions for merged layer {key}: A={a}, B={b}"
                 result_is_inpainting_model = True
 
         block,blocks26 = blockfromkey(key,isxl)

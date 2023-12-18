@@ -2,9 +2,10 @@ import os
 import torch
 import safetensors.torch
 import threading
-from modules import shared, sd_hijack, sd_models
+from modules import shared, sd_hijack, sd_models, sd_models_config
 from modules.sd_models import load_model
 import json
+import shutil
 
 try:
   from modules import sd_models_xl
@@ -136,10 +137,17 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
       print(f"ERROR: Couldn't saved:{fname},ERROR is {e}")
       return f"ERROR: Couldn't saved:{fname},ERROR is {e}"
     print("Done!")
+
     if other_dict:
+        if 'save config' in savesets: copy_config(checkpoint_info,fname)
+
         for key in other_dict.keys():
             state_dict[key] = other_dict[key]
         del other_dict
+        
+        name = os.path.basename(fname)
+        checkpoint_info = sd_models.get_closet_checkpoint_match(name)
+        sd_models.model_data.__init__()
         load_model(checkpoint_info, already_loaded_state_dict=state_dict)
     return "Merged model saved in "+fname
 
@@ -186,6 +194,35 @@ def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
     self.network_weights_backup = None
     self.network_bias_backup = None
 
+def find_checkpoint_w_config(config_source, model_a, model_b, model_c):
+    a = sd_models.get_closet_checkpoint_match(model_a)
+    b = sd_models.get_closet_checkpoint_match(model_b)
+    c = sd_models.get_closet_checkpoint_match(model_c)
+
+    config = lambda x: x if sd_models_config.find_checkpoint_config_near_filename(x) else None
+
+    if config_source == 0:
+        return config(a) or config(b) or config(c) or a
+    elif config_source == 1:
+        return a
+    elif config_source == 2:
+        return b or a
+    else:
+        return c or a
+
+def copy_config(origin,target):
+    origin_config = sd_models_config.find_checkpoint_config_near_filename(origin)
+
+    if origin_config:
+        target_noext, _ = os.path.splitext(target)
+        new_config = target_noext + ".yaml"
+
+        if origin_config != new_config:
+            print("Copying config:")
+            print("   from:", origin_config)
+            print("     to:", new_config)
+            shutil.copyfile(origin_config, new_config)
+         
 POPKEYS=[
 "betas",
 "alphas_cumprod",

@@ -121,10 +121,11 @@ def on_ui_tabs():
 
                     with gr.Accordion("Options", open=False):
                         with gr.Row(variant="compact"):
-                            save_sets = gr.CheckboxGroup(["use cuda","save model", "overwrite","safetensors","fp16","save metadata","copy config","prune","Reset CLIP ids","use old calc method","debug"], value=["safetensors"], show_label=False, label="save settings")
+                            save_sets = gr.CheckboxGroup(["use cuda","save model", "overwrite","safetensors","fp16","save metadata","save config","prune","Reset CLIP ids","use old calc method","debug"], value=["safetensors"], show_label=False, label="save settings")
                         with gr.Row():
-                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
-                            opt_value = gr.Slider(label="option(gamma) ", minimum=-1.0, maximum=20, step=0.1, value=0.3, interactive=True)
+                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to",scale=1)
+                            config_source = gr.Radio(["Any", "A", "B", "C"],value="Any",type='index',label='use config from model:',scale=1)
+                            opt_value = gr.Slider(label="option(gamma) ", minimum=-1.0, maximum=20, step=0.1, value=0.3, interactive=True,scale=2)
                         with gr.Row(variant="compact"):
                             with gr.Column(min_width = 50):
                                 with gr.Row():
@@ -500,7 +501,7 @@ def on_ui_tabs():
         load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
         reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
 
-        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae,opt_value,inex,ex_blocks,ex_elems]
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,config_source]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
