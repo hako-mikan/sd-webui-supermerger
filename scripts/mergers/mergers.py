@@ -210,8 +210,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     
     debug = "debug" in save_sets
     uselerp = "use old calc method" not in save_sets
-    device = "cuda" if "use cuda" in save_sets else "cpu"
 
+    device = "cpu"
+    if "use cuda" in save_sets:
+        if "smoothAdd" in calcmode: print(f"{bcolors.WARNING}Can't use CUDA for {calcmode}, using CPU instead.{bcolors.ENDC}")
+        else: device = "cuda" 
+        
     unload_model_weights(sd_models.model_data.sd_model)
 
     # for from file
@@ -301,6 +305,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
 
     #adjust
+    fine_for_metadata = fine
     if fine.rstrip(",0") != "":
         fine = fineman(fine,isxl)
     else:
@@ -564,6 +569,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             "mbw": useblocks,
             "elemental_merge": deep,
             "calcmode" : calcmode,
+            "adjust" : fine_for_metadata,
             f"{inex}":ex_blocks + ex_elems
             }
         metadata["sd_merge_recipe"] = json.dumps(merge_recipe)

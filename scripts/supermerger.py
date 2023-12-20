@@ -674,16 +674,14 @@ def on_ui_tabs():
             return gr.update()
 
         def finetune_reader(finetune):
-            tmp = [t.strip() for t in finetune.split(",")]
-            ret = [gr.update()]*7
-            for i, f in enumerate(tmp[0:7]):
-                try:
-                    f = float(f)
-                    ret[i] = gr.update(value=f)
-                except:
-                    pass
-            return ret
-
+            try:
+                tmp = [float(t) for t in finetune.split(",") if t]
+                assert len(tmp) == 8, f"expected 8 values, received {len(tmp)}."
+            except ValueError as err: gr.Warning(str(err))
+            except AssertionError as err: gr.Warning(str(err))
+            else: return [gr.update(value=x) for x in tmp]
+            return [gr.update()]*8
+        
         # update finetune
         finetunes = [detail1, detail2, detail3, contrast, bri, col1, col2, col3]
         finetune_reset.click(fn=lambda: [gr.update(value="")]+[gr.update(value=0.0)]*8, inputs=[], outputs=[finetune, *finetunes])
