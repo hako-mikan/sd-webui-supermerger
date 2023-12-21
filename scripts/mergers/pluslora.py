@@ -106,20 +106,23 @@ def on_ui_tabs():
                     beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=1)
                     smooth = gr.Slider(label="gamma(smooth)", minimum=-1, maximum=20, step=0.1, value=1)
         
-        sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
-        sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True)
-        sml_dims = gr.CheckboxGroup(label = "limit dimension",choices=[],value = [],type="value",interactive=True,visible = False)
-        with gr.Row(equal_height=False):
-            sml_calcdim = gr.Button(elem_id="calcloras", value="Calculate LoRA dimensions (this may take time for multiple LoRAs)",variant='primary')
-            sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
-            sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
-
+        sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value")
         with gr.Row():
-            sml_selectall = gr.Button(elem_id="sml_selectall", value="select all",variant='primary')
-            sml_deselectall = gr.Button(elem_id="slm_deselectall", value="deselect all",variant='primary')
-            components.frompromptb = gr.Button(elem_id="slm_deselectall", value="get from prompt",variant='primary')
-            hidenb = gr.Checkbox(value = False,visible = False)
-        sml_loras = gr.CheckboxGroup(label = "LoRAs on disk",choices = selectable,type="value",interactive=True,visible = True)
+            sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True,scale=10,min_width=800)
+            components.frompromptb = gr.Button(elem_id="slm_deselectall", value="get from prompt",variant='primary',size="sm",scale=1)
+        with gr.Column(variant='panel'):
+            with gr.Row():
+                    sml_calcdim = gr.Button(elem_id="calcloras", value="Calculate LoRA dimensions (this may take time for multiple LoRAs)",variant='primary',size="sm")
+                    sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary',size="sm")
+                    sml_selectall = gr.Button(elem_id="sml_selectall", value="select all",variant='primary',size="sm")
+                    sml_deselectall = gr.Button(elem_id="slm_deselectall", value="deselect all",variant='primary',size="sm")
+                    hidenb = gr.Checkbox(value = False,visible = False)
+                    sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
+            with gr.Row():
+                sml_filterloras = gr.Textbox(label = "Filter loras",max_lines=1)
+                sml_dims = gr.Dropdown(label = "Filter by dimension",choices=[],value = [],type="value",interactive=False,visible=True,min_width=400,multiselect=True)
+            sml_loras = gr.CheckboxGroup(label = "LoRAs on disk",choices = selectable,type="value",interactive=True,visible = True)
+
         sml_loraratios = gr.TextArea(label="",value=sml_lbwpresets,visible =True,interactive  = True)  
 
         sml_selectall.click(fn = lambda x:gr.update(value = selectable),outputs = [sml_loras])
@@ -165,8 +168,9 @@ def on_ui_tabs():
         llist ={}
         dlist =[]
         dn = []
+        
 
-        def updateloras():
+        def getloras():
             lora.list_available_loras()
             names = []
             dels = []
@@ -178,9 +182,14 @@ def on_ui_tabs():
 
             global selectable
             selectable = [f"{x[0]}({x[1]})" for x in llist.items()]
-            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
-
+            return [f"{x[0]}({x[1]})" for x in llist.items()]
+        
+        def updateloras():
+            return gr.update(choices = getloras())
+        
         sml_update.click(fn = updateloras,outputs = [sml_loras])
+
+        getloras()
 
         def calculatedim():
             print("listing dimensions...")
@@ -208,25 +217,13 @@ def on_ui_tabs():
             dlist.sort()
             global selectable
             selectable = [f"{x[0]}({x[1]})" for x in llist.items()]
-            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()],value =[]),gr.update(visible =True,choices = [x for x in (dlist+dn)])
+            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()],value =[]),gr.update(interactive =True,visible=True,choices = [x for x in (dlist+dn)])
 
         sml_calcdim.click(
             fn=calculatedim,
             inputs=[],
             outputs=[sml_loras,sml_dims]
         )
-
-        def dimselector(dims):
-            if dims ==[]:return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
-            rl=[]
-            for d in dims:
-                for i in llist.items():
-                    if d == i[1]:rl.append(f"{i[0]}({i[1]})")
-
-            global selectable
-            selectable = rl.copy()
-
-            return gr.update(choices = [l for l in rl],value =[])
 
         def llister(names,ratio, hiden):
           if hiden:return gr.update()
@@ -235,10 +232,20 @@ def on_ui_tabs():
             for i,n in enumerate(names):
               if "(" in n:names[i] = n[:n.rfind("(")]
             return f":{ratio},".join(names)+f":{ratio} "
+          
+        def filterloras(filterstr,dims):
+            print(dims)
+            print(llist.items())
+            filteredloras = [f"{x[0]}({x[1]})" for x in llist.items() if (str(x[1]) in dims or not dims) and filterstr in x[0]]
+            global selectable
+            selectable = filteredloras.copy()
+            return gr.update(choices = filteredloras)
+            
 
         hidenb.change(fn=lambda x: False, outputs = [hidenb])
         sml_loras.change(fn=llister,inputs=[sml_loras,sml_lratio, hidenb],outputs=[sml_loranames])     
-        sml_dims.change(fn=dimselector,inputs=[sml_dims],outputs=[sml_loras])  
+        sml_dims.input(fn=filterloras,inputs=[sml_filterloras,sml_dims],outputs=[sml_loras])
+        sml_filterloras.input(fn=filterloras,inputs=[sml_filterloras,sml_dims],outputs=[sml_loras])
 
 ##############################################################
 ####### make LoRA from checkpoint
