@@ -101,9 +101,11 @@ def on_ui_tabs():
                     with gr.Row(variant="compact"):
                         model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model A",interactive=True)
                         create_refresh_button(model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+                        swap_models_AB = gr.Button(value='⇆', elem_classes=["tool"])
 
                         model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model B",interactive=True)
                         create_refresh_button(model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+                        swap_models_BC = gr.Button(value='⇆', elem_classes=["tool"])
 
                         model_c = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model C",interactive=True)
                         create_refresh_button(model_c, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
@@ -806,6 +808,9 @@ def on_ui_tabs():
         deletexyzpreset_b.click(fn=deletexyzpreset_f,inputs=[xyzpresets],outputs=[xyzpresets])
         refreshxyzpresets_b.click(fn=refreshxyzpresets_f,outputs=[xyzpresets])
 
+        swap_models_AB.click(fn=swapvalues,inputs=[model_a,model_b],outputs=[model_a,model_b])
+        swap_models_BC.click(fn=swapvalues,inputs=[model_b,model_c],outputs=[model_b,model_c])
+
     return (supermergerui, "SuperMerger", "supermerger"),
 
 msearch = []
@@ -869,6 +874,8 @@ def searchhistory(words,searchmode):
 
     if outs == []:return [["no result","",""],]
     return outs
+
+def swapvalues(x,y): return gr.update(value=y), gr.update(value=x)
 
 #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
 #13  deep,14 calcmode,15 luckseed 16:opt_value 17 include/exclude 18: exclude_blocks, 19: exclude_elements
