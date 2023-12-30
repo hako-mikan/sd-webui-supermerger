@@ -951,8 +951,12 @@ def get_xyzpreset_data():
     try:
         with open(xyzpath, 'r') as file:
             return json.load(file)
-    except FileNotFoundError:
-        with open(xyzpath, 'w') as file:
+    except FileNotFoundError: pass
+    except json.JSONDecodeError as error:
+        shutil.copyfile(xyzpath, os.path.join(path_root,"broken_xyzpresets.json"))
+        print(error)
+    finally:
+        with open(xyzpath, 'w') as file: 
             json.dump({}, file, indent=4)
         return {}
     
@@ -1072,7 +1076,7 @@ def loadkeys(model_a, lora):
 
 def loadmodel(model):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
-    sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+    sd = sd_models.read_state_dict(checkpoint_info.filename,map_location="cpu")
     return sd
 
 ADDRAND = "\n\
