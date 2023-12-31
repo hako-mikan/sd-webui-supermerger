@@ -234,9 +234,7 @@ def on_ui_tabs():
             return f":{ratio},".join(names)+f":{ratio} "
           
         def filterloras(filterstr,dims):
-            print(dims)
-            print(llist.items())
-            filteredloras = [f"{x[0]}({x[1]})" for x in llist.items() if (str(x[1]) in dims or not dims) and filterstr in x[0]]
+            filteredloras = [f"{x[0]}({x[1]})" for x in llist.items() if (str(x[1]) in dims or not dims) and filterstr.lower() in x[0].lower()]
             global selectable
             selectable = filteredloras.copy()
             return gr.update(choices = filteredloras)
