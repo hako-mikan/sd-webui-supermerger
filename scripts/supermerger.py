@@ -406,9 +406,16 @@ def on_ui_tabs():
                 with gr.Column(variant="compact"):
                     components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")
                     components.submit_result = gr.Textbox(label="Message")
-                    mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
-
-        # main ui end 
+                    try:
+                        output_panel = create_output_panel("txt2img", opts.outdir_txt2img_samples)
+                        mgallery = output_panel.gallery
+                        mgeninfo = output_panel.generation_info
+                        mhtmlinfo = output_panel.infotext
+                        mhtmllog = output_panel.html_log
+                    except: #for compatibility with the old system
+                        mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
+                        
+        # main ui end
     
         with gr.Tab("LoRA", elem_id="tab_lora"):
             pluslora.on_ui_tabs()
@@ -952,12 +959,11 @@ def get_xyzpreset_data():
         with open(xyzpath, 'r') as file:
             return json.load(file)
     except FileNotFoundError: pass
-    except json.JSONDecodeError as error:
+    except json.JSONDecodeError:
         shutil.copyfile(xyzpath, os.path.join(path_root,"broken_xyzpresets.json"))
-        print(error)
     finally:
         with open(xyzpath, 'w') as file: 
-            json.dump({}, file, indent=4)
+            json.dump(dict(), file, indent=4)
         return {}
     
 def get_xyzpreset_keylist():
