@@ -996,7 +996,7 @@ def draw_origin(grid, text,width,height,width_one):
     fnt = get_font(fontsize)
 
     if grid.width != width_one:
-        while d.multiline_textsize(text, font=fnt)[0] > width_one*0.75 and fontsize > 0:
+        while d.multiline_textbbox((0,0), text, font=fnt)[2] > width_one*0.75 and fontsize > 0:
             fontsize -=1
             fnt = get_font(fontsize)
     d.multiline_text((0,0), text, font=fnt, fill=color_active,align="center")
@@ -1134,7 +1134,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         prompt=g("Prompt"),
         styles=g("Styles"),
         negative_prompt=g('Negative prompt'),
-        seed=g("Seed"),
+        seed=g("Seed","Initial seed"),
         subseed=g("Variation seed"),
         subseed_strength=g("Variation strength"),
         seed_resize_from_h=g("Resize seed from height"),
