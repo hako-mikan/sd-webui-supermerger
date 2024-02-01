@@ -1007,13 +1007,7 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, device="cpu", dt
     info = unet.load_state_dict(converted_unet_checkpoint)
     print("loading u-net:", info)
 
-    # Convert the VAE model.
-    vae_config = create_vae_diffusers_config()
-    converted_vae_checkpoint = convert_ldm_vae_checkpoint(state_dict, vae_config)
-
-    vae = AutoencoderKL(**vae_config).to(device)
-    info = vae.load_state_dict(converted_vae_checkpoint)
-    print("loading vae:", info)
+    vae = None
 
     # convert text_model
     if v2:
