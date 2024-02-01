@@ -406,10 +406,10 @@ def on_ui_tabs():
                     
                     output_panel = create_output_panel("txt2img", opts.outdir_txt2img_samples)
                     
-                    mgallery = output_panel.gallery
-                    mgeninfo = output_panel.generation_info
-                    mhtmlinfo = output_panel.infotext
-                    mhtmllog = output_panel.html_log
+                    mgallery = output_panel[0]  if isinstance(output_panel, tuple) else output_panel.gallery
+                    mgeninfo = output_panel[1]   if isinstance(output_panel, tuple) else output_panel.generation_info
+                    mhtmlinfo = output_panel[2]   if isinstance(output_panel, tuple) else output_panel.infotext
+                    mhtmllog = output_panel[3]   if isinstance(output_panel, tuple) else output_panel.html_log
                     
         # main ui end 
     
