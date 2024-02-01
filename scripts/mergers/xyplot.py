@@ -63,7 +63,7 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                   txt2imgparams,gensets_s,lucks]
 
     from scripts.mergers.components import paramsnames
-    seed = txt2imgparams[paramsnames.index("Seed")]
+    seed = txt2imgparams[paramsnames.index("Seed" if "Seed" in paramsnames else "Initial seed")]
 
     if RAND not in startmode:
         if sep in xmen: allsets = separator(allsets,1,sep,xmen,seed,startmode)
@@ -744,7 +744,7 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
             fnt = initial_fnt
             fontsize = initial_fontsize
             line_spacing = fontsize // 2
-            while drawing.multiline_textsize(line.text, font=fnt,spacing = 5)[0] > line.allowed_width and fontsize > 0:
+            while drawing.multiline_textbbox((0,0), line.text, font=fnt,spacing = 5)[2] > line.allowed_width and fontsize > 0:
                 fontsize -= 1
                 fnt = get_font(fontsize)
                 line_spacing = fontsize // 2
