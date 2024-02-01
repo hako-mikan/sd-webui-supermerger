@@ -942,6 +942,9 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
         setting[7] = mode_info[setting[7]] # fix mode entry for compatible
     filepath = os.path.join(path_root, "mergehistory.csv")
     is_file = os.path.isfile(filepath)
+
+    csv.field_size_limit(2244096)
+
     if not is_file:
         with open(filepath, 'a') as f:
                                        #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets, 12 deep 13 calcmode]
