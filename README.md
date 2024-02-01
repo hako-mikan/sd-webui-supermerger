@@ -29,6 +29,11 @@ This extension significantly improves the efficiency of model merging by elimina
 - [Elemental Merge](elemental_en.md)
 
 # Recent Update
+2024.02.02 0000(JST)
+- bug fix
+- MakeLoRaの標識が変わりました。Dreanboothに習ってモデル名をTunedとOriginalに変更しています。
+- The model name for MakeLoRA has changed. Following to the Dreambooth, the model names have been changed to Tuned and Original.
+
 2023.11.18.0000(JST)
 - add new option:use cuda
 If you have enough GPU memory, merge speed will be 50x. 
