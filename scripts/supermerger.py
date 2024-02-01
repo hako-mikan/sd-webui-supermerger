@@ -403,8 +403,14 @@ def on_ui_tabs():
                 with gr.Column(variant="compact"):
                     components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")
                     components.submit_result = gr.Textbox(label="Message")
-                    mgallery, mgeninfo, mhtmlinfo, mhtmllog = create_output_panel("txt2img", opts.outdir_txt2img_samples)
-
+                    
+                    output_panel = create_output_panel("txt2img", opts.outdir_txt2img_samples)
+                    
+                    mgallery = output_panel.gallery
+                    mgeninfo = output_panel.generation_info
+                    mhtmlinfo = output_panel.infotext
+                    mhtmllog = output_panel.html_log
+                    
         # main ui end 
     
         with gr.Tab("LoRA", elem_id="tab_lora"):
