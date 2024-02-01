@@ -93,13 +93,13 @@ def on_ui_tabs():
                     calc_precision = gr.Radio(label = "calc precision(fp16:cuda only)" ,choices=["float","fp16","bf16"],value = "float",type="value")
                     device = gr.Radio(label = "device",choices=["cuda","cpu"],value = "cuda",type="value")
             with gr.Column(equal_height=False):
-                sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * A - beta * B)",variant='primary')
+                sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * Tuned - beta * Original)",variant='primary')
                 sml_extract = gr.Button(elem_id="model_merger_merge", value="Extract from two LoRAs",variant='primary')
                 with gr.Row(equal_height=False):
-                    sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint Tuned",interactive=True)
                     create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
                 with gr.Row(equal_height=False):
-                    sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
+                    sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint Original",interactive=True)
                     create_refresh_button(sml_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
                 with gr.Row(equal_height=False):
                     alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=1)
@@ -279,8 +279,8 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
         v_parameterization=True,
         sdxl=is_sdxl,
         save_precision=save_precision,
-        model_org=fullpathfromname(model_a),
-        model_tuned=fullpathfromname(model_b),
+        model_org=fullpathfromname(model_b),
+        model_tuned=fullpathfromname(model_a),
         save_to=saveto,
         dim=dim,
         conv_dim=None,
