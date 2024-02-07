@@ -19,11 +19,17 @@ from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
 from scripts.kohyas import lora as klora
 from scripts.mergers.model_util import (filenamecutter, savemodel)
-from scripts.mergers.mergers import extract_super
+from scripts.mergers.mergers import extract_super, unload_forge
 from tqdm import tqdm
 
 selectable = []
 pchanged = False
+
+try:
+    from ldm_patched.modules import model_management
+    forge = True
+except:
+    forge = False
 
 BLOCKID26=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
 BLOCKID17=["BASE","IN01","IN02","IN04","IN05","IN07","IN08","M00","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
@@ -262,7 +268,10 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
 
     print(f"Detected model type: SDXL: {is_sdxl}, SD2.X: {is_sd2}, SD1.X: {is_sd1}")
 
-    sd_models.unload_model_weights()
+    if forge:
+        unload_forge()
+    else:
+        sd_models.unload_model_weights()
 
     if saveto =="" : saveto = makeloraname(model_a,model_b)
     if not ".safetensors" in saveto :saveto  += ".safetensors"

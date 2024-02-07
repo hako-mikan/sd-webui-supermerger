@@ -40,6 +40,12 @@ try:
 except:
     ui_version = 100
 
+try:
+    from ldm_patched.modules import model_management
+    forge = True
+except:
+    forge = False
+
 orig_cache = 0
 
 modelcache = collections.OrderedDict()
@@ -123,7 +129,6 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     sd_models.model_data.__init__()
     load_model(checkpoint_info, already_loaded_state_dict=theta_0)
-
     cachedealer(False)
 
     del theta_0
@@ -210,7 +215,10 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     uselerp = "use old calc method" not in save_sets
     device = "cuda" if "use cuda" in save_sets else "cpu"
 
-    unload_model_weights(sd_models.model_data.sd_model)
+    if forge:
+        unload_forge()
+    else:
+        unload_model_weights(sd_models.model_data.sd_model)
 
     # for from file
     if type(useblocks) is str:
@@ -1221,7 +1229,17 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     else:
         p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(p.negative_prompt, p.styles)]
 
-    processed:Processed = processing.process_images(p)
+    if forge:
+        global orig_reload_model_weights
+        orig_reload_model_weights = sd_models.reload_model_weights
+        sd_models.reload_model_weights = reload_model_weights
+
+        processed:Processed = processing.process_images(p)
+
+        sd_models.reload_model_weights = orig_reload_model_weights
+    else:
+        processed:Processed = processing.process_images(p)
+
     if "image" in id_sets:
         for i, image in enumerate(processed.images):
             processed.images[i] = draw_origin(image, str(modelid),p.width,p.height,p.width)
@@ -1450,3 +1468,18 @@ def casterr(*args,hear=hear):
     if hear:
         names = {id(v): k for k, v in currentframe().f_back.f_locals.items()}
         print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
+
+
+################################################
+##### forge
+def unload_forge():
+    sd_models.model_data.sd_model = None
+    sd_models.model_data.loaded_sd_models = []
+    model_management.unload_all_models()
+    model_management.soft_empty_cache()
+    gc.collect()
+
+def reload_model_weights():
+    pass
+
+orig_reload_model_weights = None
