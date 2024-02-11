@@ -474,7 +474,7 @@ def on_ui_tabs():
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
 
-        with gr.Tab("Metadeta", elem_id="tab_metadata"):
+        with gr.Tab("Metadate", elem_id="tab_metadata"):
                 with gr.Row():
                     meta_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="read metadata",interactive=True)
                     create_refresh_button(meta_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
