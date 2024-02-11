@@ -552,7 +552,13 @@ def swapxy(imgs,xs,ys):
 def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,wa,wb,usebeta):
     model_a=filenamecutter(model_a)
     model_b=filenamecutter(model_b)
-    model_c=filenamecutter(model_c)
+    
+    if model_c == "" or model_c is None:
+        #fallback to avoid crash
+        model_c = "model A"
+        print(f"{bcolors.WARNING}Substituting empty model_c with model_a{bcolors.ENDC}")
+    else:
+        model_c=filenamecutter(model_c)
 
     if not usebeta:beta,wb = "not used","not used"
     vals = ""
