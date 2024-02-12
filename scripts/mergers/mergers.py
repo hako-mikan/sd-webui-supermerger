@@ -315,11 +315,11 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     if isxl and useblocks:
         if len(weights_a) == 25:
             weights_a = weighttoxl(weights_a)
-            print(f"weight converted for XL{weights_a}")
+            print(f"alpha weight converted for XL{weights_a}")
         if usebeta:
             if len(weights_b) == 25:
                 weights_b = weighttoxl(weights_b)
-                print(f"weight converted for XL{weights_b}")
+                print(f"beta weight converted for XL{weights_b}")
         if len(weights_a) == 19: weights_a = weights_a + [0]
         if len(weights_b) == 19: weights_b = weights_b + [0]
 
