@@ -20,6 +20,7 @@ from torchvision import transforms
 from transformers import CLIPTokenizer
 import diffusers
 from diffusers import DDPMScheduler, StableDiffusionPipeline
+from scripts.kohyas.original_unet import UNet2DConditionModel
 import numpy as np
 from PIL import Image
 import cv2
@@ -1253,8 +1254,8 @@ class FlashAttentionFunction(torch.autograd.function.Function):
 
     return dq, dk, dv, None, None, None, None
 
-
-def replace_unet_modules(unet: diffusers.models.unet_2d_condition.UNet2DConditionModel, mem_eff_attn, xformers):
+"""
+def replace_unet_modules(unet: UNet2DConditionModel, mem_eff_attn, xformers):
   if mem_eff_attn:
     replace_unet_cross_attn_to_memory_efficient()
   elif xformers:
@@ -1342,6 +1343,23 @@ def replace_unet_cross_attn_to_xformers():
     return out
 
   diffusers.models.attention.CrossAttention.forward = forward_xformers
+"""
+def replace_unet_modules(unet: UNet2DConditionModel, mem_eff_attn, xformers, sdpa):
+    if mem_eff_attn:
+        print("Enable memory efficient attention for U-Net")
+        unet.set_use_memory_efficient_attention(False, True)
+    elif xformers:
+        print("Enable xformers for U-Net")
+        try:
+            import xformers.ops
+        except ImportError:
+            raise ImportError("No xformers / xformersがインストールされていないようです")
+
+        unet.set_use_memory_efficient_attention(True, False)
+    elif sdpa:
+        print("Enable SDPA for U-Net")
+        unet.set_use_sdpa(True)
+
 # endregion
 
 
