@@ -105,7 +105,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
     if os.path.isfile(fname) and not "overwrite" in savesets:
         _err_msg = f"Output file ({fname}) existed and was not saved]"
         print(_err_msg)
-        return _err_msg
+        raise Exception(_err_msg)
 
     print("Saving...")
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in state_dict
@@ -141,7 +141,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
             state_dict[key] = other_dict[key]
         del other_dict
         load_model(checkpoint_info, already_loaded_state_dict=state_dict)
-    return "Merged model saved in "+fname
+    return f"{fname}"
 
 def filenamecutter(name,model_a = False):
     if name =="" or name ==[]: return
