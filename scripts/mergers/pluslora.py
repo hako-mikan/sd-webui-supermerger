@@ -664,6 +664,21 @@ def lycomerge(filename,ratios,calc_precision):
 ##############################################################
 ####### merge to checkpoint
 def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precision,metasets,device):
+    
+    request_input = {
+        "lnames": lnames,
+        "loraratios": loraratios,
+        "output": output,
+        "model": model,
+        "save_precision": save_precision,
+        "calc_precision": calc_precision,
+        "metasets": metasets,
+        "device": device,
+        "settings": settings
+    }
+    print("Merge To Checkpoint Request: ",request_input)
+    
+    
     if model == []: return "ERROR: No model Selected"
     if lnames == "":return "ERROR: No LoRA Selected"
 
@@ -802,6 +817,8 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     result = savemodel(theta_0,dname,output,settings)
     del theta_0
     gc.collect()
+    
+    print("Plus LoRA end: ",result)
     return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
