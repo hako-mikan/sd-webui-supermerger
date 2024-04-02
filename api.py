@@ -17,6 +17,10 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import api_models as models
 from scripts.mergers import pluslora
 
+from fastapi import File, UploadFile, Form
+from typing import Annotated
+import shutil
+
 
 class Api:
     """Api class for FastAPI"""
@@ -65,9 +69,23 @@ class Api:
 
         self.add_api_route(
             'merge-lora',
-            self.merge_lora,
+            self.merge_lora_api,
             methods=['POST'],
             response_model=models.MergeLoraResponse,
+        )
+
+        self.add_api_route(
+            'upload-lora',
+            self.upload_lora_api,
+            methods=['POST'],
+            response_model=models.UploadLoraResponse,
+        )
+
+        self.add_api_route(
+            'upload-lora-merge-checkpoint',
+            self.upload_lora_and_merge_lora_to_checkpoint,
+            methods=['POST'],
+            response_model=models.UploadLoraMergeLoraResponse,
         )
 
     async def add_to_queue(self, m, q, n='', i=None, t=0.0) -> Dict[
@@ -189,7 +207,7 @@ class Api:
 
         return f"Successfully unload {unloaded_models} model(s)"
 
-    def merge_lora(self, request: models.MergeLoraRequest):
+    def merge_lora(self, request: models.MergeLoraRequest) -> str:
         """Merge Lora"""
         try:
             # comment:
@@ -220,8 +238,68 @@ class Api:
                 settings=[]
             )
 
+            return res
+
+        except Exception as e:
+            raise e
+        # end try
+
+    def merge_lora_api(self, request: models.MergeLoraRequest):
+        """Merge Lora"""
+        try:
+            # comment:
+
+            res = self.merge_lora(request)
+
             return models.MergeLoraResponse(checkpoint_merged_path=res)
 
+        except Exception as e:
+            raise e
+        # end try
+
+    def upload_file(self, file: UploadFile):
+        try:
+            # save lora file to disk
+            file_location = f"models/Lora/{file.filename}"
+            with open(file_location, "wb+") as file_object:
+                shutil.copyfileobj(file.file, file_object)
+            message = f'{file.filename} saved at {file_location}'
+
+            return message
+        except Exception as e:
+            raise e
+        # end try
+
+    def upload_lora_api(self, lora_file: UploadFile):
+        """Upload Lora"""
+        try:
+            # comment:
+            message = self.upload_file(lora_file)
+
+            return models.UploadLoraResponse(message=message)
+        except Exception as e:
+            raise e
+        # end try
+
+    def upload_lora_and_merge_lora_to_checkpoint(self, lora_file: UploadFile, merge_request: models.UploadLoraMergeLoraRequest = Depends()):
+        """Upload Lora and merge Lora to checkpoint"""
+        try:
+            # comment:
+            print("Merge Request:   ", merge_request)
+            lora_file_name = lora_file.filename.split(".")[0]
+
+            upload_res = self.upload_file(lora_file)
+
+            # merge lora
+            merge_request.lnames = f"{lora_file_name}:{merge_request.rate}"
+
+            merged_res = self.merge_lora(merge_request)
+
+            message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
+
+            checkpoint_merged_name = merged_res.split("/")[-1]
+
+            return models.UploadLoraMergeLoraResponse(message=message, checkpoint_merged_name=checkpoint_merged_name)
         except Exception as e:
             raise e
         # end try
