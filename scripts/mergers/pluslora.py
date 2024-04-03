@@ -91,7 +91,7 @@ def on_ui_tabs():
         sml_submit_result = gr.Textbox(label="Message")
         with gr.Row(equal_height=False):
             with gr.Column(equal_height=False):
-                sml_cpmerge = gr.Button(elem_id="model_merger_merge", value="Merge to Checkpoint",variant='primary')
+                sml_cpmerge = gr.Button(elem_id="model_merger_merge", value="Merge to Checkpoint(Model A)",variant='primary')
                 sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
                 with gr.Row(equal_height=False):
                     sml_settings = gr.CheckboxGroup(["same to Strength", "overwrite"], label="settings")
@@ -105,7 +105,7 @@ def on_ui_tabs():
                 sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * Tuned - beta * Original)",variant='primary')
                 sml_extract = gr.Button(elem_id="model_merger_merge", value="Extract from two LoRAs",variant='primary')
                 with gr.Row(equal_height=False):
-                    sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint Tuned",interactive=True)
+                    sml_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint Tuned / Model A)",interactive=True)
                     create_refresh_button(sml_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
                 with gr.Row(equal_height=False):
                     sml_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint Original",interactive=True)
@@ -266,7 +266,7 @@ def on_ui_tabs():
           if names ==[] : return ""
           else:
             for i,n in enumerate(names):
-              if "(" in n:names[i] = n[:n.rfind("(")]
+              if "[" in n:names[i] = n[:n.rfind("[")]
             return f":{ratio},".join(names)+f":{ratio} "
 
         hidenb.change(fn=lambda x: False, outputs = [hidenb])
