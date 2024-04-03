@@ -1,4 +1,5 @@
 """API module for FastAPI"""
+import requests
 from typing import Callable, Dict, Optional
 from threading import Lock
 from secrets import compare_digest
@@ -244,6 +245,19 @@ class Api:
             raise e
         # end try
 
+    def referesh_loras_request(self):
+        """Refresh Loras"""
+        try:
+            # comment:
+
+            res = requests.post("http://localhost:7860/sdapi/v1/refresh-loras")
+
+            return res
+
+        except Exception as e:
+            raise e
+        # end try
+
     def merge_lora_api(self, request: models.MergeLoraRequest):
         """Merge Lora"""
         try:
@@ -275,6 +289,7 @@ class Api:
         try:
             # comment:
             message = self.upload_file(lora_file)
+            self.referesh_loras_request()
 
             return models.UploadLoraResponse(message=message)
         except Exception as e:
