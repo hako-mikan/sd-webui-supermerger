@@ -290,7 +290,7 @@ class Api:
             # comment:
             message = self.upload_file(lora_file)
             self.referesh_loras_request()
-
+                
             return models.UploadLoraResponse(message=message)
         except Exception as e:
             raise e
@@ -305,6 +305,7 @@ class Api:
 
             upload_res = self.upload_file(lora_file)
             print("Uploaded file successfully:   ", upload_res)
+            self.referesh_loras_request()
 
             # merge lora
             merge_request.lnames = f"{lora_file_name}:{merge_request.rate}"
