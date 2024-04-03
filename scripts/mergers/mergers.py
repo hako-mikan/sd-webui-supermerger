@@ -8,7 +8,7 @@ import re
 import torch
 import tqdm
 import datetime
-
+from typing import Union, Optional
 import csv
 import json
 import launch
@@ -688,7 +688,7 @@ def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
 
 ################################################
 ##### Extract
-def extract_super(base: Tensor | None, a: Tensor, b: Tensor, alpha: float, beta: float, gamma: float) -> Tensor:
+def extract_super(base: Optional[Tensor], a: Tensor, b: Tensor, alpha: float, beta: float, gamma: float) -> Tensor:
     assert base is None or base.shape == a.shape
     assert a.shape == b.shape
     assert 0 <= alpha <= 1
