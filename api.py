@@ -289,10 +289,12 @@ class Api:
             lora_file_name = lora_file.filename.split(".")[0]
 
             upload_res = self.upload_file(lora_file)
+            print("Uploaded file successfully:   ", upload_res)
 
             # merge lora
             merge_request.lnames = f"{lora_file_name}:{merge_request.rate}"
-
+            
+            print("Started to merge lora")
             merged_res = self.merge_lora(merge_request)
 
             message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
