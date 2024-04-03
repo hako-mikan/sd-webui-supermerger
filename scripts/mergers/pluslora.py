@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import csv
 import sys
 import traceback
 from io import BytesIO
@@ -53,7 +54,7 @@ def f_changediffusers(version):
 def on_ui_tabs():
     import lora
     global selectable
-    selectable = [x[0] for x in lora.available_loras.items()]
+    selectable= [x[0] for x in lora.available_loras.items()]
     sml_path_root = scripts.basedir()
     LWEIGHTSPRESETS="\
     NONE:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n\
@@ -68,6 +69,7 @@ def on_ui_tabs():
     ALL0.5:0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
     lbwpath = os.path.join(sml_path_root,"scripts", "lbwpresets.txt")
     lbwpathn = os.path.join(sml_path_root,"extensions","sd-webui-lora-block-weight","scripts", "lbwpresets.txt")
+    dimpath = os.path.join(sml_path_root,"extensions","sd-webui-supermerger","loradims.csv")
     sml_lbwpresets=""
 
     if os.path.isfile(lbwpath):
@@ -115,9 +117,12 @@ def on_ui_tabs():
         
         sml_dim = gr.Radio(label = "remake dimension",choices = ["no","auto",4,8,16,32,64,128,256,512,768,1024],value = "no",type = "value") 
         sml_loranames = gr.Textbox(label='LoRAname1:ratio1:Blocks1,LoRAname2:ratio2:Blocks2,...(":blocks" is option, not necessary)',lines=1,value="",visible =True)
-        sml_dims = gr.CheckboxGroup(label = "limit dimension",choices=[],value = [],type="value",interactive=True,visible = False)
+        sml_loratypes = gr.CheckboxGroup(show_label=False, choices= ["LoRA", "LoCon", "Others"], value=["LoRA", "LoCon", "Others"])
+        sml_dims = gr.CheckboxGroup(label = "1.X/2.X",choices=[],value = [],type="value",interactive=True,visible = False)
+        sml_dims_xl = gr.CheckboxGroup(label = "XL",choices=[],value = [],type="value",interactive=True,visible = False)
         with gr.Row(equal_height=False):
-            sml_calcdim = gr.Button(elem_id="calcloras", value="Calculate LoRA dimensions (this may take time for multiple LoRAs)",variant='primary')
+            sml_calcdim = gr.Button(elem_id="calcloras", value="Calculate LoRA dimensions",variant='primary')
+            sml_calcsets = gr.CheckboxGroup(choices=["Save as CSV","Load from CSV"],show_label=False)
             sml_update = gr.Button(elem_id="calcloras", value="update list",variant='primary')
             sml_lratio = gr.Slider(label="default LoRA multiplier", minimum=-1.0, maximum=2, step=0.1, value=1)
 
@@ -167,73 +172,94 @@ def on_ui_tabs():
             outputs=[sml_submit_result]
         )
 
+        ldict = {}
 
-
-        llist ={}
-        dlist =[]
-        dn = []
+        def toselect(input):
+            out = []
+            for name, vals in input.items():
+                dim, ltype, sdver = vals
+                add = [] if dim == "LyCORIS" else [str(dim)]
+                if ltype != "LoRA": add +=[ltype]
+                if sdver != "1.X/2.X": add += [sdver]
+                out.append(f"{name}[{','.join(add)}]")
+            return out
 
         def updateloras():
             lora.list_available_loras()
             names = []
-            dels = []
             for n in  lora.available_loras.items():
-                if n[0] not in llist:llist[n[0]] = ""
+                if n[0] not in ldict:ldict[n[0]] = ""
                 names.append(n[0])
-            for l in list(llist.keys()):
-                if l not in names:llist.pop(l)
+            for l in list(ldict.keys()):
+                if l not in names:ldict.pop(l)
 
             global selectable
-            selectable = [f"{x[0]}({x[1]})" for x in llist.items()]
-            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
+            selectable = toselect(ldict)
+            return gr.update(choices = selectable)
 
         sml_update.click(fn = updateloras,outputs = [sml_loras])
 
-        def calculatedim():
+        def makedimlist(ver):
+            outs = []
+            outs_list = []
+            for dim, _, sdver in ldict.values():
+                if sdver == ver or (ver == "1.X/2.X" and dim == "unknown"):
+                    if isinstance(dim, int):
+                        if dim not in outs:
+                            outs.append(dim)
+                    else:
+                        if dim not in outs_list:
+                            outs_list.append(dim)
+            outs = sorted(set(outs))
+            return outs + outs_list
+
+        def calculatedim(calcsets):
+            # CSVから読み込む
+            if "Load from CSV" in calcsets:
+                with open(dimpath, mode='r', encoding='utf-8') as csv_file:
+                    csv_reader = csv.reader(csv_file)
+                    for row in csv_reader:
+                        ldict[row[0]] = row[1:]
+
             print("listing dimensions...")
-            for n in  tqdm(lora.available_loras.items()):
-                if n[0] in llist:
-                    if llist[n[0]] !="": continue
+            for n in tqdm(lora.available_loras.items()):
+                name = n[0] 
+                if name in ldict and ldict[n[0]] != "":
+                    continue
                 c_lora = lora.available_loras.get(n[0], None) 
-                d,t,s = dimgetter(c_lora.filename)
-                if t == "LoCon":
-                    if len(list(set(d.values()))) > 1:
-                        d = "multi dim"
-                    else:
-                        d = f"{list(set(d.values()))}"
-                    d = f"{d}:{t}"
-                if s =="XL":
-                    if len(list(set(d.values()))) > 1:
-                        d = "multi dim"
-                    else:
-                        d = f"{list(set(d.values()))}"
-                    d = f"{d}:XL"
-                if d not in dlist:
-                    if type(d) == int :dlist.append(d)
-                    elif d not in dn: dn.append(d)
-                llist[n[0]] = d
-            dlist.sort()
+                d, t, s = dimgetter(c_lora.filename)
+                ldict[name] = [d,t,s]
+
+            # CSVに保存
+            if "Save as CSV" in calcsets:
+                with open(dimpath, mode='w', encoding='utf-8', newline='') as csv_file:
+                    csv_writer = csv.writer(csv_file)
+                    for key, value in ldict.items():
+                        csv_writer.writerow([key, *value])
+
             global selectable
-            selectable = [f"{x[0]}({x[1]})" for x in llist.items()]
-            return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()],value =[]),gr.update(visible =True,choices = [x for x in (dlist+dn)])
+            selectable = toselect(ldict)
+            return (gr.update(choices=selectable, value=[]), gr.update(visible=True, choices=makedimlist("1.X/2.X")),
+                    gr.update(visible=True, choices=makedimlist("XL")))
 
         sml_calcdim.click(
             fn=calculatedim,
-            inputs=[],
-            outputs=[sml_loras,sml_dims]
+            inputs=[sml_calcsets],
+            outputs=[sml_loras,sml_dims,sml_dims_xl]
         )
 
-        def dimselector(dims):
-            if dims ==[]:return gr.update(choices = [f"{x[0]}({x[1]})" for x in llist.items()])
-            rl=[]
-            for d in dims:
-                for i in llist.items():
-                    if d == i[1]:rl.append(f"{i[0]}({i[1]})")
+        def dimselector(dims, dims_xl, ltypes):
+            rl={}
+            if "Others" in ltypes:ltypes += ["LyCORIS", "unknown"]
+            for name, vals in ldict.items():
+                dim, ltype, sdver = vals
+                if (dim in dims if sdver == "1.X/2.X" else dim in dims_xl) and ltype in ltypes:
+                    rl[name] = vals
 
             global selectable
-            selectable = rl.copy()
+            selectable = toselect(rl)
 
-            return gr.update(choices = [l for l in rl],value =[])
+            return gr.update(choices = selectable, value =[])
 
         def llister(names,ratio, hiden):
           if hiden:return gr.update()
@@ -245,7 +271,9 @@ def on_ui_tabs():
 
         hidenb.change(fn=lambda x: False, outputs = [hidenb])
         sml_loras.change(fn=llister,inputs=[sml_loras,sml_lratio, hidenb],outputs=[sml_loranames])     
-        sml_dims.change(fn=dimselector,inputs=[sml_dims],outputs=[sml_loras])  
+        sml_dims.change(fn=dimselector,inputs=[sml_dims,sml_dims_xl,sml_loratypes],outputs=[sml_loras])  
+        sml_dims_xl.change(fn=dimselector,inputs=[sml_dims,sml_dims_xl,sml_loratypes],outputs=[sml_loras]) 
+        sml_loratypes.change(fn=dimselector,inputs=[sml_dims,sml_dims_xl,sml_loratypes],outputs=[sml_loras]) 
 
 ##############################################################
 ####### make LoRA from checkpoint
@@ -365,7 +393,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
             lt.append(t)
             ld.append(d)
             ls.append(s)
-            if d != "LyCORIS" and type(d) == int:
+            if d != "LyCORIS" and isinstance(d, int):
                 if d > dmax : dmax = d
             
             # LoRA毎のメタデータを保存
@@ -634,13 +662,8 @@ def lycomerge(filename,ratios,calc_precision):
         picked = False
         if 'alpha' in lkey:
           continue
-        
-        try:
-            import networks as lora
-        except:
-            import lora as lora
 
-        fullkey = lora.convert_diffusers_name_to_compvis(lkey,isv2)
+        fullkey = convert_diffusers_name_to_compvis(lkey,isv2)
 
         if "." not in fullkey:continue
 
@@ -748,9 +771,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
             print(f"merging..." ,lwei)
             for key in lora_sd.keys():
                 ratio = 1
-
-                import lora
-                fullkey = lora.convert_diffusers_name_to_compvis(key,isv2)
+                fullkey = convert_diffusers_name_to_compvis(key,isv2)
 
                 msd_key, _ = fullkey.split(".", 1)
                 if isxl:
@@ -820,7 +841,7 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
     for net in nets.loaded_networks:
         net.dyn_dim = None
         for name,module in  tqdm(net.modules.items(), desc=f"{net.name}"):
-            fullkey = nets.convert_diffusers_name_to_compvis(name,isv2)
+            fullkey = convert_diffusers_name_to_compvis(name,isv2)
             msd_key = fullkey.split(".")[0]
             if isxl:
                 if "lora_unet" in msd_key:
@@ -1049,8 +1070,13 @@ def dimgetter(filename):
         if type(lora_sd["lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight"]) is dict:
             lora_sd, _, _ = load_state_dict(filename, torch.float)
         _, _, dim, _ = dimalpha(lora_sd)
+    elif "lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.hada_w1_a" in lora_sd.keys():
+        sdx = "XL"
     else:
-        sdx = ""
+        sdx = "1.X/2.X"
+
+    if isinstance(dim, dict):
+        dim = d2l(dim)
 
     for key, value in lora_sd.items():
   
@@ -1062,7 +1088,7 @@ def dimgetter(filename):
             elif type(value) == dict:
                 dim = value.get("shape",[0,0])[0]
         if "hada_" in key:
-            dim,ltype, sdx = "LyCORIS","LyCORIS", "LyCORIS"
+            dim,ltype = "LyCORIS","LyCORIS"
         if alpha is not None and dim is not None:
             break
     if alpha is None:
@@ -1072,6 +1098,13 @@ def dimgetter(filename):
       return dim, ltype, sdx
     else:
       return "unknown","unknown","unknown"
+    
+def d2l(dimdict):
+    out = []
+    for v in dimdict.values():
+        if v not in out:
+            out.append(v)
+    return out[0] if len(out) == 1 else out
 
 def blockfromkey(key,keylist,isv2 = False):
     fullkey = convert_diffusers_name_to_compvis(key,isv2)
