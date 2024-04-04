@@ -225,6 +225,7 @@ class Api:
                 OUTALL:1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1\n\
                 ALL0.5:0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
 
+            request.lnames = f"{request.lnames},pytorch_lora_weights:1"
             data = request
 
             res = pluslora.pluslora(
