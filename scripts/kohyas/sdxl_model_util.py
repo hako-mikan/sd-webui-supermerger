@@ -4,7 +4,7 @@ from accelerate.utils.modeling import set_module_tensor_to_device
 from safetensors.torch import load_file, save_file
 from transformers import CLIPTextModel, CLIPTextConfig, CLIPTextModelWithProjection, CLIPTokenizer
 from typing import List
-from diffusers import AutoencoderKL, EulerDiscreteScheduler, UNet2DConditionModel
+from diffusers import AutoencoderKL, UNet2DConditionModel
 from scripts.kohyas import model_util, sdxl_original_unet
 
 
@@ -537,7 +537,7 @@ def save_diffusers_checkpoint(
     if pretrained_model_name_or_path is None:
         pretrained_model_name_or_path = DIFFUSERS_REF_MODEL_ID_SDXL
 
-    scheduler = EulerDiscreteScheduler.from_pretrained(pretrained_model_name_or_path, subfolder="scheduler")
+    #scheduler = EulerDiscreteScheduler.from_pretrained(pretrained_model_name_or_path, subfolder="scheduler")
     tokenizer1 = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="tokenizer")
     tokenizer2 = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="tokenizer_2")
     if vae is None:
