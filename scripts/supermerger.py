@@ -400,7 +400,7 @@ def on_ui_tabs():
                             loadcachelist = gr.Button(elem_id="model_merger_merge", value="Reload Cache List",variant='primary')
                             unloadmodel = gr.Button(value="unload model",variant='primary')
 
-                with gr.Column(variant="compact"):
+                with gr.Column(variant="compact",elem_id="txt2img_results"):
                     components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")
                     components.submit_result = gr.Textbox(label="Message")
                     
