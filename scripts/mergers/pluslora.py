@@ -387,7 +387,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
             ln.append(c_lora.filename)
             lr.append(ratio)
             d, t, s = dimgetter(c_lora.filename)
-            if t == "LoCon":
+            if t == "LoCon" and isinstance(d, list):
                 d = list(set(d.values()))
                 d = d[0]
             lt.append(t)
@@ -631,9 +631,6 @@ def extract_two(a,b,pa,pb,ps):
         scale_b = math.sqrt(alpha_b / base_alpha_b)
 
         merged_sd[key] = extract_super(None,a[key] * scale_a,b[key] * scale_b,pa,pb,ps)
-
-        merged_sd[key] = merged_sd[key] + a[key] * scale_a
-        merged_sd[key] = a[key] * scale_a
 
     # set alpha to sd
     for lora_module_name, alpha in base_alphas.items():
