@@ -399,7 +399,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if a[1] == 8 and b[1] == 4:#If we have an Instruct-Pix2Pix model...
                 result_is_instruct_pix2pix_model = True
             else:
-                assert a.shape[1] == 9 and b.shape[1] == 4, f"Bad dimensions for merged layer {key}: A={a.shape}, B={b.shape}"
+                assert a[1] == 9 and b[1] == 4, f"Bad dimensions for merged layer {key}: A={a}, B={b}"
                 result_is_inpainting_model = True
 
         block,blocks26 = blockfromkey(key,isxl)
