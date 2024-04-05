@@ -177,6 +177,7 @@ def on_ui_tabs():
         def toselect(input):
             out = []
             for name, vals in input.items():
+                if (not isinstance(vals, list)) or len(vals) != 3: continue
                 dim, ltype, sdver = vals
                 add = [] if dim == "LyCORIS" else [str(dim)]
                 if ltype != "LoRA": add +=[ltype]
@@ -694,8 +695,14 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     import lora
     lnames = lnames.split(",")
 
-    for i, n in enumerate(lnames):
-        lnames[i] = n.split(":")
+    temp = []
+    for n in lnames:
+        if ":" in n:
+            temp.append(n.split(":"))
+        else:
+            temp[-1].append(n)
+    
+    lnames = temp
 
     loraratios=loraratios.splitlines()
     ldict ={}
@@ -707,11 +714,16 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     names, filenames, loratypes, lweis = [], [], [], []
 
     for n in lnames:
-        if len(n) ==3:
+        if len(n) ==2:
+            ratio = [float(n[1])]*26
+        elif len(n) ==3:
             if n[2].strip() in ldict:
                 ratio = [float(r)*float(n[1]) for r in ldict[n[2]].split(",")]
                 ratio = to26(ratio)
             else:ratio = [float(n[1])]*26
+        elif len(n[2:]) in BLOCKNUMS:
+            ratio = [float(x) for x in n[2:]]
+            ratio = to26(ratio)
         else:ratio = [float(n[1])]*26
         c_lora = lora.available_loras.get(n[0], None) 
         names.append(n[0])
