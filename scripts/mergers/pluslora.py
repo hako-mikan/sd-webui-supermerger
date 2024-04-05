@@ -182,15 +182,16 @@ def on_ui_tabs():
                 add = [] if dim == "LyCORIS" else [str(dim)]
                 if ltype != "LoRA": add +=[ltype]
                 if sdver != "1.X/2.X": add += [sdver]
-                out.append(f"{name}[{','.join(add)}]")
+                out.append(f"{name}[{','.join(add)}]" if add != ["","",""] else f"{name}")
             return out
 
         def updateloras():
             lora.list_available_loras()
             names = []
             for n in  lora.available_loras.items():
-                if n[0] not in ldict:ldict[n[0]] = ""
+                if n[0] not in ldict:ldict[n[0]] = ["","",""]
                 names.append(n[0])
+
             for l in list(ldict.keys()):
                 if l not in names:ldict.pop(l)
 
@@ -225,7 +226,7 @@ def on_ui_tabs():
             print("listing dimensions...")
             for n in tqdm(lora.available_loras.items()):
                 name = n[0] 
-                if name in ldict and ldict[n[0]] != "":
+                if name in ldict and ldict[n[0]] != ["","",""]:
                     continue
                 c_lora = lora.available_loras.get(n[0], None) 
                 d, t, s = dimgetter(c_lora.filename)
