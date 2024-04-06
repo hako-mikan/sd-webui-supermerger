@@ -935,7 +935,7 @@ def lbw(lora,lwei,isv2):
 
         for i,block in enumerate(blocks):
             if block in key:
-                if i == 26: i=0
+                if i == 26 or i == 27: i=0
                 ratio = lwei[i]
                 picked = True
 
@@ -1194,7 +1194,8 @@ LBLCOKS26=["encoder",
 "diffusion_model_output_blocks_9_",
 "diffusion_model_output_blocks_10_",
 "diffusion_model_output_blocks_11_",
-"embedders"]
+"embedders",
+"transformer_resblocks"]
 
 ###########################################################
 ##### metadata
