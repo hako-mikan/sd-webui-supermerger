@@ -21,7 +21,8 @@ from scripts.mergers import pluslora
 from fastapi import File, UploadFile, Form
 from typing import Annotated
 import shutil
-
+from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
+from time import sleep
 
 class Api:
     """Api class for FastAPI"""
@@ -225,7 +226,7 @@ class Api:
                 OUTALL:1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1\n\
                 ALL0.5:0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
 
-            request.lnames = f"{request.lnames},pytorch_lora_weights:1"
+            request.lnames = f"{request.lnames},pytorch_lora_weights:0.7"
             data = request
 
             res = pluslora.pluslora(
@@ -291,7 +292,7 @@ class Api:
             # comment:
             message = self.upload_file(lora_file)
             self.referesh_loras_request()
-                
+
             return models.UploadLoraResponse(message=message)
         except Exception as e:
             raise e
@@ -300,8 +301,16 @@ class Api:
     def upload_lora_and_merge_lora_to_checkpoint(self, lora_file: UploadFile, merge_request: models.UploadLoraMergeLoraRequest = Depends()):
         """Upload Lora and merge Lora to checkpoint"""
         try:
+
+            task_id = create_task_id(
+                "upload_lora_and_merge_lora_to_checkpoint")
+            print("Task ID:   ", task_id)
+            add_task_to_queue(task_id)
             # comment:
+
+            start_task(task_id)
             print("Merge Request:   ", merge_request)
+            # sleep(30)
             lora_file_name = lora_file.filename.split(".")[0]
 
             upload_res = self.upload_file(lora_file)
@@ -309,8 +318,8 @@ class Api:
             self.referesh_loras_request()
 
             # merge lora
-            merge_request.lnames = f"{lora_file_name}:{merge_request.rate}"
-            
+            merge_request.lnames = f"{lora_file_name}:0.8"
+
             print("Started to merge lora")
             merged_res = self.merge_lora(merge_request)
 
@@ -321,8 +330,12 @@ class Api:
             return models.UploadLoraMergeLoraResponse(message=message, checkpoint_merged_name=checkpoint_merged_name)
         except Exception as e:
             raise e
+        finally:
+            print("Finish task")
+            finish_task(task_id)
         # end try
 
 
 def on_app_started(_, app: FastAPI):
+
     Api(app, queue_lock, '/supermerger/v1')
