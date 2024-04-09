@@ -24,7 +24,6 @@ import shutil
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 from time import sleep
 
-
 class Api:
     """Api class for FastAPI"""
 
@@ -316,7 +315,6 @@ class Api:
                 try:
                     shared.state.begin(job="scripts_txt2img")
                     start_task(task_id)
-                    sleep(30)
 
                     upload_res = self.upload_file(lora_file)
                     print("Uploaded file successfully:   ", upload_res)
