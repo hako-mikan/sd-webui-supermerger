@@ -24,6 +24,7 @@ import shutil
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 from time import sleep
 
+
 class Api:
     """Api class for FastAPI"""
 
@@ -302,30 +303,41 @@ class Api:
         """Upload Lora and merge Lora to checkpoint"""
         try:
 
-            task_id = create_task_id(
-                "upload_lora_and_merge_lora_to_checkpoint")
-            print("Task ID:   ", task_id)
+            task_id = create_task_id("txt2img")
+            print("Task merge ID:   ", task_id)
             add_task_to_queue(task_id)
             # comment:
 
-            start_task(task_id)
             print("Merge Request:   ", merge_request)
-            # sleep(30)
             lora_file_name = lora_file.filename.split(".")[0]
 
-            upload_res = self.upload_file(lora_file)
-            print("Uploaded file successfully:   ", upload_res)
-            self.referesh_loras_request()
+            with self.queue_lock:
 
-            # merge lora
-            merge_request.lnames = f"{lora_file_name}:0.8"
+                try:
+                    shared.state.begin(job="scripts_txt2img")
+                    start_task(task_id)
+                    sleep(30)
 
-            print("Started to merge lora")
-            merged_res = self.merge_lora(merge_request)
+                    upload_res = self.upload_file(lora_file)
+                    print("Uploaded file successfully:   ", upload_res)
+                    self.referesh_loras_request()
 
-            message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
+                    # merge lora
+                    merge_request.lnames = f"{lora_file_name}:0.8"
 
-            checkpoint_merged_name = merged_res.split("/")[-1]
+                    print("Started to merge lora")
+                    merged_res = self.merge_lora(merge_request)
+
+                    message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
+
+                    checkpoint_merged_name = merged_res.split("/")[-1]
+                finally:
+                    shared.state.end()
+                    shared.total_tqdm.clear()
+                    finish_task(task_id)
+
+     
+            
 
             return models.UploadLoraMergeLoraResponse(message=message, checkpoint_merged_name=checkpoint_merged_name)
         except Exception as e:
@@ -337,5 +349,4 @@ class Api:
 
 
 def on_app_started(_, app: FastAPI):
-
     Api(app, queue_lock, '/supermerger/v1')
