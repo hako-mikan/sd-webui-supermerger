@@ -23,6 +23,7 @@ import shutil
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 from time import sleep
 
+
 class Api:
     """Api class for FastAPI"""
 
@@ -246,6 +247,44 @@ class Api:
             raise e
         # end try
 
+    def merge_lora_with_lcm(self, request: models.MergeLoraRequest) -> str:
+        """Merge Lora"""
+        try:
+            # comment:
+
+            request.loraratios = "\
+                NONE:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n\
+                ALL:1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\n\
+                INS:1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0\n\
+                IND:1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0\n\
+                INALL:1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0\n\
+                MIDD:1,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0\n\
+                OUTD:1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0\n\
+                OUTS:1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1\n\
+                OUTALL:1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1\n\
+                ALL0.5:0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
+
+            request.lnames = f"{request.lnames}, pytorch_lora_weights:0.8"
+            data = request
+
+            res = pluslora.pluslora(
+                loraratios=data.loraratios,
+                calc_precision=data.calc_precision,
+                device=data.device,
+                lnames=data.lnames,
+                metasets=data.metasets,
+                model=data.model,
+                output=data.output,
+                save_precision=data.save_precision,
+                settings=[]
+            )
+
+            return res
+
+        except Exception as e:
+            raise e
+        # end try
+
     def referesh_loras_request(self):
         """Refresh Loras"""
         try:
@@ -323,7 +362,10 @@ class Api:
                     merge_request.lnames = f"{lora_file_name}:0.8"
 
                     print("Started to merge lora")
-                    merged_res = self.merge_lora(merge_request)
+                    if merge_request.is_with_lcm == True:
+                        merged_res = self.merge_lora_with_lcm(merge_request)
+                    else:
+                        merged_res = self.merge_lora(merge_request)
 
                     message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
 
@@ -332,9 +374,6 @@ class Api:
                     shared.state.end()
                     shared.total_tqdm.clear()
                     finish_task(task_id)
-
-     
-            
 
             return models.UploadLoraMergeLoraResponse(message=message, checkpoint_merged_name=checkpoint_merged_name)
         except Exception as e:

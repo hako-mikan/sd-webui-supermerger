@@ -170,6 +170,12 @@ class UploadLoraMergeLoraRequest(BaseModel):
         description='Rate.',
         default=0.7,
     )
+    
+    is_with_lcm: bool = Field(
+        title='Is with LCM',
+        description='Is with LCM.',
+        default=False,
+    )
 
 
 class UploadLoraMergeLoraResponse(BaseModel):

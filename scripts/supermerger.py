@@ -1310,9 +1310,9 @@ def has_alphanumeric(text):
     pattern = re.compile(r'[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;"\'<>,.?/\|\\]')
     return bool(pattern.search(text.replace("</w>","")))
 
-# from api import on_app_started
+from api import on_app_started
 
 if __package__ == "supermerger":
-    # script_callbacks.on_app_started(on_app_started)
+    script_callbacks.on_app_started(on_app_started)
     script_callbacks.on_ui_tabs(on_ui_tabs)
     
