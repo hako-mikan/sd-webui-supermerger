@@ -94,7 +94,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
     else:
         fname = fname if ext in fname else fname +pre+ext
 
-    fname = os.path.join(sd_models.model_path, fname)
+    fname = os.path.join(shared.cmd_opts.ckpt_dir if shared.cmd_opts.ckpt_dir is not None else sd_models.model_path, fname)
     fname = fname.replace("ProgramFiles_x86_","Program Files (x86)")
 
     if len(fname) > 255:
@@ -111,7 +111,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in state_dict
     if isxl:
         # prune share memory tensors, "cond_stage_model." prefixed base tensors are share memory with "conditioner." prefixed tensors
-        for i, key in enumerate(state_dict.keys()):
+        for key in list(state_dict.keys()):
             if "cond_stage_model." in key:
                 del state_dict[key]
 

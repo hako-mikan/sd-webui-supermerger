@@ -1063,7 +1063,10 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, device="cpu", dt
             torch_dtype="float32",
         )
         text_model = CLIPTextModel._from_config(cfg)
-        info = text_model.load_state_dict(converted_text_encoder_checkpoint)
+        try:
+            info = text_model.load_state_dict(converted_text_encoder_checkpoint)
+        except:
+            info = text_model.load_state_dict(converted_text_encoder_checkpoint, strict=False) 
     print("loading text encoder:", info)
 
     return text_model, vae, unet

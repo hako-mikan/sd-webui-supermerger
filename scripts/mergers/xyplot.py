@@ -12,7 +12,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageColor, PngImagePlugin
 from modules import images, sd_models, devices
 from modules.sd_models import load_model
 from modules.shared import opts
-from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font
+from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,BLOCKID,BLOCKIDXLL,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font
 from scripts.mergers.model_util import savemodel
 from scripts.mergers.bcolors import bcolors
 
@@ -293,7 +293,6 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     state_mergen = False
 
     #type[0:none,1:aplha,2:beta,3:seed,4:mbw,5:model_A,6:model_B,7:model_C,8:pinpoint ]
-    blockid=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
     #format ,IN00 IN03,IN04-IN09,OUT4,OUT05
     def weightsdealer(xyzval: list,xyztype: list,weights: str, mode: str):
         caster(f"weights from : {weights}",hear)
@@ -301,11 +300,13 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         wa = xyzval[xyztype.index(mode)]
         ww = [w.strip() for w in ww.split(' ')]
         weights_t = [w.strip() for w in weights.split(',')]
+        wlen = len(weights_t)
+        blockid = BLOCKID if wlen == 26 else BLOCKIDXLL
         if ww[0]!="NOT":
-            flagger=[False]*26
+            flagger=[False] * wlen
             changer = True
         else:
-            flagger=[True]*26
+            flagger=[True] * wlen
             changer = False
         for w in ww:
             if w =="NOT":continue

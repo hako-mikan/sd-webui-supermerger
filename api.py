@@ -19,7 +19,6 @@ import api_models as models
 from scripts.mergers import pluslora
 
 from fastapi import File, UploadFile, Form
-from typing import Annotated
 import shutil
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 from time import sleep

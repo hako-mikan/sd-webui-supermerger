@@ -103,6 +103,25 @@ class GenParamGetter(scripts.Script):
                     outputs=[*components.imagegal],
                 )
 
+                components.merge2.click(
+                    fn=smergegen,
+                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dfalse,*components.txt2img_params],
+                    outputs=[components.submit_result,components.currentmodel]
+                )
+
+                components.mergeandgen2.click(
+                    fn=smergegen,
+                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dtrue,*components.txt2img_params],
+                    outputs=[components.submit_result,components.currentmodel,*components.imagegal]
+                )
+
+                components.gen2.click(
+                    fn=simggen,
+                    inputs=[*components.genparams,*components.hiresfix,components.currentmodel,components.id_sets,gr.Textbox(value="No id",visible=False),*components.txt2img_params],
+                    outputs=[*components.imagegal],
+                )
+
+
                 components.s_reserve.click(
                     fn=numanager,
                     inputs=[gr.Textbox(value="reserve",visible=False),*components.xysettings,*components.msettings,*components.genparams,*components.hiresfix,*components.lucks,*components.txt2img_params],
