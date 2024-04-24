@@ -5,7 +5,6 @@ from modules.api import models as sd_models  # pylint: disable=E0401
 from pydantic import BaseModel, Field
 
 from fastapi import File, UploadFile, Form
-from typing import Annotated
 
 
 class TaggerInterrogateRequest(sd_models.InterrogateRequest):

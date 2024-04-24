@@ -19,7 +19,6 @@ import api_models as models
 from scripts.mergers import pluslora
 
 from fastapi import File, UploadFile, Form
-from typing import Annotated
 import shutil
 
 
@@ -225,7 +224,7 @@ class Api:
                 OUTALL:1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1\n\
                 ALL0.5:0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
 
-            request.lnames = f"{request.lnames},pytorch_lora_weights:1"
+            request.lnames = f"{request.lnames}"
             data = request
 
             res = pluslora.pluslora(
