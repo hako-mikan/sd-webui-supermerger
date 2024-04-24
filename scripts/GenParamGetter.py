@@ -36,8 +36,8 @@ class GenParamGetter(scripts.Script):
         elif  component.elem_id == "img2img_generate":
             GenParamGetter.img2img_gen_button = component
 
-    def get_components_by_ids(root: gr.Blocks, ids: list[int]):
-        components: list[gr.Blocks] = []
+    def get_components_by_ids(root: gr.Blocks, ids: 'list[int]'):
+        components: 'list[gr.Blocks]' = []
 
         if root._id in ids:
             components.append(root)
@@ -48,7 +48,7 @@ class GenParamGetter(scripts.Script):
                 components.extend(GenParamGetter.get_components_by_ids(block, ids))
         return components
     
-    def compare_components_with_ids(components: list[gr.Blocks], ids: list[int]):
+    def compare_components_with_ids(components: 'list[gr.Blocks]', ids: 'list[int]'):
         return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
 
     def get_params_components(demo: gr.Blocks, app):

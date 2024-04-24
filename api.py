@@ -351,7 +351,7 @@ class Api:
             with self.queue_lock:
 
                 try:
-                    shared.state.begin(job="scripts_txt2img")
+                    # shared.state.begin(job="scripts_txt2img")
                     start_task(task_id)
 
                     upload_res = self.upload_file(lora_file)
@@ -371,8 +371,8 @@ class Api:
 
                     checkpoint_merged_name = merged_res.split("/")[-1]
                 finally:
-                    shared.state.end()
-                    shared.total_tqdm.clear()
+                    # shared.state.end()
+                    # shared.total_tqdm.clear()
                     finish_task(task_id)
 
             return models.UploadLoraMergeLoraResponse(message=message, checkpoint_merged_name=checkpoint_merged_name)
