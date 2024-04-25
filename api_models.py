@@ -173,7 +173,7 @@ class UploadLoraMergeLoraRequest(BaseModel):
     
     is_with_lcm: bool = Field(
         title='Is with LCM',
-        description='Is with LCM.',
+        description='Default false for Stable Diffusion v1.3 is not compatible with LCM.',
         default=False,
     )
 
