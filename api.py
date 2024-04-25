@@ -359,7 +359,7 @@ class Api:
                     self.referesh_loras_request()
 
                     # merge lora
-                    merge_request.lnames = f"{lora_file_name}:0.8"
+                    merge_request.lnames = f"{lora_file_name}:{merge_request.rate}"
 
                     print("Started to merge lora")
                     if merge_request.is_with_lcm == True:
