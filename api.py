@@ -22,6 +22,11 @@ from fastapi import File, UploadFile, Form
 import shutil
 from modules.progress import create_task_id, add_task_to_queue, start_task, finish_task, current_task
 from time import sleep
+import subprocess
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Api:
@@ -367,6 +372,8 @@ class Api:
                     else:
                         merged_res = self.merge_lora(merge_request)
 
+                    self.copy_checkpoint(merged_res)
+
                     message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
 
                     checkpoint_merged_name = merged_res.split("/")[-1]
@@ -382,7 +389,21 @@ class Api:
             print("Finish task")
             finish_task(task_id)
         # end try
+    
+    def copy_checkpoint(source_file):
+        print(source_file)
+        pem_file = os.environ['PEM_PATH']
+        server_address = os.environ['SERVER_ADDRESS']
+        destination_file = os.environ['DESTINATION_FILE']
 
+        command = ["sudo", "scp", "-i", pem_file, source_file, server_address + ":" + destination_file]
+
+        try:
+            subprocess.run(command, check=True)
+            print("File copied successfully!")
+        except subprocess.CalledProcessError as e:
+            print("Error copying file:", e.output)
+            raise e
 
 def on_app_started(_, app: FastAPI):
     Api(app, queue_lock, '/supermerger/v1')
