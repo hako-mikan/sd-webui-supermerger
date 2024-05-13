@@ -372,6 +372,7 @@ class Api:
                     else:
                         merged_res = self.merge_lora(merge_request)
 
+                    print('Merge checkpoint response:: ', merged_res)
                     self.copy_checkpoint(merged_res)
 
                     message = f'Upload and merge lora <{lora_file.filename}> to checkpoint <{merge_request.model}> successfully.'
@@ -391,7 +392,7 @@ class Api:
         # end try
     
     def copy_checkpoint(source_file):
-        print(source_file)
+        print('Source file:: ', source_file)
         pem_file = os.environ['PEM_PATH']
         server_address = os.environ['SERVER_ADDRESS']
         destination_file = os.environ['DESTINATION_FILE']
