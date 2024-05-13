@@ -36,8 +36,8 @@ class GenParamGetter(scripts.Script):
         elif  component.elem_id == "img2img_generate":
             GenParamGetter.img2img_gen_button = component
 
-    def get_components_by_ids(root: gr.Blocks, ids: list[int]):
-        components: list[gr.Blocks] = []
+    def get_components_by_ids(root: gr.Blocks, ids: 'list[int]'):
+        components: 'list[gr.Blocks]' = []
 
         if root._id in ids:
             components.append(root)
@@ -48,7 +48,7 @@ class GenParamGetter(scripts.Script):
                 components.extend(GenParamGetter.get_components_by_ids(block, ids))
         return components
     
-    def compare_components_with_ids(components: list[gr.Blocks], ids: list[int]):
+    def compare_components_with_ids(components: 'list[gr.Blocks]', ids: 'list[int]'):
         return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
 
     def get_params_components(demo: gr.Blocks, app):
@@ -102,6 +102,25 @@ class GenParamGetter(scripts.Script):
                     inputs=[*components.genparams,*components.hiresfix,components.currentmodel,components.id_sets,gr.Textbox(value="No id",visible=False),*components.txt2img_params],
                     outputs=[*components.imagegal],
                 )
+
+                components.merge2.click(
+                    fn=smergegen,
+                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dfalse,*components.txt2img_params],
+                    outputs=[components.submit_result,components.currentmodel]
+                )
+
+                components.mergeandgen2.click(
+                    fn=smergegen,
+                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dtrue,*components.txt2img_params],
+                    outputs=[components.submit_result,components.currentmodel,*components.imagegal]
+                )
+
+                components.gen2.click(
+                    fn=simggen,
+                    inputs=[*components.genparams,*components.hiresfix,components.currentmodel,components.id_sets,gr.Textbox(value="No id",visible=False),*components.txt2img_params],
+                    outputs=[*components.imagegal],
+                )
+
 
                 components.s_reserve.click(
                     fn=numanager,

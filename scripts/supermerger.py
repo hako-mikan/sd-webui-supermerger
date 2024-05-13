@@ -410,6 +410,12 @@ def on_ui_tabs():
                     mgeninfo = output_panel[1]   if isinstance(output_panel, tuple) else output_panel.generation_info
                     mhtmlinfo = output_panel[2]   if isinstance(output_panel, tuple) else output_panel.infotext
                     mhtmllog = output_panel[3]   if isinstance(output_panel, tuple) else output_panel.html_log
+
+                    with gr.Row():
+                        components.merge2 = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
+                        components.mergeandgen2 = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge&Gen",variant='primary')
+                        components.gen2 = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Gen",variant='primary')
+                        stopmerge2 = gr.Button(elem_id="stopmerge", elem_classes=["compact_button"], value="Stop")
                     
         # main ui end 
     
@@ -539,6 +545,7 @@ def on_ui_tabs():
 
         stopgrid.click(fn=freezetime)
         stopmerge.click(fn=freezemtime)
+        stopmerge2.click(fn=freezemtime)
 
         checkpoints.change(fn=lambda x:",".join(x),inputs=[checkpoints],outputs=[inputer])
         blockids.change(fn=lambda x:" ".join(x),inputs=[blockids],outputs=[inputer])
@@ -1303,5 +1310,9 @@ def has_alphanumeric(text):
     pattern = re.compile(r'[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;"\'<>,.?/\|\\]')
     return bool(pattern.search(text.replace("</w>","")))
 
+from api import on_app_started
+
 if __package__ == "supermerger":
+    script_callbacks.on_app_started(on_app_started)
     script_callbacks.on_ui_tabs(on_ui_tabs)
+    

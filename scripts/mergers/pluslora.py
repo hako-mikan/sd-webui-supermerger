@@ -177,19 +177,21 @@ def on_ui_tabs():
         def toselect(input):
             out = []
             for name, vals in input.items():
+                if (not isinstance(vals, list)) or len(vals) != 3: continue
                 dim, ltype, sdver = vals
                 add = [] if dim == "LyCORIS" else [str(dim)]
                 if ltype != "LoRA": add +=[ltype]
                 if sdver != "1.X/2.X": add += [sdver]
-                out.append(f"{name}[{','.join(add)}]")
+                out.append(f"{name}[{','.join(add)}]" if add != ["","",""] else f"{name}")
             return out
 
         def updateloras():
             lora.list_available_loras()
             names = []
             for n in  lora.available_loras.items():
-                if n[0] not in ldict:ldict[n[0]] = ""
+                if n[0] not in ldict:ldict[n[0]] = ["","",""]
                 names.append(n[0])
+
             for l in list(ldict.keys()):
                 if l not in names:ldict.pop(l)
 
@@ -224,7 +226,7 @@ def on_ui_tabs():
             print("listing dimensions...")
             for n in tqdm(lora.available_loras.items()):
                 name = n[0] 
-                if name in ldict and ldict[n[0]] != "":
+                if name in ldict and ldict[n[0]] != ["","",""]:
                     continue
                 c_lora = lora.available_loras.get(n[0], None) 
                 d, t, s = dimgetter(c_lora.filename)
@@ -685,6 +687,21 @@ def lycomerge(filename,ratios,calc_precision):
 ##############################################################
 ####### merge to checkpoint
 def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precision,metasets,device):
+    
+    request_input = {
+        "lnames": lnames,
+        "loraratios": loraratios,
+        "output": output,
+        "model": model,
+        "save_precision": save_precision,
+        "calc_precision": calc_precision,
+        "metasets": metasets,
+        "device": device,
+        "settings": settings
+    }
+    print("Merge To Checkpoint Request: ",request_input)
+    
+    
     if model == []: return "ERROR: No model Selected"
     if lnames == "":return "ERROR: No LoRA Selected"
 
@@ -694,8 +711,14 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     import lora
     lnames = lnames.split(",")
 
-    for i, n in enumerate(lnames):
-        lnames[i] = n.split(":")
+    temp = []
+    for n in lnames:
+        if ":" in n:
+            temp.append(n.split(":"))
+        else:
+            temp[-1].append(n)
+    
+    lnames = temp
 
     loraratios=loraratios.splitlines()
     ldict ={}
@@ -707,11 +730,16 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     names, filenames, loratypes, lweis = [], [], [], []
 
     for n in lnames:
-        if len(n) ==3:
+        if len(n) ==2:
+            ratio = [float(n[1])]*26
+        elif len(n) ==3:
             if n[2].strip() in ldict:
                 ratio = [float(r)*float(n[1]) for r in ldict[n[2]].split(",")]
                 ratio = to26(ratio)
             else:ratio = [float(n[1])]*26
+        elif len(n[2:]) in BLOCKNUMS:
+            ratio = [float(x) for x in n[2:]]
+            ratio = to26(ratio)
         else:ratio = [float(n[1])]*26
         c_lora = lora.available_loras.get(n[0], None) 
         names.append(n[0])
@@ -821,6 +849,8 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     result = savemodel(theta_0,dname,output,settings)
     del theta_0
     gc.collect()
+    
+    print("Plus LoRA end: ",result)
     return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
@@ -922,7 +952,7 @@ def lbw(lora,lwei,isv2):
 
         for i,block in enumerate(blocks):
             if block in key:
-                if i == 26: i=0
+                if i == 26 or i == 27: i=0
                 ratio = lwei[i]
                 picked = True
 
@@ -1181,7 +1211,8 @@ LBLCOKS26=["encoder",
 "diffusion_model_output_blocks_9_",
 "diffusion_model_output_blocks_10_",
 "diffusion_model_output_blocks_11_",
-"embedders"]
+"embedders",
+"transformer_resblocks"]
 
 ###########################################################
 ##### metadata
