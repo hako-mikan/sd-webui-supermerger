@@ -268,7 +268,7 @@ def on_ui_tabs():
           if names ==[] : return ""
           else:
             for i,n in enumerate(names):
-              if "[" in n:names[i] = n[:n.rfind("[")]
+              if "[" in n:names[i] = n[:n.find("[")]
             return f":{ratio},".join(names)+f":{ratio} "
 
         hidenb.change(fn=lambda x: False, outputs = [hidenb])
@@ -390,7 +390,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
             lr.append(ratio)
             d, t, s = dimgetter(c_lora.filename)
             if t == "LoCon" and isinstance(d, list):
-                d = list(set(d.values()))
+                d = list(set(d))
                 d = d[0]
             lt.append(t)
             ld.append(d)
