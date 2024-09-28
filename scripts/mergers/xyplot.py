@@ -454,7 +454,12 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 gc.collect()
                 devices.torch_gc()
 
-                xyimage.append(image_temp[0][0])
+                for i, image_t in enumerate(image_temp[0]):
+                    if len(xyimage) <= i:
+                        xyimage.append([])
+
+                    xyimage[i].append(image_t)
+
                 xcount+=1
                 deep = deepy
                 if state_mergen:
@@ -485,19 +490,27 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if ys_t==[""]:ys_t = [" "]
 
         if "effective" in xtype or "effective" in ytype:
-            xyimage,xs_t,ys_t = effectivechecker(xyimage,xs_t,ys_t,model_a,model_b,esettings)
+            for i in range(len(xyimage)):
+                xyimage[i], xs_t, ys_t = effectivechecker(xyimage[i], xs_t, ys_t, model_a, model_b, esettings)
 
+        output = []
         if not "grid" in esettings:
             if "swap XY" in esettings:
-                xyimage, xs_t, ys_t = swapxy(xyimage, xs_t, ys_t)
+                for i in range(len(xyimage)):
+                    xyimage[i], xs_t, ys_t = swapxy(xyimage[i], xs_t, ys_t)
             gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
-            grid = smakegrid(xyimage,xs_t,ys_t,gridmodel,image_temp[4])
-            xyimage.insert(0,grid)
-        
+
+            for xy in xyimage:
+                print(xy)
+                output.append(smakegrid(xy,xs_t,ys_t,gridmodel,image_temp[4]))
+        else:
+            for xy in xyimage:
+                output.extend(xy)
+
         if savestat: savestatics(statid)
 
         zcount+=1
-        xyzimage.append(xyimage[0])
+        xyzimage.extend(output)
         if flag: break
 
     state_mergen = False
