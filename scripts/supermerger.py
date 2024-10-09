@@ -5,6 +5,7 @@ import re
 import json
 import shutil
 from tqdm import tqdm
+from functools import wraps
 import torch
 from statistics import mean
 import csv
@@ -17,6 +18,7 @@ from modules import (script_callbacks, sd_models,sd_vae, shared)
 from modules.scripts import basedir
 from modules.sd_models import checkpoints_loaded, load_model,unload_model_weights
 from modules.shared import opts
+from modules.ui_components import ResizeHandleRow
 from modules.sd_samplers import samplers
 from modules.ui import create_output_panel, create_refresh_button
 import scripts.mergers.mergers
@@ -38,16 +40,11 @@ xyzpath = os.path.join(path_root,"xyzpresets.json")
 
 CALCMODES  = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","extract","tensor","tensor2","self","plus random"]
 
-class ResizeHandleRow(gr.Row):
-    """Same as gr.Row but fits inside gradio forms"""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.elem_classes.append("resize-handle-row")
-
-    def get_block_name(self):
-        return "row"
+try:
+    from backend.utils import load_torch_file
+    forge = True
+except:
+    forge = False
 
 from typing import Union
 def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
@@ -88,8 +85,7 @@ def on_ui_tabs():
     if "ALLR" not in weights_presets: weights_presets += ADDRAND
 
     with gr.Blocks() as supermergerui:
-        with gr.Tab("Merge"):
-            with ResizeHandleRow(equal_height=False):
+        with gr.Tab("Merge") as tabn , ResizeHandleRow(equal_height=False):
                 with gr.Column(variant="compact"):
                     gr.HTML(value="<p>Merge models and load it for generation</p>")
 
@@ -154,14 +150,14 @@ def on_ui_tabs():
                                 with gr.Tab("Weights for alpha"):
                                     with gr.Row(variant="compact"):
                                         weights_a = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5", show_copy_button=True)
-                                    with gr.Row(scale=2):
+                                    with gr.Row():
                                         setalpha = gr.Button(elem_id="copytogen", value="↑ Set alpha",variant='primary', scale=3)
                                         readalpha = gr.Button(elem_id="copytogen", value="↓ Read alpha",variant='primary', scale=3)
                                         setx = gr.Button(elem_id="copytogen", value="↑ Set X", min_width="80px", scale=1)
                                 with gr.Tab("beta"):
                                     with gr.Row(variant="compact"):
                                         weights_b = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2", show_copy_button=True)
-                                    with gr.Row(scale=2):
+                                    with gr.Row():
                                         setbeta = gr.Button(elem_id="copytogen", value="↑ Set beta",variant='primary', scale=3)
                                         readbeta = gr.Button(elem_id="copytogen", value="↓ Read beta",variant='primary', scale=3)
                                         sety = gr.Button(elem_id="copytogen", value="↑ Set Y", min_width="80px", scale=1)
@@ -479,6 +475,7 @@ def on_ui_tabs():
                     smd_loadkeys_l = gr.Button(value="load keys",variant='primary')
                 with gr.Row():
                     keys = gr.Dataframe(headers=["No.","block","key"],)
+                    keys_t = gr.TextArea()
 
         with gr.Tab("Metadata", elem_id="tab_metadata"):
                 with gr.Row():
@@ -495,8 +492,8 @@ def on_ui_tabs():
         )                 
 
         mclearcache.click(fn=clearcache)
-        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,components.dfalse],outputs=[keys])
-        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,components.dtrue],outputs=[keys])
+        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,components.dfalse],outputs=[keys,keys_t])
+        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,components.dtrue],outputs=[keys,keys_t])
 
         te_smd_loadkeys.click(fn=encodetexts,inputs=[exclude],outputs=[encoded])
         te_smd_searchkeys.click(fn=pickupencode,inputs=[pickupword],outputs=[encoded])
@@ -890,9 +887,9 @@ MSETSNUM = 20
 
 def reversparams(id):
     def selectfromhash(hash):
-        for model in sd_models.checkpoint_tiles():
-            if hash in model:
-                return model
+        for model in sd_models.checkpoints_list.values():
+            if str(hash) == str(model.shorthash):
+                return model.name
         return ""
     try:
         idsets = rwmergelog(id = id)
@@ -918,7 +915,7 @@ def reversparams(id):
     while len(mgs) < MSETSNUM:
         mgs.append("")
     mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
-    mgs[14] = -1 if mgs[14] == "" else mgs[14]
+    mgs[14] = -1 if mgs[14] == "" else int(mgs[14])
     mgs[16] = 0.3 if mgs[16] == "" else float(mgs[16]) 
     mgs[17] = "Off" if mgs[17] == "" else mgs[17]
     mgs[18] = cutter(mgs[18])
@@ -1055,10 +1052,13 @@ ISXLBLOCK=[True,  True,  True,  True,  True,  True,  True,  True,  True,  True, 
 
 def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():
-        modeltype = "XL"
+        return "XL"
+    elif any("double"in x for x in sd.keys()):
+        if any("nf4"in x for x in sd.keys()):return "flux.nf4"
+        if any("fp4"in x for x in sd.keys()):return "flux.fp4"
+        return "flux"
     else:
-        modeltype = "1.X or 2.X"
-    return modeltype
+        return "1.X or 2.X"
 
 def loadkeys(model_a, lora):
     if lora:
@@ -1068,19 +1068,23 @@ def loadkeys(model_a, lora):
         sd = loadmodel(model_a)
     keys = []
     mtype = modeltype(sd)
+
     if lora:
         for i, key in enumerate(sd.keys()):
             keys.append([i,"LoRA",key,sd[key].shape])
     else:    
         for i, key in enumerate(sd.keys()):
-            keys.append([i,blockfromkey(key,mtype),key,sd[key].shape])
+            keys.append([i,blockfromkey(key,"XL" in mtype,"flux" in mtype),key,sd[key].shape])
 
-    return keys
+    return keys,keys
 
 def loadmodel(model):
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
-    sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
-    return sd
+    if not forge:
+        sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+        return sd
+    else:
+        return load_torch_file(checkpoint_info.filename)
 
 ADDRAND = "\n\
 ALL_R	R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R\n\
