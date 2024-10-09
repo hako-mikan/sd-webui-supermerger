@@ -90,7 +90,7 @@ def on_ui_tabs():
     with gr.Blocks(analytics_enabled=False) :
         sml_submit_result = gr.Textbox(label="Message")
         with gr.Row(equal_height=False):
-            with gr.Column(equal_height=False):
+            with gr.Column():
                 sml_cpmerge = gr.Button(elem_id="model_merger_merge", value="Merge to Checkpoint(Model A)",variant='primary')
                 sml_merge = gr.Button(elem_id="model_merger_merge", value="Merge LoRAs",variant='primary')
                 with gr.Row(equal_height=False):
@@ -101,7 +101,7 @@ def on_ui_tabs():
                     save_precision = gr.Radio(label = "save precision",choices=["float","fp16","bf16"],value = "fp16",type="value")
                     calc_precision = gr.Radio(label = "calc precision(fp16:cuda only)" ,choices=["float","fp16","bf16"],value = "float",type="value")
                     device = gr.Radio(label = "device",choices=["cuda","cpu"],value = "cuda",type="value")
-            with gr.Column(equal_height=False):
+            with gr.Column():
                 sml_makelora = gr.Button(elem_id="model_merger_merge", value="Make LoRA (alpha * Model A - beta * Model B)",variant='primary')
                 sml_extract = gr.Button(elem_id="model_merger_merge", value="Extract from two LoRAs",variant='primary')
                 with gr.Row(equal_height=False):
