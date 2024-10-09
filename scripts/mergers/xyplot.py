@@ -12,7 +12,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageColor, PngImagePlugin
 from modules import images, sd_models, devices
 from modules.sd_models import load_model
 from modules.shared import opts
-from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,BLOCKID,BLOCKIDXLL,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font
+from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,BLOCKID,BLOCKIDXLL,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font,model_loader
 from scripts.mergers.model_util import savemodel
 from scripts.mergers.bcolors import bcolors
 
@@ -436,7 +436,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                         savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
                     
                     sd_models.model_data.__init__()
-                    load_model(checkpoint_info, already_loaded_state_dict=theta_0)
+                    model_loader(checkpoint_info, theta_0)
 
                 theta_0 = None
                 del theta_0
