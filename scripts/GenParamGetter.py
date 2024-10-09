@@ -49,39 +49,32 @@ class GenParamGetter(scripts.Script):
         return components
     
     def compare_components_with_ids(components: list[gr.Blocks], ids: list[int]):
-        return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
+        
+        try:
+            return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
+        except:
+            return False
 
     def get_params_components(demo: gr.Blocks, app):
         for _id, _is_txt2img in zip([GenParamGetter.txt2img_gen_button._id, GenParamGetter.img2img_gen_button._id], [True, False]):
-            dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and _id in x["targets"]]
+            dependencies: list[dict] = [x for x in demo.config["dependencies"] if x["targets"][0][1] == "click" and _id in x["targets"][0]]
             dependency: dict = None
-            cnet_dependency: dict = None
-            UiControlNetUnit = None
             for d in dependencies:
-                if len(d["outputs"]) == 1:
-                    outputs = GenParamGetter.get_components_by_ids(demo, d["outputs"])
-                    output = outputs[0]
-                    if (
-                        isinstance(output, gr.State)
-                        and type(output.value).__name__ == "UiControlNetUnit"
-                    ):
-                        cnet_dependency = d
-                        UiControlNetUnit = type(output.value)
-
-                elif len(d["outputs"]) == 4:
+                
+                if len(d["outputs"]) == 4:
                     dependency = d
 
-            params = [params for params in demo.fns if GenParamGetter.compare_components_with_ids(params.inputs, dependency["inputs"])]
-
             from pprint import pprint
+            
+            params = [demo.blocks[x] for x in dependency['inputs']]
 
             if _is_txt2img:
-                components.paramsnames = [x.label if hasattr(x,"label") else "None" for x in params[0].inputs]
+                components.paramsnames = [x.label if hasattr(x,"label") else "None" for x in params]
 
             if _is_txt2img:
-                components.txt2img_params = params[0].inputs 
+                components.txt2img_params = params
             else:
-                components.img2img_params = params[0].inputs
+                components.img2img_params = params
         
         if not GenParamGetter.events_assigned:
             with demo:
