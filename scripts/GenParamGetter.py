@@ -57,24 +57,39 @@ class GenParamGetter(scripts.Script):
 
     def get_params_components(demo: gr.Blocks, app):
         for _id, _is_txt2img in zip([GenParamGetter.txt2img_gen_button._id, GenParamGetter.img2img_gen_button._id], [True, False]):
-            dependencies: list[dict] = [x for x in demo.config["dependencies"] if x["targets"][0][1] == "click" and _id in x["targets"][0]]
+            if hasattr(demo,"dependencies"):
+                dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and _id in x["targets"]]
+                g4 = False
+            else:
+                dependencies: list[dict] = [x for x in demo.config["dependencies"] if x["targets"][0][1] == "click" and _id in x["targets"][0]]
+                g4 = True
+            
             dependency: dict = None
+
             for d in dependencies:
-                
                 if len(d["outputs"]) == 4:
                     dependency = d
-
-            from pprint import pprint
             
-            params = [demo.blocks[x] for x in dependency['inputs']]
+            if g4:
+                params = [demo.blocks[x] for x in dependency['inputs']]
+                if _is_txt2img:
+                    components.paramsnames = [x.label if hasattr(x,"label") else "None" for x in params]
 
-            if _is_txt2img:
-                components.paramsnames = [x.label if hasattr(x,"label") else "None" for x in params]
-
-            if _is_txt2img:
-                components.txt2img_params = params
+                if _is_txt2img:
+                    components.txt2img_params = params
+                else:
+                    components.img2img_params = params
             else:
-                components.img2img_params = params
+                params = [params for params in demo.fns if GenParamGetter.compare_components_with_ids(params.inputs, dependency["inputs"])]
+
+                if _is_txt2img:
+                    components.paramsnames = [x.label if hasattr(x,"label") else "None" for x in params[0].inputs]
+
+                if _is_txt2img:
+                    components.txt2img_params = params[0].inputs 
+                else:
+                    components.img2img_params = params[0].inputs
+
         
         if not GenParamGetter.events_assigned:
             with demo:
