@@ -89,8 +89,11 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
             pre += "-instruct-pix2pix"
 
     if not fname or fname == "":
-        fname = currentmodel.replace(" ","").replace(",","_").replace("(","_").replace(")","_")+pre+ext
-        if fname[0]=="_":fname = fname[1:]
+        model_name = os.path.basename(currentmodel)
+        model_name = model_name.replace(" ", "").replace(",", "_").replace("(", "_").replace(")", "_")
+        fname = model_name + pre + ext
+        if fname[0] == "_":
+            fname = fname[1:]
     else:
         fname = fname if ext in fname else fname +pre+ext
 
