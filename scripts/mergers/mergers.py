@@ -381,7 +381,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         prefixer(theta_2)
         qtype = [q_type(theta_0),q_type(theta_1),q_type(theta_2)]
     else:
-        qtype = [False,False, False]
+        qtype = [False,False,False]
         need_revert = False
     
     ##### Stage 0/2 in Cosine
@@ -395,7 +395,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         if stopmerge: return "STOPPED", *NON4
         if flux:
-            if "blocks" not in key: continue
+            if key not in theta_1: continue
         else:
             if not ("model" in key and key in theta_1): continue
         if not ("weight" in key or "bias" in key): continue
