@@ -23,15 +23,15 @@ from scripts.kohyas import lora as klora
 from scripts.mergers.model_util import (filenamecutter, savemodel)
 from scripts.mergers.mergers import extract_super, unload_forge
 from tqdm import tqdm
+from modules.ui import versions_html
+
+forge = "forge" in versions_html()
 
 selectable = []
 pchanged = False
 
-try:
-    from ldm_patched.modules import model_management
-    forge = True
-except:
-    forge = False
+CUDA = torch.device("cuda:0")
+CPU = torch.device("cpu")
 
 BLOCKID26=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
 BLOCKID17=["BASE","IN01","IN02","IN04","IN05","IN07","IN08","M00","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
@@ -289,7 +289,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
     currentinfo = shared.sd_model.sd_checkpoint_info
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-    sd_models.load_model(checkpoint_info)
+    load_model(checkpoint_info)
 
     model = shared.sd_model
 
@@ -332,7 +332,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
 
     result = ext.svd(args)
 
-    sd_models.load_model(currentinfo)
+    load_model(currentinfo)
     return result
 
 ##############################################################
@@ -726,7 +726,8 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
             ratio = [float(x) for x in n[2:]]
             ratio = to26(ratio)
         else:ratio = [float(n[1])]*26
-        c_lora = lora.available_loras.get(n[0], None) 
+ 
+        c_lora = lora.available_loras.get(n[0], lora.available_lora_aliases.get(n[0],None)) 
         names.append(n[0])
         filenames.append(c_lora.filename)
         lweis.append(ratio)
@@ -737,8 +738,11 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
       dname = dname + "+"+n
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
+    if forge:
+        revert_target = sd_models.get_closet_checkpoint_match(shared.opts.sd_model_checkpoint)
     print(f"Loading {model}")
-    theta_0 = sd_models.read_state_dict(checkpoint_info.filename,map_location=device)
+
+    theta_0 = read_model_state_dict(checkpoint_info, device)
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_0.keys()
     isv2 = "cond_stage_model.model.transformer.resblocks.0.attn.out_proj.weight" in theta_0.keys()
@@ -763,7 +767,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
 
     if is15:
         if shared.sd_model is not None:
-            orig_checkpoint = shared.sd_model.sd_checkpoint_info
+            orig_checkpoint = shared.sd_model.sd_checkpoint_info if hasattr(shared.sd_model, "sd_checkpoint_info") else None
         else:
             orig_checkpoint = None
         checkpoint_info = sd_models.get_closet_checkpoint_match(model)
@@ -832,13 +836,22 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     settings.append(save_precision)
     settings.append("safetensors")
     result = savemodel(theta_0,dname,output,settings)
+
+    lora.loaded_loras.clear()
+    sd_models.checkpoints_loaded.clear()
+    if forge:
+        from modules.sd_models import FakeInitialModel
+        sd_models.unload_model_weights()
+        sd_models.checkpoint_info = FakeInitialModel()
+        load_model(revert_target, reload=True)
+
     del theta_0
     gc.collect()
     return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
-    import networks as nets
-    nets.load_networks(names, [1]* len(names),[1]* len(names))
+    import scripts.A1111.networks as nets
+    nets.load_networks(names, [1]* len(names),[1]* len(names), isxl, isv2)
 
     for l, loaded in enumerate(nets.loaded_networks):
         for n, name in enumerate(names):
@@ -850,7 +863,7 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
     
     for net in nets.loaded_networks:
         net.dyn_dim = None
-        for name,module in  tqdm(net.modules.items(), desc=f"{net.name}"):
+        for name,module in tqdm(net.modules.items(), desc=f"{net.name}"):
             fullkey = convert_diffusers_name_to_compvis(name,isv2)
             msd_key = fullkey.split(".")[0]
             if isxl:
@@ -880,7 +893,7 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
                     else:
                         theta_0[keychanger[inkey]] ,theta_0[keychanger[outkey]], _= plusweightsqvk(theta_0[keychanger[inkey]],theta_0[keychanger[outkey]], name ,module, net)
                 else:
-                    print(msd_key)
+                    print("unchanged key:",msd_key)
         gc.collect()
     return theta_0
 
@@ -894,7 +907,6 @@ def plusweights(weight, module, bias = None):
             updown, ex_bias = updown
             if ex_bias is not None and bias is not None:
                 bias += ex_bias
-
         weight += updown
     return weight, bias
 
@@ -1531,3 +1543,28 @@ def convert_diffusers_name_to_compvis(key, is_sd2):
             return f"1_model_transformer_resblocks_{m[0]}_{m[1].replace('self_attn', 'attn')}"
 
     return key
+
+def read_model_state_dict(checkpoint_info, device):
+    if forge:
+        from backend.utils import load_torch_file
+        load_model(checkpoint_info)
+        return load_torch_file(checkpoint_info.filename,device=CUDA if "cuda" in device else CPU)
+    else:
+        return sd_models.read_state_dict(checkpoint_info.filename,map_location=device)
+    
+def load_model(checkpoint_info, reload = False):
+    if forge:
+        from modules.sd_models import forge_model_reload, model_data
+        from modules_forge.main_entry import forge_unet_storage_dtype_options
+        unet_storage_dtype, _ = forge_unet_storage_dtype_options.get(shared.opts.forge_unet_storage_dtype, (None, False))
+        forge_model_params = dict(
+            checkpoint_info=checkpoint_info,
+            additional_modules=shared.opts.forge_additional_modules,
+            unet_storage_dtype=unet_storage_dtype
+        )
+        if reload:
+            model_data.forge_hash = None
+        model_data.forge_loading_parameters = forge_model_params
+        forge_model_reload()
+    else:
+        sd_models.load_model(checkpoint_info)
