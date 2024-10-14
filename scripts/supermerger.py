@@ -915,7 +915,7 @@ def reversparams(id):
     while len(mgs) < MSETSNUM:
         mgs.append("")
     mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
-    mgs[14] = -1 if mgs[14] == "" else int(mgs[14])
+    mgs[14] = -1 if mgs[14] == "" else int(float(mgs[14]))
     mgs[16] = 0.3 if mgs[16] == "" else float(mgs[16]) 
     mgs[17] = "Off" if mgs[17] == "" else mgs[17]
     mgs[18] = cutter(mgs[18])
