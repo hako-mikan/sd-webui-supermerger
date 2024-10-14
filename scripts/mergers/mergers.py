@@ -238,8 +238,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     #random
     if lucks != {}:
-        if lucks["seed"] == -1: lucks["ceed"] = str(random.randrange(4294967294))
-        else: lucks["ceed"] = lucks["seed"] 
+        if lucks["seed"] == -1: lucks["ceed"] = str(int(random.randrange(4294967294)))
+        else: lucks["ceed"] = lucks["seed"] = int(lucks["seed"]) 
     else: lucks["ceed"]  = 0
     np.random.seed(int(lucks["ceed"]))
     randomer = np.random.rand(2500)
