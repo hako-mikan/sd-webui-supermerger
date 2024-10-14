@@ -1,12 +1,13 @@
 import torch
 
 import scripts.A1111.lyco_helpers as lyco_helpers
-import modules.models.sd3.mmdit
 import scripts.A1111.network as network
 from modules import devices
 from modules.ui import versions_html
 
 forge = "forge" in versions_html()
+class QkvLinear(torch.nn.Linear):
+    pass
 
 class ModuleTypeLora(network.ModuleType):
     def create_module(self, net: network.Network, weights: network.NetworkWeights):
@@ -39,7 +40,7 @@ class NetworkModuleLora(network.NetworkModule):
         if weight is None and none_ok:
             return None
         
-        is_linear = "Linear" in str(type(self.sd_module)) if forge else type(self.sd_module) in [torch.nn.Linear, torch.nn.modules.linear.NonDynamicallyQuantizableLinear, torch.nn.MultiheadAttention, modules.models.sd3.mmdit.QkvLinear]
+        is_linear = "Linear" in str(type(self.sd_module)) if forge else type(self.sd_module) in [torch.nn.Linear, torch.nn.modules.linear.NonDynamicallyQuantizableLinear, torch.nn.MultiheadAttention, QkvLinear]
         is_conv = "Conv2d" in str(type(self.sd_module)) if forge else type(self.sd_module) in [torch.nn.Conv2d]
 
         if is_linear:

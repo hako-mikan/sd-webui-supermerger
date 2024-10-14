@@ -20,7 +20,9 @@ from typing import Union
 
 from modules import shared, devices, sd_models, errors, scripts, sd_hijack
 import modules.textual_inversion.textual_inversion as textual_inversion
-import modules.models.sd3.mmdit
+
+class QkvLinear(torch.nn.Linear):
+    pass
 
 module_types = [
     network_lora.ModuleTypeLora(),
@@ -458,7 +460,7 @@ def network_apply_weights(self: Union[torch.nn.Conv2d, torch.nn.Linear, torch.nn
 
         for net in loaded_networks:
             module = net.modules.get(network_layer_name, None)
-            if module is not None and hasattr(self, 'weight') and not isinstance(module, modules.models.sd3.mmdit.QkvLinear):
+            if module is not None and hasattr(self, 'weight') and not isinstance(module, QkvLinear):
                 try:
                     with torch.no_grad():
                         if getattr(self, 'fp16_weight', None) is None:
@@ -518,7 +520,7 @@ def network_apply_weights(self: Union[torch.nn.Conv2d, torch.nn.Linear, torch.nn
 
                 continue
 
-            if isinstance(self, modules.models.sd3.mmdit.QkvLinear) and module_q and module_k and module_v:
+            if isinstance(self, QkvLinear) and module_q and module_k and module_v:
                 try:
                     with torch.no_grad():
                         # Send "real" orig_weight into MHA's lora module
