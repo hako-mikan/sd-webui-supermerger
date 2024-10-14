@@ -515,7 +515,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             cosine(calcmode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp)
 
         elif calcmode == "trainDifference":
-            if torch.allclose(theta_1[key].float(), theta_2[key].float(), rtol=0, atol=0):
+            if torch.allclose(theta_1[key].float(), theta_2[key].float().to(theta_1[key].device), rtol=0, atol=0):
                 theta_2[key] = theta_0[key]
                 continue
             traindiff(key,current_alpha,theta_0,theta_1,theta_2)
