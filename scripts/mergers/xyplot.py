@@ -396,9 +396,11 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     for z in zs:
         ycount = 0
         xyimage = []
+        deep = deep_ori
         xydealer(z,ztype,xtype,ytype)
+        deep_z = deep
         for y in ys:
-            deep = deep_ori
+            deep = deep_z
             xydealer(y,ytype,xtype,ztype)
             xcount = 0
             for x in xs:
