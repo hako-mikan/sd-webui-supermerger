@@ -396,11 +396,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     for z in zs:
         ycount = 0
         xyimage = []
-        deep = deep_ori
         xydealer(z,ztype,xtype,ytype)
-        deep_z = deep
         for y in ys:
-            deep = deep_z
+            deep = deep_ori
             xydealer(y,ytype,xtype,ztype)
             xcount = 0
             for x in xs:
@@ -437,8 +435,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     if "save model" in esettings:
                         savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) 
                     
-                    sd_models.model_data.__init__()
-                    model_loader(checkpoint_info, theta_0)
+                    model_loader(checkpoint_info, theta_0, metadata, currentmodel)
 
                 theta_0 = None
                 del theta_0
@@ -503,7 +500,6 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
 
             for xy in xyimage:
-                print(xy)
                 output.append(smakegrid(xy,xs_t,ys_t,gridmodel,image_temp[4]))
         else:
             for xy in xyimage:
