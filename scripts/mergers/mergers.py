@@ -126,14 +126,12 @@ def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,m
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
 
-    if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
-
     save = True if SAVEMODES[0] in save_sets else False
 
     if not forge:
         result = savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) if save else "Merged model loaded:"+currentmodel
 
-    model_loader(checkpoint_info, theta_0)
+    model_loader(checkpoint_info, theta_0, metadata, currentmodel)
 
     if forge and save:
         result = forge_save(custom_name if custom_name else currentmodel.replace(" ","").replace(",","_").replace("(","_").replace(")","_"))
@@ -165,7 +163,7 @@ def checkpointer_infomer(name):
     return sd_models.get_closet_checkpoint_match(name)
 
 # XXX hack. fake checkpoint_info
-def fake_checkpoint_info(checkpoint_info,metadata,currentmodel):
+def fake_checkpoint_info(checkpoint_info,metadata={},currentmodel=""):
     from modules import cache
     dump_cache = cache.dump_cache
     c_cache = cache.cache
@@ -238,8 +236,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     #random
     if lucks != {}:
-        if lucks["seed"] == -1: lucks["ceed"] = str(int(random.randrange(4294967294)))
-        else: lucks["ceed"] = lucks["seed"] = int(lucks["seed"]) 
+        if lucks["seed"] == -1: lucks["ceed"] = str(random.randrange(4294967294))
+        else: lucks["ceed"] = lucks["seed"] 
     else: lucks["ceed"]  = 0
     np.random.seed(int(lucks["ceed"]))
     randomer = np.random.rand(2500)
@@ -419,7 +417,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         theta_0[key] = theta_0[key].to("cuda")
         theta_1[key] = theta_1[key].to("cuda")
-        if key in theta_2:theta_2[key] = theta_2[key].to("cuda")
 
         weight_index = -1
         current_alpha = alpha
@@ -446,12 +443,14 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         block,blocks26 = blockfromkey(key,isxl,flux)
         #if block == "Not Merge": continue
         if inex != "Off" and (ex_blocks or (ex_elems != [""])) and excluder(blocks26,inex,ex_blocks,ex_elems,key): continue
-        if flux:
+        if flux and blocks26 in BLOCKIDFLUX:
             weight_index = BLOCKIDFLUX.index(blocks26)
-        elif isxl:
+        elif isxl and blocks26 in BLOCKIDXLL:
             weight_index = BLOCKIDXLL.index(blocks26)
-        else:
+        elif blocks26 in BLOCKID:
             weight_index = BLOCKID.index(blocks26)
+        else:
+            continue
 
         if useblocks:
             if weight_index > 0: 
@@ -516,7 +515,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             cosine(calcmode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp)
 
         elif calcmode == "trainDifference":
-            if torch.allclose(theta_1[key].float(), theta_2[key].float().to(theta_1[key].device), rtol=0, atol=0):
+            if torch.allclose(theta_1[key].float(), theta_2[key].float().to(device=theta_1[key].device), rtol=0, atol=0):
                 theta_2[key] = theta_0[key]
                 continue
             traindiff(key,current_alpha,theta_0,theta_1,theta_2)
@@ -1562,12 +1561,14 @@ def casterr(*args,hear=hear):
 
 ################################################
 ##### model_loader
-def model_loader(checkpoint_info, state_dict):
+def model_loader(checkpoint_info, state_dict,metadata, currentmodel): 
+    if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
+
     if not forge:
         sd_models.model_data.__init__()
         load_model(checkpoint_info, already_loaded_state_dict=state_dict)
     else:
-        load_forge_model(state_dict)
+        load_forge_model(state_dict,checkpoint_info)
 
 ################################################
 ##### forge
@@ -1592,7 +1593,7 @@ if forge:
     from modules_forge.main_entry import refresh_model_loading_parameters
 
 @torch.inference_mode()
-def load_forge_model(state_dict):
+def load_forge_model(state_dict,checkpoint_info = None):
     current_hash = str(fsd.model_data.forge_loading_parameters)
     print('Loading Model: ' + str(fsd.model_data.forge_loading_parameters))
 
@@ -1606,8 +1607,8 @@ def load_forge_model(state_dict):
 
     timer.record("unload existing model")
 
-    checkpoint_info = fsd.model_data.forge_loading_parameters['checkpoint_info']
-
+    checkpoint_info = fsd.model_data.forge_loading_parameters.get('checkpoint_info', checkpoint_info)
+ 
     if checkpoint_info is None:
         raise ValueError('You do not have any model! Please download at least one model in [models/Stable-diffusion].')
 
