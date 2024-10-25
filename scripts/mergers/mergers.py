@@ -739,15 +739,15 @@ def cosine(mode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp):
 ##### Traindiff
 def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
             # Check if theta_1[key] is equal to theta_2[key]
-    diff_AB = theta_1[key].float() - theta_2[key].float()
+    diff_AB = theta_1[key].float() - theta_2[key].float().to(device=theta_1[key].device)
 
-    distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
-    distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
+    distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float().to(device=theta_1[key].device))
+    distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float().to(device=theta_1[key].device))
 
     sum_distances = distance_A0 + distance_A1
 
     scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
-    sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
+    sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float().to(device=theta_1[key].device))
     scale = sign_scale * torch.abs(scale)
 
     new_diff = scale * torch.abs(diff_AB)
