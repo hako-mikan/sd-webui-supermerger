@@ -518,7 +518,21 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if torch.allclose(theta_1[key].float(), theta_2[key].float().to(device=theta_1[key].device), rtol=0, atol=0):
                 theta_2[key] = theta_0[key]
                 continue
-            traindiff(key,current_alpha,theta_0,theta_1,theta_2)
+
+            if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+                # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
+                theta_0_a = theta_0[key][:, 0:4, :, :]
+            else:
+                theta_0_a = theta_0[key]
+
+            traindiff(key,current_alpha,theta_0_a,theta_1,theta_2)
+
+            if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+                theta_0[key][:, 0:4, :, :] = theta_0_a
+            else:
+                theta_0[key] = theta_0_a
+
+            del theta_0_a, a, b
 
         elif calcmode == "smoothAdd":
             caster(f"{num}, {block}, model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
@@ -737,12 +751,12 @@ def cosine(mode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp):
 
 ################################################
 ##### Traindiff
-def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
+def traindiff(key,current_alpha,theta_0_a,theta_1,theta_2):
             # Check if theta_1[key] is equal to theta_2[key]
     diff_AB = theta_1[key].float() - theta_2[key].float().to(device=theta_1[key].device)
 
     distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float().to(device=theta_1[key].device))
-    distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float().to(device=theta_1[key].device))
+    distance_A1 = torch.abs(theta_1[key].float() - theta_0_a.float().to(device=theta_1[key].device))
 
     sum_distances = distance_A0 + distance_A1
 
@@ -751,7 +765,7 @@ def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
     scale = sign_scale * torch.abs(scale)
 
     new_diff = scale * torch.abs(diff_AB)
-    theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
+    theta_0_a = theta_0_a + (new_diff * (current_alpha*1.8))
 
 ################################################
 ##### Extract
