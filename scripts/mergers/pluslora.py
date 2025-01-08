@@ -20,6 +20,7 @@ from modules.ui import create_refresh_button
 from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
 from scripts.kohyas import lora as klora
+from scripts.A1111 import networks as nets
 from scripts.mergers.model_util import (filenamecutter, savemodel)
 from scripts.mergers.mergers import extract_super, unload_forge
 from tqdm import tqdm
@@ -850,7 +851,6 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
-    import scripts.A1111.networks as nets
     nets.load_networks(names, [1]* len(names),[1]* len(names), isxl, isv2)
 
     for l, loaded in enumerate(nets.loaded_networks):
