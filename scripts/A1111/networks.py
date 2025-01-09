@@ -346,6 +346,7 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
 
         net.te_multiplier = te_multipliers[i] if te_multipliers else 1.0
         net.unet_multiplier = unet_multipliers[i] if unet_multipliers else 1.0
+        print(f"dyn_dims = {dyn_dims}")
         net.dyn_dim = dyn_dims[i] if dyn_dims else 1.0
         loaded_networks.append(net)
 

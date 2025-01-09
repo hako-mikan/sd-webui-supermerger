@@ -851,7 +851,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
-    nets.load_networks(names, [1]* len(names),[1]* len(names), isxl, isv2)
+    nets.load_networks(names, [1]* len(names),[1]* len(names), [1]* len(names), isxl, isv2)
 
     for l, loaded in enumerate(nets.loaded_networks):
         for n, name in enumerate(names):
