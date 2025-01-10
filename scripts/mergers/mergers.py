@@ -565,8 +565,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         ##### del quantize info
         if flux and qtype[0] and "weight" in key:
             theta_0[key] = theta_0[key].to("cpu")
+            del theta_1[key]
         theta_0[key] = theta_0[key].to("cpu")
-        del theta_1[key]
 
     #flux
     if qtype[0]:
@@ -579,12 +579,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         for key in dellist:
             if key in theta_0: del theta_0[key]
     
-    if need_revert:
-        keys = list(theta_0.keys())
-        for key in keys:
-            theta_0[key.replace(PREFIX_M,"")] = theta_0.pop(key)
-            print(key)
-
     if calcmode == "smoothAdd MT":
         # setting threads to higher than 8 doesn't significantly affect the time for merging
         threads = cpu_count()
@@ -593,6 +587,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         theta_0, theta_1, stopped = multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear)
         if stopped:
             return "STOPPED", *NON4
+
+    if need_revert:
+        keys = list(theta_0.keys())
+        for key in keys:
+            theta_0[key.replace(PREFIX_M,"")] = theta_0.pop(key)
+            print(key)
 
     currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
 
@@ -875,6 +875,8 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
             return False
 
         for key in keys:
+            if key not in theta_1:
+                continue
             caster(f"model A[{key}] +  {key_and_alpha[key]} + * (model B - model C)[{key}]", hear)
             filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
             filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
