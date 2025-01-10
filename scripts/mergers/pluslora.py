@@ -482,6 +482,7 @@ def merge_lora_models(models, ratios, sets, locon, calc_precision):
 
             ratio = ratios[blockfromkey(key, keylist, isv2)]
             #print(key,blockfromkey(key, keylist, isv2))
+            
             if "same to Strength" in sets:
                 ratio, fugou = (ratio ** 0.5, 1) if ratio > 0 else (abs(ratio) ** 0.5, -1)
 
