@@ -134,6 +134,9 @@ def convert_sdxl_text_encoder_2_checkpoint(checkpoint, max_length):
 
     return new_sd, logit_scale
 
+delkeys =[
+'text_model.embeddings.position_ids'
+]
 
 # load state_dict without allocating new tensors
 def _load_state_dict_on_device(model, state_dict, device, dtype=None):
@@ -141,12 +144,14 @@ def _load_state_dict_on_device(model, state_dict, device, dtype=None):
     missing_keys = list(model.state_dict().keys() - state_dict.keys())
     unexpected_keys = list(state_dict.keys() - model.state_dict().keys())
 
+    unexpected_keys = list(set(unexpected_keys) - set(delkeys))
+
     # similar to model.load_state_dict()
     if not missing_keys and not unexpected_keys:
         for k in list(state_dict.keys()):
             set_module_tensor_to_device(model, k, device, value=state_dict.pop(k), dtype=dtype)
         return "<All keys matched successfully>"
-
+    
     # error_msgs
     error_msgs: List[str] = []
     if missing_keys:

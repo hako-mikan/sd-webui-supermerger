@@ -287,16 +287,22 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
       return "ERROR: No model Selected"
     gc.collect()
 
-    currentinfo = shared.sd_model.sd_checkpoint_info
+    try:
+        currentinfo = shared.sd_model.sd_checkpoint_info
+    except:
+        currentinfo = None
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
     load_model(checkpoint_info)
 
     model = shared.sd_model
+    print(type(model).__name__)
+    print("XL" in type(model).__name__)
 
-    is_sdxl = hasattr(model, 'conditioner')
-    is_sd2 = not model.is_sdxl and hasattr(model.cond_stage_model, 'model')
-    is_sd1 = not model.is_sdxl and not model.is_sd2
+    is_sdxl = type(model).__name__ == "StableDiffusionXL" or getattr(model,'is_sdxl', False)
+    is_sd2 = type(model).__name__ == "StableDiffusion2" or getattr(model,'is_sd2', False)
+    is_sd1 = type(model).__name__ == "StableDiffusion" or getattr(model,'is_sd1', False)
+    is_flux = type(model).__name__ == "Flux" or getattr(model,'is_flux', False)
 
     print(f"Detected model type: SDXL: {is_sdxl}, SD2.X: {is_sd2}, SD1.X: {is_sd1}")
 
@@ -333,7 +339,8 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
 
     result = ext.svd(args)
 
-    load_model(currentinfo)
+    if currentinfo:
+        load_model(currentinfo)
     return result
 
 ##############################################################
