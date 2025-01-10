@@ -481,6 +481,7 @@ def merge_lora_models(models, ratios, sets, locon, calc_precision):
             alpha = alphas[lora_module_name]
 
             ratio = ratios[blockfromkey(key, keylist, isv2)]
+            #print(key,blockfromkey(key, keylist, isv2))
             if "same to Strength" in sets:
                 ratio, fugou = (ratio ** 0.5, 1) if ratio > 0 else (abs(ratio) ** 0.5, -1)
 
@@ -1135,10 +1136,12 @@ def blockfromkey(key,keylist,isv2 = False):
         fullkey = fullkey.replace("lora_unet", "diffusion_model")
     elif "lora_te1_text_model" in fullkey:
         fullkey = fullkey.replace("lora_te1_text_model", "0_transformer_text_model")
-    
-    for i,n in enumerate(keylist):
-        if n in  fullkey: return i
+
     if "1_model_transformer_resblocks_" in fullkey:return 0
+
+    for i,n in enumerate(keylist):
+        if n in fullkey: return i
+
     print(f"ERROR:Block is not deteced:{fullkey}")
     return 0
 
