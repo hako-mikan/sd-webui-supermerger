@@ -292,6 +292,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
     except:
         currentinfo = None
 
+
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
     load_model(checkpoint_info)
 
