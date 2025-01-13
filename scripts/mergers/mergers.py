@@ -406,19 +406,19 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
         ##### Dequantize
         if flux and qtype[0] and "weight" in key:
-            theta_0[key] = q_dequantize(theta_0,key,qtype[0])
+            theta_0[key] = q_dequantize(theta_0,key,qtype[0],device)
             #print("Dequantize Model A")
         if flux and qtype[1] and "weight" in key:
-            theta_1[key] = q_dequantize(theta_1,key,qtype[1]).to(theta_0[key].device)
+            theta_1[key] = q_dequantize(theta_1,key,qtype[1],device).to(theta_0[key].device)
             #print(key,"Dequantize Model B")
         if theta_2 != {} and qtype[2] and "weight" in key:
-            theta_2[key] = q_dequantize(theta_2,key,qtype[2]).to(theta_0[key].device)
+            theta_2[key] = q_dequantize(theta_2,key,qtype[2],device).to(theta_0[key].device)
             #print("Dequantize Model C")
 
-        theta_0[key] = theta_0[key].to("cuda")
-        theta_1[key] = theta_1[key].to("cuda")
+        theta_0[key] = theta_0[key].to(device)
+        theta_1[key] = theta_1[key].to(device)
         try:
-            theta_2[key] = theta_2[key].to("cuda")
+            theta_2[key] = theta_2[key].to(device)
         except Exception as e:
             pass # Do nothing
 
@@ -511,7 +511,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 theta_0[key][:, 0:4, :, :] = theta_0_a
             else:
                 theta_0[key] = theta_0_a
-            
+
+            theta_0_a = a = b = None
             del theta_0_a, a, b
 
         elif "cosine" in calcmode:
@@ -563,10 +564,14 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             else :theta_0[key] =theta_0[key] + torch.tensor(fine[5]).to(theta_0[key].device)
 
         ##### del quantize info
-        if flux and qtype[0] and "weight" in key:
-            theta_0[key] = theta_0[key].to("cpu")
+        if flux and not calcmode == "smoothAdd MT":
+            theta_1[key] = None
             del theta_1[key]
         theta_0[key] = theta_0[key].to("cpu")
+        try:
+            theta_1[key] = theta_1[key].to("cpu")
+        except:
+            pass
 
     #flux
     if qtype[0]:
@@ -602,9 +607,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         if "model" in key and key not in theta_0:
             theta_0.update({key:theta_1[key]})
 
+    theta_1 = None
     del theta_1
     if calcmode == "trainDifference" or calcmode == "extract":
+        theta_2 = None
         del theta_2
+    gc.collect()
 
     ##### BakeVAE
     bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
@@ -616,7 +624,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_0_key = 'first_stage_model.' + key
             if theta_0_key in theta_0:
                 theta_0[theta_0_key] = vae_dict[key]
-
+        vae_dict = None
         del vae_dict
 
     modelid = rwmergelog(currentmodel,mergedmodel)
@@ -1652,8 +1660,6 @@ def load_forge_model(state_dict,checkpoint_info = None):
         unet_storage_dtype=fsd.dynamic_args['forge_unet_storage_dtype']
     )
 
-    return sd_model, True
-
 COMP_NAME_AND_PREFIX = {"transformer":PREFIX_M, "text_encoder": "clip_l" , "text_encoder2": "t5xxl", "vae": "vae."}
 
 @torch.inference_mode()
@@ -1719,6 +1725,7 @@ def prefixer(t):
         if key.startswith(PREFIXFIX):
             t["model.diffusion_model." + key] = t.pop(key)
             need_revert = True
+    gc.collect()
     return need_revert
 
 def forge_save(filename):
@@ -1741,12 +1748,12 @@ def q_type(theta_0):
     elif any("nf4" in k for k in theta_0.keys()):
         return "nf4"
 
-def q_dequantize(sd,key,qtype):
+def q_dequantize(sd,key,qtype,device):
     from bitsandbytes.functional import dequantize_4bit
     qs = q_tensor_to_dict(sd[key + BNB + qtype])
-    out = torch.empty(qs["shape"],device="cuda")
-    weight = dequantize_4bit(sd[key].to("cuda"),out=out, absmax=sd[key + ".absmax"].to("cuda"),blocksize=qs["blocksize"],quant_type=qs["quant_type"])
-    return weight
+    out = torch.empty(qs["shape"],device=device)
+    weight = dequantize_4bit(sd[key].to(device),out=out, absmax=sd[key + ".absmax"].to(device),blocksize=qs["blocksize"],quant_type=qs["quant_type"])
+    return weight.to(torch.float16)
 
 def q_quantize(weight,qtype,shape):
     from bitsandbytes.functional import quantize_4bit
