@@ -780,6 +780,8 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
                 else:
                     keychanger[skey.split("model_",1)[1]] = key
 
+    lowvram.module_in_gpu = None #web-uiのバグ対策
+
     if is15:
         if shared.sd_model is not None:
             orig_checkpoint = shared.sd_model.sd_checkpoint_info if hasattr(shared.sd_model, "sd_checkpoint_info") else None
@@ -864,7 +866,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     gc.collect()
     return result + add
 
-def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
+def newpluslora(theta_0,filenames,lweis,names, calc_precision,isxl,isv2, keychanger):
     nets.load_networks(names, [1]* len(names),[1]* len(names), None, isxl, isv2)
 
     for l, loaded in enumerate(nets.loaded_networks):
