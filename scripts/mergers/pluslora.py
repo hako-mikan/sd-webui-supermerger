@@ -19,7 +19,6 @@ from modules import extra_networks, scripts, sd_models, lowvram
 from modules.ui import create_refresh_button
 from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
-from scripts.kohyas import lora as klora
 from scripts.A1111 import networks as nets
 from scripts.mergers.model_util import (filenamecutter, savemodel)
 from scripts.mergers.mergers import extract_super, unload_forge
@@ -216,7 +215,7 @@ def on_ui_tabs():
             outs = sorted(set(outs))
             return outs + outs_list
 
-        def calculatedim(calcsets):
+        def calculatedim(calcsets, device):
             # CSVから読み込む
             if "Load from CSV" in calcsets:
                 with open(dimpath, mode='r', encoding='utf-8') as csv_file:
@@ -230,7 +229,12 @@ def on_ui_tabs():
                 if name in ldict and ldict[n[0]] != ["","",""]:
                     continue
                 c_lora = lora.available_loras.get(n[0], None) 
-                d, t, s = dimgetter(c_lora.filename)
+                
+                try:
+                    d, t, s = dimgetter(c_lora.filename, device)
+                except:
+                    d, t, s = dimgetter(c_lora.filename)
+                    
                 ldict[name] = [d,t,s]
 
             # CSVに保存
@@ -247,7 +251,7 @@ def on_ui_tabs():
 
         sml_calcdim.click(
             fn=calculatedim,
-            inputs=[sml_calcsets],
+            inputs=[sml_calcsets, device],
             outputs=[sml_loras,sml_dims,sml_dims_xl]
         )
 
@@ -397,7 +401,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
             c_lora = lora.available_loras.get(n[0], None) 
             ln.append(c_lora.filename)
             lr.append(ratio)
-            d, t, s = dimgetter(c_lora.filename)
+            d, t, s = dimgetter(c_lora.filename, device)
             if t == "LoCon" and isinstance(d, list):
                 d = list(set(d))
                 d = d[0]
@@ -424,23 +428,23 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
             if "LyCORIS" in ld:
                 if len(ld) !=1:
                     return "multiple merge of LyCORIS is not supported"
-                sd = lycomerge(ln[0], lr[0], calc_precision)
+                sd = lycomerge(ln[0], lr[0], calc_precision, device)
             elif dim > 0:
                 print("change demension to ", dim)
-                sd = merge_lora_models_dim(ln, lr, dim,settings,device,calc_precision)
+                sd = merge_lora_models_dim(ln, lr, dim,settings,device,calc_precision, device)
             elif auto and ld.count(ld[0]) != len(ld):
                 print("change demension to ",dmax)
-                sd = merge_lora_models_dim(ln, lr, dmax,settings,device,calc_precision)
+                sd = merge_lora_models_dim(ln, lr, dmax,settings,device,calc_precision, device)
             else:
-                sd = merge_lora_models(ln, lr, settings, False, calc_precision)
+                sd = merge_lora_models(ln, lr, settings, False, calc_precision, device)
 
             if os.path.isfile(filename) and not "overwrite" in settings:
                 _err_msg = f"Output file ({filename}) existed and was not saved"
                 print(_err_msg)
                 return _err_msg
         else:
-            a = merge_lora_models(ln[0:1], lr[0:1], settings, False, calc_precision)
-            b = merge_lora_models(ln[1:2], lr[1:2], settings, False, calc_precision)
+            a = merge_lora_models(ln[0:1], lr[0:1], settings, False, calc_precision, device)
+            b = merge_lora_models(ln[1:2], lr[1:2], settings, False, calc_precision, device)
             sd = extract_two(a,b,alpha,beta,smooth)
         
         # マージ後のメタデータを取得
@@ -458,7 +462,7 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
         traceback.print_exc()
         return exc_value
 
-def merge_lora_models(models, ratios, sets, locon, calc_precision):
+def merge_lora_models(models, ratios, sets, locon, calc_precision, device):
     base_alphas = {}                          # alpha for merged model
     base_dims = {}
     merge_dtype = str_to_dtype(calc_precision)
@@ -468,7 +472,7 @@ def merge_lora_models(models, ratios, sets, locon, calc_precision):
         keylist = LBLCOKS26
 
         print(f"merging {model}: {ratios}")
-        lora_sd, metadata, isv2 = load_state_dict(model, merge_dtype)
+        lora_sd, metadata, isv2 = load_state_dict(model, merge_dtype, device)
 
         # get alpha and dim
         alphas = {}                             # alpha for current model
@@ -655,9 +659,9 @@ def extract_two(a,b,pa,pb,ps):
 
     return merged_sd
 
-def lycomerge(filename,ratios,calc_precision):
+def lycomerge(filename, ratios, calc_precision, device):
     merge_dtype = str_to_dtype(calc_precision)
-    sd, metadata, isv2 = load_state_dict(filename, merge_dtype)
+    sd, metadata, isv2 = load_state_dict(filename, merge_dtype, device)
 
     if len(ratios) == 17:
       r0 = 1
@@ -757,7 +761,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_0.keys()
     isv2 = "cond_stage_model.model.transformer.resblocks.0.attn.out_proj.weight" in theta_0.keys()
-
+    
     try:
         import networks
         is15 = True
@@ -784,14 +788,14 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
         checkpoint_info = sd_models.get_closet_checkpoint_match(model)
         if orig_checkpoint != checkpoint_info:
             sd_models.reload_model_weights(info=checkpoint_info)
-        theta_0 = newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger)
+        theta_0 = newpluslora(theta_0,filenames,lweis,names, calc_precision, isxl,isv2, keychanger)
         
         if orig_checkpoint:
             sd_models.reload_model_weights(info=orig_checkpoint)
     else:
         for name,filename, lwei in zip(names,filenames, lweis):
             print(f"loading: {name}")
-            lora_sd, metadata, isv2 = load_state_dict(filename, torch.float)
+            lora_sd, metadata, isv2 = load_state_dict(filename, torch.float, device)
 
             print(f"merging..." ,lwei)
             for key in lora_sd.keys():
@@ -861,7 +865,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     return result + add
 
 def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
-    nets.load_networks(names, [1]* len(names),[1]* len(names), [1]* len(names), isxl, isv2)
+    nets.load_networks(names, [1]* len(names),[1]* len(names), None, isxl, isv2)
 
     for l, loaded in enumerate(nets.loaded_networks):
         for n, name in enumerate(names):
@@ -870,7 +874,7 @@ def newpluslora(theta_0,filenames,lweis,names, isxl,isv2, keychanger):
                 lbw(nets.loaded_networks[l],to26(lweis[n]),isv2)
                 changed = True
             if not changed: "ERROR: {name}weight is not changed"
-    
+
     for net in nets.loaded_networks:
         net.dyn_dim = None
         for name,module in tqdm(net.modules.items(), desc=f"{net.name}"):
@@ -1085,7 +1089,7 @@ def load_metadata_from_safetensors(safetensors_file: str) -> dict:
         metadata = {}
     return metadata
 
-def dimgetter(filename):
+def dimgetter(filename, device = "cpu"):
     lora_sd = load_state_header(filename, torch.float)
     alpha = None
     dim = None
@@ -1094,13 +1098,13 @@ def dimgetter(filename):
     if "lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight" in lora_sd.keys():
       ltype = "LoCon"
       if type(lora_sd["lora_unet_down_blocks_0_resnets_0_conv1.lora_down.weight"]) is dict:
-          lora_sd, _, _ = load_state_dict(filename, torch.float)
+          lora_sd, _, _ = load_state_dict(filename, torch.float, device)
       _, _, dim, _ = dimalpha(lora_sd)
 
     if "lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight" in lora_sd.keys():
         sdx = "XL"
         if type(lora_sd["lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.lora_down.weight"]) is dict:
-            lora_sd, _, _ = load_state_dict(filename, torch.float)
+            lora_sd, _, _ = load_state_dict(filename, torch.float, device)
         _, _, dim, _ = dimalpha(lora_sd)
     elif "lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.hada_w1_a" in lora_sd.keys():
         sdx = "XL"
