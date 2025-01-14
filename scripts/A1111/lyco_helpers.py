@@ -7,8 +7,8 @@ def make_weight_cp(t, wa, wb):
 
 
 def rebuild_conventional(up, down, shape, dyn_dim=None):
-    up = up.reshape(up.size(0), -1)
-    down = down.reshape(down.size(0), -1)
+    up = cpufloat(up.reshape(up.size(0), -1))
+    down = cpufloat(down.reshape(down.size(0), -1))
     if dyn_dim is not None:
         up = up[:, :dyn_dim]
         down = down[:dyn_dim, :]
@@ -16,8 +16,9 @@ def rebuild_conventional(up, down, shape, dyn_dim=None):
 
 
 def rebuild_cp_decomposition(up, down, mid):
-    up = up.reshape(up.size(0), -1)
-    down = down.reshape(down.size(0), -1)
+    up = cpufloat(up.reshape(up.size(0), -1))
+    down = cpufloat(down.reshape(down.size(0), -1))
+    mid = cpufloat(mid)
     return torch.einsum('n m k l, i n, m j -> i j k l', mid, up, down)
 
 
@@ -66,3 +67,6 @@ def factorization(dimension: int, factor:int=-1) -> tuple[int, int]:
         n, m = m, n
     return m, n
 
+def cpufloat(module):
+    if not module: return module #None対策
+    return module.to(torch.float) if module.device.type == "cpu" else module
