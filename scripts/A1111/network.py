@@ -7,7 +7,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from modules import sd_models, cache, errors, hashes, shared
+try:
+    from modules import sd_models, cache, errors, hashes, shared
+except:
+    pass
+
 class QkvLinear(torch.nn.Linear):
     pass
 
