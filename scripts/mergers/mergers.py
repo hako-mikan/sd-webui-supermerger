@@ -618,7 +618,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
     if bake_in_vae_filename is not None:
         print(f"Baking in VAE from {bake_in_vae_filename}")
-        vae_dict = sd_vae.load_vae_dict(bake_in_vae_filename, map_location='cpu')
+        vae_dict = load_torch_file(bake_in_vae_filename, device = torch.device(device)) if forge else sd_vae.load_vae_dict(bake_in_vae_filename, map_location=device)
 
         for key in vae_dict.keys():
             theta_0_key = 'first_stage_model.' + key
