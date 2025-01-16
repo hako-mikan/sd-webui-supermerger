@@ -68,5 +68,5 @@ def factorization(dimension: int, factor:int=-1) -> tuple[int, int]:
     return m, n
 
 def cpufloat(module):
-    if not module: return module #None対策
+    if module is None: return module #None対策
     return module.to(torch.float) if module.device.type == "cpu" else module
