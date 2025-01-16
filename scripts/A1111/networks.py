@@ -124,14 +124,23 @@ def assign_network_names_to_compvis_modules(sd_model):
     network_layer_mapping = {}
 
     if shared.sd_model.is_sdxl:
-        for i, embedder in enumerate(shared.sd_model.forge_objects.clip if forge else shared.sd_model.conditioner.embedders):
-            if not hasattr(embedder, 'wrapped'):
+        forges = [shared.sd_model.forge_objects.clip.cond_stage_model.clip_l, shared.sd_model.forge_objects.clip.cond_stage_model.clip_g]
+        for i, embedder in enumerate(forges if forge else shared.sd_model.conditioner.embedders):
+            if not forge and not hasattr(embedder, 'wrapped'):
                 continue
+                
+            cmodules = embedder.named_modules() if forge else embedder.wrapped.named_modules()
 
-            for name, module in embedder.wrapped.named_modules():
+            for name, module in cmodules:
                 network_name = f'{i}_{name.replace(".", "_")}'
+                if forge and i == 1:
+                    network_name = network_name.replace("1_transformer_text_model_encoder_layers","1_model_transformer_resblocks")
+                    network_name = network_name.replace("self_attn", "attn")
+                    network_name = network_name.replace('mlp_fc2', 'mlp_c_proj')
+                    network_name = network_name.replace('mlp_fc1', 'mlp_c_fc')
                 network_layer_mapping[network_name] = module
                 module.network_layer_name = network_name
+
     else:
         cond_stage_model = shared.sd_model.forge_objects.clip.cond_stage_model if forge else getattr( shared.sd_model.cond_stage_model, 'wrapped', shared.sd_model.cond_stage_model)
 
@@ -274,7 +283,7 @@ def load_network(name, network_on_disk, isxl, is_sd2):
     net.bundle_embeddings = embeddings
 
     if keys_failed_to_match:
-        logging.debug(f"Network {network_on_disk.filename} didn't match keys: {keys_failed_to_match}")
+        print(f"Network {network_on_disk.filename} didn't match keys: {keys_failed_to_match}")
 
     return net
 
