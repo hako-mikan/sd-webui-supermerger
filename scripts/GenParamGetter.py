@@ -2,7 +2,29 @@ import gradio as gr
 import scripts.mergers.components as components
 from scripts.mergers.mergers import smergegen, simggen
 from scripts.mergers.xyplot import numanager
-from scripts.mergers.pluslora import frompromptf
+try:
+    from scripts.mergers.pluslora import frompromptf
+except ImportError as e:
+    try:
+        import transformers
+        transformers_version = transformers.__version__
+    except ImportError:
+        transformers_version = "not installed"
+    
+    try:
+        import diffusers
+        diffusers_version = diffusers.__version__
+    except ImportError:
+        diffusers_version = "not installed"
+
+    print(
+        f"Version error: Failed to import module.\n"
+        f"Transformers version: {transformers_version}\n"
+        f"Diffusers version: {diffusers_version}\n"
+        "Please ensure compatibility between these packages."
+    )
+    raise e
+
 from modules import scripts, script_callbacks
 
 class GenParamGetter(scripts.Script):
