@@ -237,7 +237,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         else: lucks["ceed"] = lucks["seed"] 
     else: lucks["ceed"]  = 0
     np.random.seed(int(lucks["ceed"]))
-    randomer = np.random.rand(2500)
+    randomer = np.random.rand(3000)
 
     cachetarget =[]
     for model,num in zip([model_a,model_b,model_c],main):
