@@ -355,10 +355,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     if stopmerge: return "STOPPED", *NON4
                     if not ("weight" in key or "bias" in key): continue
                     if key in theta_2:
-                        if uselerp:
-                            theta_1[key] = torch.lerp(theta_1[key].to(torch.float32), -theta_2[key].to(torch.float32), 1.0).to(theta_1[key].dtype)
-                        else:
-                            theta_1[key] = (theta_1[key].to(torch.float32) -theta_2[key].to(torch.float32)).to(theta_1[key].dtype)
+                        theta_1[key] = (theta_1[key].to(torch.float32) -theta_2[key].to(torch.float32)).to(theta_1[key].dtype)
                     else:
                         theta_1[key] = torch.zeros_like(theta_1[key].to(torch.float16))
 
