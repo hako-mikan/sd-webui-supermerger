@@ -360,7 +360,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                         else:
                             theta_1[key] = (theta_1[key].to(torch.float32) -theta_2[key].to(torch.float32)).to(theta_1[key].dtype)
                     else:
-                        theta_1[key] = torch.zeros_like(theta_1[key])
+                        theta_1[key] = torch.zeros_like(theta_1[key].to(torch.float16))
 
             del theta_2
             theta_2 = None
