@@ -1566,6 +1566,7 @@ def model_loader(checkpoint_info, state_dict):
         sd_models.model_data.__init__()
         load_model(checkpoint_info, already_loaded_state_dict=state_dict)
     else:
+        memory_management.free_memory(1e30,torch.device("cpu"))
         load_forge_model(state_dict)
 
 ################################################
