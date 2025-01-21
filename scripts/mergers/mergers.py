@@ -417,8 +417,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_2[key] = q_dequantize(theta_2,key,qtype[2]).to(theta_0[key].device)
             #print("Dequantize Model C")
 
-        theta_0[key] = theta_0[key].to("cuda")
-        theta_1[key] = theta_1[key].to("cuda")
+        theta_0[key] = theta_0[key].to(device)
+        theta_1[key] = theta_1[key].to(device)
 
         weight_index = -1
         current_alpha = alpha
