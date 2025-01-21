@@ -1260,7 +1260,6 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         do_not_save_grid=True,
         do_not_save_samples=True,
         do_not_reload_embeddings=True,
-        do_not_reload_embeddings=True,
     )
     p.hr_checkpoint_name=None if g("Hires checkpoint") == 'Use same checkpoint' else g("Hires checkpoint")
     p.hr_sampler_name=None if hr_sampler_name == 'Use same sampler' else  hr_sampler_name
