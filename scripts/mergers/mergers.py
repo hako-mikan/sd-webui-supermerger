@@ -355,10 +355,17 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                     if stopmerge: return "STOPPED", *NON4
                     if not ("weight" in key or "bias" in key): continue
                     if key in theta_2:
-                        theta_1[key] = (theta_1[key].to(torch.float32) -theta_2[key].to(torch.float32)).to(theta_1[key].dtype)
+                        a = list(theta_1[key].shape)
+                        b = list(theta_2[key].shape)
+                        assert_inpaint(a, b, key)
+                        if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+                            # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
+                            theta_1_a = theta_1[key][:, 0:4, :, :]
+                        else:
+                            theta_1_a = theta_1[key]
+                        theta_1[key] = (theta_1_a.to(torch.float32) -theta_2[key].to(torch.float32)).to(theta_1[key].dtype)
                     else:
                         theta_1[key] = torch.zeros_like(theta_1[key].to(torch.float16))
-
             del theta_2
             theta_2 = None
             devices.torch_gc()
@@ -414,20 +421,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         a = list(theta_0[key].shape)
         b = list(theta_1[key].shape)
 
-        # this enables merging an inpainting model (A) with another one (B);
-        # where normal model would have 4 channels, for latenst space, inpainting model would
-        # have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9
-        if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
-            if a[1] == 4 and b[1] == 9:
-                raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
-            if a[1] == 4 and b[1] == 8:
-                raise RuntimeError("When merging instruct-pix2pix model with a normal one, A must be the instruct-pix2pix model.")
-
-            if a[1] == 8 and b[1] == 4:#If we have an Instruct-Pix2Pix model...
-                result_is_instruct_pix2pix_model = True
-            else:
-                assert a[1] == 9 and b[1] == 4, f"Bad dimensions for merged layer {key}: A={a}, B={b}"
-                result_is_inpainting_model = True
+        assert_inpaint(a, b, key)
 
         block,blocks26 = blockfromkey(key,isxl,isflux)
         #if block == "Not Merge": continue
@@ -1418,6 +1412,25 @@ def blockfromkey(key,isxl,isflux=False):
             return block + nums + add, block + "0" + nums[0] if "MID" not in block else "M00"
 
     return "Not Merge", "Not Merge"
+
+################################################
+##### Assert Inpaint
+def assert_inpaint(a, b, key):
+    """ this enables merging an inpainting model (A) with another one (B);
+        where normal model would have 4 channels, for latenst space, inpainting model would
+        have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9 
+    """
+    if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
+        if a[1] == 4 and b[1] == 9:
+            raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
+        if a[1] == 4 and b[1] == 8:
+            raise RuntimeError("When merging instruct-pix2pix model with a normal one, A must be the instruct-pix2pix model.")
+
+        if a[1] == 8 and b[1] == 4:#If we have an Instruct-Pix2Pix model...
+            result_is_instruct_pix2pix_model = True
+        else:
+            assert a[1] == 9 and b[1] == 4, f"Bad dimensions for merged layer {key}: A={a}, B={b}"
+            result_is_inpainting_model = True
 
 ################################################
 ##### Adjust
