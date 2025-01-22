@@ -1063,7 +1063,7 @@ def modeltype(sd):
 def loadkeys(model_a, lora):
     if lora:
         import lora
-        sd = sd_models.read_state_dict(lora.available_loras[model_a].filename,"cpu")
+        sd =  load_torch_file(lora.available_loras[model_a].filename, device = torch.device("cpu")) if forge else sd_models.read_state_dict(lora.available_loras[model_a].filename,"cpu")
     else:
         sd = loadmodel(model_a)
     keys = []
