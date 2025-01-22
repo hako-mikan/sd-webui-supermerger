@@ -642,16 +642,8 @@ def convert_ldm_clip_checkpoint_v2(checkpoint, max_length):
             new_sd[key_pfx + "k_proj" + key_suffix] = values[1]
             new_sd[key_pfx + "v_proj" + key_suffix] = values[2]
 
-    # rename or add position_ids
-    ANOTHER_POSITION_IDS_KEY = "text_model.encoder.text_model.embeddings.position_ids"
-    if ANOTHER_POSITION_IDS_KEY in new_sd:
-        # waifu diffusion v1.4
-        position_ids = new_sd[ANOTHER_POSITION_IDS_KEY]
-        del new_sd[ANOTHER_POSITION_IDS_KEY]
-    else:
-        position_ids = torch.Tensor([list(range(max_length))]).to(torch.int64)
-
-    new_sd["text_model.embeddings.position_ids"] = position_ids
+    if "text_model.embeddings.position_ids" in new_sd:
+        new_sd.pop("text_model.embeddings.position_ids")
     return new_sd
 
 
@@ -996,12 +988,15 @@ def load_checkpoint_with_text_encoder_conversion(ckpt_path, device="cpu"):
 
 
 # TODO dtype指定の動作が怪しいので確認する text_encoderを指定形式で作れるか未確認
-def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, device="cpu", dtype=None, unet_use_linear_projection_in_v2=True):
+def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, device="cpu", dtype=None, unet_use_linear_projection_in_v2=True, del_ids=False):
     _, state_dict = load_checkpoint_with_text_encoder_conversion(ckpt_path, device)
 
     # Convert the UNet2DConditionModel model.
     unet_config = create_unet_diffusers_config(v2, unet_use_linear_projection_in_v2)
     converted_unet_checkpoint = convert_ldm_unet_checkpoint(v2, state_dict, unet_config)
+    
+    if del_ids and "text_model.embeddings.position_ids" in converted_unet_checkpoint:
+        converted_unet_checkpoint.pop("text_model.embeddings.position_ids")
 
     unet = UNet2DConditionModel(**unet_config).to(device)
     info = unet.load_state_dict(converted_unet_checkpoint)
@@ -1033,6 +1028,8 @@ def load_models_from_stable_diffusion_checkpoint(v2, ckpt_path, device="cpu", dt
             torch_dtype="float32",
             transformers_version="4.25.0.dev0",
         )
+        if del_ids and "text_model.embeddings.position_ids" in converted_text_encoder_checkpoint:
+            converted_text_encoder_checkpoint.pop("text_model.embeddings.position_ids")
         text_model = CLIPTextModel._from_config(cfg)
         info = text_model.load_state_dict(converted_text_encoder_checkpoint)
     else:

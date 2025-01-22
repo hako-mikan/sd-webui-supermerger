@@ -49,10 +49,10 @@ def svd(args):
     # load models
     if not args.sdxl:
         print(f"loading original SD model : {args.model_org}")
-        text_encoder_o, _, unet_o = model_util.load_models_from_stable_diffusion_checkpoint(args.v2, args.model_org)
+        text_encoder_o, _, unet_o = model_util.load_models_from_stable_diffusion_checkpoint(args.v2, args.model_org, del_ids=True)
         text_encoders_o = [text_encoder_o]
         print(f"loading tuned SD model : {args.model_tuned}")
-        text_encoder_t, _, unet_t = model_util.load_models_from_stable_diffusion_checkpoint(args.v2, args.model_tuned)
+        text_encoder_t, _, unet_t = model_util.load_models_from_stable_diffusion_checkpoint(args.v2, args.model_tuned, del_ids=True)
         text_encoders_t = [text_encoder_t]
         model_version = model_util.get_model_version_str_for_sd1_sd2(args.v2, args.v_parameterization)
     else:
