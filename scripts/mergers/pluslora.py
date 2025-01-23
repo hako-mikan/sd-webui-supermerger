@@ -21,7 +21,7 @@ from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
 from scripts.A1111 import networks as nets
 from scripts.mergers.model_util import filenamecutter, savemodel
-from scripts.mergers.mergers import extract_super, unload_forge
+from scripts.mergers.mergers import extract_super, unload_forge, q_dequantize, q_quantize, qdtyper, prefixer
 from tqdm import tqdm
 from modules.ui import versions_html
 
@@ -757,11 +757,18 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     print(f"Loading {model}")
 
     theta_0 = read_model_state_dict(checkpoint_info, device)
+    dtype = qdtyper(theta_0)
+
+    if dtype == "fp4" or dtype == "nf4":
+        print(f"Changing dtype of {model} from {dtype} to float16")
+        qkeys = list(theta_0.keys())
+        q_dequantize(theta_0,dtype,device,torch.float16,False)
 
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_0.keys()
     isv2 = "cond_stage_model.model.transformer.resblocks.0.attn.out_proj.weight" in theta_0.keys()
     isflux = any("double_block" in k for k in theta_0.keys())
-    
+    need_revert = prefixer(theta_0) if isflux else False
+
     try:
         import networks
         is15 = True
@@ -793,6 +800,20 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
         
         theta_0 = newpluslora(theta_0,filenames,lweis,names, calc_precision, isxl,isv2, keychanger)
         
+        if dtype == "fp4" or dtype == "nf4":
+            print(f"Changing dtype of {model} from float16 to {dtype}")
+            q_quantize(theta_0,dtype,device,False)
+        
+            failedkeys = []
+            for key in theta_0:
+                if key not in qkeys:
+                    failedkeys.append(key)
+
+            print(f"Key Check : {'OK' if failedkeys == [] else str(len(failedkeys)) + ' keys failed'}")
+
+        if need_revert:
+            prefixer(theta_0, True)
+
         if orig_checkpoint:
             sd_models.reload_model_weights(info=orig_checkpoint)
     else:
@@ -883,6 +904,7 @@ def newpluslora(theta_0,filenames,lweis,names, calc_precision,isxl,isv2, keychan
                 changed = True
             if not changed: "ERROR: {name}weight is not changed"
 
+    errormodules = []
     for net in nets.loaded_networks:
         net.dyn_dim = None
         for name,module in tqdm(net.modules.items(), desc=f"{net.name}"):
@@ -915,7 +937,10 @@ def newpluslora(theta_0,filenames,lweis,names, calc_precision,isxl,isv2, keychan
                     else:
                         theta_0[keychanger[inkey]] ,theta_0[keychanger[outkey]], _= plusweightsqvk(theta_0[keychanger[inkey]],theta_0[keychanger[outkey]], name ,module, net)
                 else:
-                    print("unchanged key:",msd_key)
+                    errormodules.append(msd_key)
+                    
+        if errormodules != []:
+            print(f"Unmerged modules in {net.name} : {errormodules}")
         gc.collect()
     return theta_0
 
@@ -1001,7 +1026,7 @@ def lbw(lora,lwei,isv2):
             print("unkwon LoRA")
 
     if errormodules:
-        print("unchanged modules:", errormodules)
+        print("unchanged modules in lbw:", errormodules)
     else:
         print(f"{lora.name}: Successfully set the ratio {lwei} ")
 
