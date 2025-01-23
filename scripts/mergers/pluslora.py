@@ -21,7 +21,7 @@ from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
 from scripts.A1111 import networks as nets
 from scripts.mergers.model_util import filenamecutter, savemodel
-from scripts.mergers.mergers import extract_super, unload_forge, q_dequantize, q_quantize, qdtyper, prefixer
+from scripts.mergers.mergers import extract_super, unload_forge, q_dequantize, q_quantize, qdtyper, prefixer, BLOCKIDFLUX
 from tqdm import tqdm
 from modules.ui import versions_html
 
@@ -798,7 +798,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
         if orig_checkpoint != checkpoint_info:
             sd_models.reload_model_weights(info=checkpoint_info)
         
-        theta_0 = newpluslora(theta_0,filenames,lweis,names, calc_precision, isxl,isv2, keychanger)
+        theta_0 = newpluslora(theta_0,filenames,lweis,names, calc_precision, isxl,isv2,isflux, keychanger)
         
         if dtype == "fp4" or dtype == "nf4":
             print(f"Changing dtype of {model} from float16 to {dtype}")
@@ -893,14 +893,14 @@ def oldpluslora(theta_0,filenames,lweis,names, calc_precision,isxl,isv2, keychan
                 theta_0[keychanger[msd_key]] = torch.nn.Parameter(weight)
     return theta_0
 
-def newpluslora(theta_0,filenames,lweis,names, calc_precision,isxl,isv2, keychanger):
+def newpluslora(theta_0,filenames,lweis,names, calc_precision,isxl,isv2,isflux, keychanger):
     nets.load_networks(names, [1]* len(names),[1]* len(names), None, isxl, isv2)
 
     for l, loaded in enumerate(nets.loaded_networks):
         for n, name in enumerate(names):
             changed = False
             if name == loaded.name:
-                lbw(nets.loaded_networks[l],to26(lweis[n]),isv2)
+                lbw(nets.loaded_networks[l],to26(lweis[n]),isv2,isflux)
                 changed = True
             if not changed: "ERROR: {name}weight is not changed"
 
@@ -986,7 +986,7 @@ def plusweightsqvk(inweight, outweight, network_layer_name, module ,net,bias = N
 
     return inweight,outweight,bias
 
-def lbw(lora,lwei,isv2):
+def lbw(lora,lwei,isv2,isflux=False):
     errormodules = []
 
     blocks = LBLCOKS26
@@ -997,11 +997,18 @@ def lbw(lora,lwei,isv2):
         ratio = 1
         picked = False
 
-        for i,block in enumerate(blocks):
-            if block in key:
-                if i == 26 or i == 27: i=0
-                ratio = lwei[i]
+        if isflux:
+            block = get_flux_blocks(key)
+            if block in BLOCKIDFLUX:
+                ratio = lwei[BLOCKIDFLUX.index(block)]
                 picked = True
+
+        else:
+            for i,block in enumerate(blocks):
+                if block in key:
+                    if i == 26 or i == 27: i=0
+                    ratio = lwei[i]
+                    picked = True
 
         if not picked:
             errormodules.append(key)
@@ -1058,7 +1065,6 @@ def save_to_file(file_name, model, state_dict, dtype, metadata):
         torch.save(model, file_name)
 
 CLAMP_QUANTILE = 0.99
-
 
 def str_to_dtype(p):
   if p == 'float':
@@ -1535,7 +1541,7 @@ suffix_conversion = {
 }
 
 
-def convert_diffusers_name_to_compvis(key, is_sd2, isflux = False):
+def convert_diffusers_name_to_compvis(key, is_sd2):
     def match(match_list, regex_text):
         regex = re_compiled.get(regex_text)
         if regex is None:
@@ -1636,6 +1642,25 @@ def convert_diffusers_name_to_compvis(key, is_sd2, isflux = False):
         return f"model.diffusion_model.single_blocks.{block_index}.{suffix}"
 
     return key
+
+def get_flux_blocks(key):
+    if "vae" in key:
+        return "VAE"
+    if "t5xxl" in key:
+        return "T5"
+    if "text_encoders.clip" in key:
+        return "CLIP"
+    
+    match = re.search(r'\_(\d+)\_', key)
+    if "double_blocks" in key:
+        return f"D{match.group(1).zfill(2) }"
+    if "single_blocks" in key:
+        return f"S{match.group(1).zfill(2) }"
+    if "_in" in key:
+        return "IN"
+    if "final_layer" in key:
+        return "OUT"
+    return "Not Merge"
 
 def read_model_state_dict(checkpoint_info, device):
     if forge:
