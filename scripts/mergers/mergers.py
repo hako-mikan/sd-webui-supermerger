@@ -298,12 +298,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     #exclude/include
     ex_elems = ex_elems.split(",")
 
-    #adjust
-    if fine.rstrip(",0") != "":
-        fine = fineman(fine,isxl)
-    else:
-        fine = ""
-
     #for MBW text to list
     if useblocks:
         weights_a_t=weights_a.split(',',1)
@@ -328,6 +322,12 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     
     isxl = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in theta_1.keys()
     isflux = any("double_block" in k for k in theta_1.keys())
+
+    #adjust
+    if fine.rstrip(",0") != "":
+        fine = fineman(fine,isxl)
+    else:
+        fine = ""
 
     if isxl and useblocks:
         if len(weights_a) == 25:
