@@ -1043,6 +1043,7 @@ LORAANDSOON = {
     "LoraKronModule" : "w1",
     "LycoKronModule" : "w1",
     "NetworkModuleLokr": "w1",
+    "NetworkModuleNorm": "w_norm",
 }
 
 def save_to_file(file_name, model, state_dict, dtype, metadata):
