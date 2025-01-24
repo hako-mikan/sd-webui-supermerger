@@ -48,6 +48,15 @@ def to26(ratios):
         output[BLOCKID26.index(id)] = ratios[i]
     return output
 
+def to61s(ratioss):
+    out = []
+    for ratios in ratioss:
+        if len(ratios) == 61:
+            out.append(ratios)
+        else:
+            out.append(ratios + [ratios[0]] * (61 - len(ratios)))
+    return out
+
 def f_changediffusers(version):
     launch.run_pip(f"install diffusers=={version}", f"diffusers ver {version}")
 
@@ -769,6 +778,9 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
     isflux = any("double_block" in k for k in theta_0.keys())
     need_revert = prefixer(theta_0) if isflux else False
 
+    if isflux:
+        lweis = to61s(lweis)
+
     try:
         import networks
         is15 = True
@@ -1154,6 +1166,8 @@ def dimgetter(filename, device = "cpu"):
         _, _, dim, _ = dimalpha(lora_sd)
     elif "lora_unet_input_blocks_4_1_transformer_blocks_1_attn1_to_k.hada_w1_a" in lora_sd.keys():
         sdx = "XL"
+    elif any("single_blocks" in key for key in lora_sd.keys()):
+        sdx = "Flux"
     else:
         sdx = "1.X/2.X"
 
