@@ -117,6 +117,18 @@ def convert_diffusers_name_to_compvis(key, is_sd2):
         else:
             return f"1_model_transformer_resblocks_{m[0]}_{m[1].replace('self_attn', 'attn')}"
 
+    if match(m, r"lora_te1_text_model_encoder_layers_(\d+)_(.+)"):
+        return f"clip_l_transformer_text_model_encoder_layers_{m[0]}_{m[1]}"
+
+    if match(m, r"lora_te3_text_model_encoder_layers_(\d+)_(.+)"):
+        if 'mlp_fc1' in m[1]:
+            return f"t5xxl_transformer_text_model_encoder_layers_{m[0]}layer{m[1]}SelfAttention_k"
+    
+    match_pattern = re.match(r"lora_te3_encoder_block_(\d+)_layer_(\d+)_(.+)", key)
+    if match_pattern:
+        block_num, layer_num, suffix = match_pattern.groups()
+        return f"t5xxl_transformer_encoder_block_{block_num}_layer_{layer_num}_{suffix}"
+    
     return key
 
 
