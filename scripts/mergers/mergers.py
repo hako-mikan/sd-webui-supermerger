@@ -49,8 +49,14 @@ try:
     from backend import memory_management
     from backend.utils import load_torch_file
     forge = True
+    reforge = False
 except:
-    forge = False
+    try:
+        from modules.ui import versions_html
+        reforge = "reForge" in versions_html()
+        forge = "forge" in versions_html()
+    except:
+        forge = reforge = False
 
 revert_target = ""
 orig_cache = 0
@@ -1282,7 +1288,8 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     else:
         p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(p.negative_prompt, p.styles)]
 
-    if forge:
+    print("SuperMerger: Start Image Generation", reforge)
+    if forge or reforge:
         global orig_reload_model_weights
         orig_reload_model_weights = sd_models.reload_model_weights
         sd_models.reload_model_weights = reload_model_weights
@@ -1591,6 +1598,7 @@ def model_loader(checkpoint_info, state_dict,metadata, currentmodel):
         memory_management.free_memory(1e30,torch.device("cpu"))
         
         load_forge_model(state_dict,checkpoint_info)
+    print("SuperMerger: Merged Model Loaded.")
 
 ################################################
 ##### forge
