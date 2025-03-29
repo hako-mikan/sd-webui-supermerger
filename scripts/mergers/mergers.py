@@ -54,7 +54,7 @@ except:
     try:
         from modules.ui import versions_html
         reforge = "reForge" in versions_html()
-        forge = "forge" in versions_html()
+        forge = False
     except:
         forge = reforge = False
 
@@ -1609,7 +1609,7 @@ def unload_forge():
     memory_management.soft_empty_cache()
     gc.collect()
 
-def reload_model_weights():
+def reload_model_weights(info=None):
     pass
 
 orig_reload_model_weights = None
