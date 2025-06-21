@@ -36,6 +36,7 @@ def is_installed(pip_package):
 requirements = [
 "diffusers==0.31.0",
 "scikit-learn",
+"accelerate"
 ]
 
 for module in requirements:

@@ -1187,7 +1187,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         elif wantedv and wantedv in paramsnames:return txt2imgparams[paramsnames.index(wantedv)]
         else:return None
 
-    sampler_index = g("Sampling method")
+    sampler_index = g("Sampling method","Sampling Method")
     if type(sampler_index) is str:
         sampler_name = sampler_index
     else:       
@@ -1206,7 +1206,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
         prompt=g("Prompt"),
         styles=g("Styles"),
-        negative_prompt=g('Negative prompt'),
+        negative_prompt=g('Negative prompt','Negative Prompt'),
         seed=g("Seed","Initial seed"),
         subseed=g("Variation seed"),
         subseed_strength=g("Variation strength"),
@@ -1214,9 +1214,9 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         seed_resize_from_w=g("Resize seed from width"),
         seed_enable_extras=g("Extra"),
         sampler_name=sampler_name,
-        batch_size=g("Batch size"),
-        n_iter=g("Batch count"),
-        steps=g("Sampling steps"),
+        batch_size=g("Batch size","Batch Size"),
+        n_iter=g("Batch count","Batch Count"),
+        steps=g("Sampling steps","Sampling Steps"),
         cfg_scale=g("CFG Scale"),
         width=g("Width"),
         height=g("Height"),

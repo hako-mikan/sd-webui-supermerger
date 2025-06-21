@@ -18,7 +18,7 @@ import scripts.A1111.network_oft as network_oft
 import torch
 from typing import Union
 
-from modules import shared, devices, sd_models, errors, scripts, sd_hijack
+from modules import shared, devices, sd_models, errors, scripts, sd_hijack, launch_utils
 import modules.textual_inversion.textual_inversion as textual_inversion
 
 class QkvLinear(torch.nn.Linear):
@@ -34,8 +34,8 @@ module_types = [
     network_glora.ModuleTypeGLora(),
     network_oft.ModuleTypeOFT(),
 ]
-from modules.ui import versions_html
-forge = "forge" in versions_html()
+
+forge = launch_utils.git_tag()[0:2] == "f2"
 
 re_digits = re.compile(r"\d+")
 re_x_proj = re.compile(r"(.*)_([qkv]_proj)$")
@@ -676,7 +676,10 @@ def network_MultiheadAttention_load_state_dict(self, *args, **kwargs):
 
 def process_network_files(names: list[str] | None = None):
     candidates = list(shared.walk_files(shared.cmd_opts.lora_dir, allowed_extensions=[".pt", ".ckpt", ".safetensors"]))
-    candidates += list(shared.walk_files(shared.cmd_opts.lyco_dir_backcompat, allowed_extensions=[".pt", ".ckpt", ".safetensors"]))
+    try:
+        candidates += list(shared.walk_files(shared.cmd_opts.lyco_dir_backcompat, allowed_extensions=[".pt", ".ckpt", ".safetensors"]))
+    except:
+        pass
     for filename in candidates:
         if os.path.isdir(filename):
             continue

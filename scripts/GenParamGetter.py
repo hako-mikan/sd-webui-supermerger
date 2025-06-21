@@ -71,7 +71,6 @@ class GenParamGetter(scripts.Script):
         return components
     
     def compare_components_with_ids(components: list[gr.Blocks], ids: list[int]):
-        
         try:
             return len(components) == len(ids) and all(component._id == _id for component, _id in zip(components, ids))
         except:
@@ -80,8 +79,10 @@ class GenParamGetter(scripts.Script):
     def get_params_components(demo: gr.Blocks, app):
         for _id, _is_txt2img in zip([GenParamGetter.txt2img_gen_button._id, GenParamGetter.img2img_gen_button._id], [True, False]):
             if hasattr(demo,"dependencies"):
-                dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and _id in x["targets"]]
+                #dependencies: list[dict] = [x for x in demo.dependencies if x["trigger"] == "click" and _id in x["targets"]]
+                dependencies: list[dict] = [x for x in demo.dependencies if _id in x["targets"]]
                 g4 = False
+                
             else:
                 dependencies: list[dict] = [x for x in demo.config["dependencies"] if x["targets"][0][1] == "click" and _id in x["targets"][0]]
                 g4 = True
@@ -91,6 +92,7 @@ class GenParamGetter(scripts.Script):
             for d in dependencies:
                 if len(d["outputs"]) == 4:
                     dependency = d
+                    print("GenParamsGetter detected!")
             
             if g4:
                 params = [demo.blocks[x] for x in dependency['inputs']]
@@ -102,6 +104,8 @@ class GenParamGetter(scripts.Script):
                 else:
                     components.img2img_params = params
             else:
+                if dependency is None:continue
+
                 params = [params for params in demo.fns if GenParamGetter.compare_components_with_ids(params.inputs, dependency["inputs"])]
 
                 if _is_txt2img:
@@ -111,7 +115,6 @@ class GenParamGetter(scripts.Script):
                     components.txt2img_params = params[0].inputs 
                 else:
                     components.img2img_params = params[0].inputs
-
         
         if not GenParamGetter.events_assigned:
             with demo:

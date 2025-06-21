@@ -15,7 +15,7 @@ import numpy as np
 import safetensors.torch
 import scripts.mergers.components as components
 import torch
-from modules import extra_networks, scripts, sd_models, lowvram
+from modules import extra_networks, scripts, sd_models, launch_utils
 from modules.ui import create_refresh_button
 from safetensors.torch import load_file, save_file
 from scripts.kohyas import extract_lora_from_models as ext
@@ -23,9 +23,8 @@ from scripts.A1111 import networks as nets
 from scripts.mergers.model_util import filenamecutter, savemodel
 from scripts.mergers.mergers import extract_super, unload_forge, q_dequantize, q_quantize, qdtyper, prefixer, BLOCKIDFLUX
 from tqdm import tqdm
-from modules.ui import versions_html
 
-forge = "forge" in versions_html()
+forge = launch_utils.git_tag()[0:2] == "f2"
 
 selectable = []
 pchanged = False
@@ -314,7 +313,7 @@ def makelora(model_a,model_b,dim,saveto,settings,alpha,beta,save_precision,calc_
     except:
         currentinfo = None
 
-    lowvram.module_in_gpu = None #web-uiのバグ対策
+    lowvramdealer() #web-uiのバグ対策
 
     checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
     load_model(checkpoint_info)
@@ -809,7 +808,7 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
             elif "model_" in skey:
                 keychanger[skey.split("model_",1)[1]] = key
 
-    lowvram.module_in_gpu = None #web-uiのバグ対策
+    lowvramdealer() #web-uiのバグ対策
 
     if is15:
         if shared.sd_model is not None:
@@ -1667,6 +1666,13 @@ def convert_diffusers_name_to_compvis(key, is_sd2):
         return f"model.diffusion_model.single_blocks.{block_index}.{suffix}"
 
     return key
+
+def lowvramdealer():
+    try:
+        from modules import lowvram
+        lowvram.module_in_gpu = None #web-uiのバグ対策
+    except:
+        pass
 
 def get_flux_blocks(key):
     if "vae" in key:
