@@ -1234,7 +1234,7 @@ def dimalpha(lora_sd, base_dims={}, base_alphas={}):
     for key in lora_sd.keys():
         if 'alpha' in key:
             lora_module_name = key[:key.rfind(".alpha")]
-            alpha = float(lora_sd[key].detach().numpy())
+            alpha = float(lora_sd[key].detach().cpu().numpy()) 
             alphas[lora_module_name] = alpha
             if lora_module_name not in base_alphas:
                 base_alphas[lora_module_name] = alpha
