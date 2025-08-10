@@ -5,7 +5,7 @@ import scripts.A1111.network as network
 from modules import devices
 from modules.ui import versions_html
 
-forge = "forge" in versions_html()
+forge = "forge" in versions_html().lower()
 class QkvLinear(torch.nn.Linear):
     pass
 
