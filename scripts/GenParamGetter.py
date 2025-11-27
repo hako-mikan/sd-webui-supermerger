@@ -90,7 +90,7 @@ class GenParamGetter(scripts.Script):
             dependency: dict = None
 
             for d in dependencies:
-                if len(d["outputs"]) == 4:
+                if len(d["outputs"]) == 4 or len(d["outputs"]) == 5:
                     dependency = d
                     print("GenParamsGetter detected!")
             

@@ -4,6 +4,7 @@ import gc
 import hashlib
 import numpy as np
 import os.path
+
 import re
 import torch
 import tqdm
@@ -14,17 +15,18 @@ import json
 import launch
 import torch.nn as nn
 import scipy.ndimage
+from unittest.mock import patch
 from copy import deepcopy
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
 from functools import partial
 from torch import Tensor, lerp
 from torch.nn.functional import cosine_similarity, relu, softplus
-from modules import shared, processing, sd_models, sd_vae, images, sd_samplers, scripts,devices, extras
+from modules import shared, processing, sd_models, sd_vae, images, sd_samplers, scripts,devices, extras, script_callbacks
 from modules.ui import  plaintext_to_html
-from modules.shared import opts
+from modules.shared import opts, cmd_opts
+from modules.sd_models import unload_model_weights
 from modules.processing import create_infotext,Processed
-from modules.sd_models import  load_model,unload_model_weights
 from modules.generation_parameters_copypaste import create_override_settings_dict
 from scripts.mergers.model_util import filenamecutter,savemodel
 from math import ceil
@@ -48,11 +50,12 @@ except:
 try:
     from modules import launch_utils
     forge = launch_utils.git_tag()[0:2] == "f2"
-    reforge = launch_utils.git_tag()[0:2] == "f1" or launch_utils.git_tag() == "classic"
+    reforge = launch_utils.git_tag()[0:2] == "f1" or launch_utils.git_tag() == "classic" 
+    neo = launch_utils.git_tag() == "neo"
 except:
-    forge = reforge = False
+    forge = reforge = neo = False
 
-if forge:
+if forge or neo:
     from backend import memory_management
     from backend.utils import load_torch_file
 
@@ -232,7 +235,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     use32 = "use float32" in save_sets
     to_cpu = "offload" in save_sets
 
-    if forge:
+    if forge or neo:
         fcinfo = sd_models.get_closet_checkpoint_match(shared.opts.sd_model_checkpoint)
         revert_target = revert_target if hasattr(fcinfo, "isfake") else fcinfo
         unload_forge()
@@ -633,7 +636,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
     if bake_in_vae_filename is not None:
         print(f"Baking in VAE from {bake_in_vae_filename}")
-        vae_dict = load_torch_file(bake_in_vae_filename, device = torch.device(device)) if forge else sd_vae.load_vae_dict(bake_in_vae_filename, map_location=device)
+        vae_dict = load_torch_file(bake_in_vae_filename, device = torch.device(device)) if forge or neo else sd_vae.load_vae_dict(bake_in_vae_filename, map_location=device)
 
         for key in vae_dict.keys():
             theta_0_key = 'first_stage_model.' + key
@@ -970,7 +973,7 @@ def elementals(key,weight_index,weight_index_xl,deep,randomer,num,lucks,deepprin
     return current_alpha
 
 def forkforker(filename,device):
-    if forge:
+    if forge or neo:
         return load_torch_file(filename, device = torch.device(device))
     try:
         return sd_models.read_state_dict(filename, map_location = device)
@@ -1389,14 +1392,18 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(p.negative_prompt, p.styles)]
 
     print("SuperMerger: Start Image Generation")
+    global orig_reload_model_weights
+
     if forge or reforge:
-        global orig_reload_model_weights
         orig_reload_model_weights = sd_models.reload_model_weights
         sd_models.reload_model_weights = reload_model_weights
 
         processed:Processed = processing.process_images(p)
 
         sd_models.reload_model_weights = orig_reload_model_weights
+    elif neo:
+        with patch.object(processing.sd_models, 'forge_model_reload', reload_model_weights), patch.object(processing, 'forge_model_reload', reload_model_weights):
+            processed: Processed = processing.process_images(p)
     else:
         processed:Processed = processing.process_images(p)
 
@@ -1630,7 +1637,8 @@ def resetclip(theta):
 def cachedealer(start):
     if start:
         global orig_cache
-        orig_cache = shared.opts.sd_checkpoint_cache
+        if not neo:
+            orig_cache = shared.opts.sd_checkpoint_cache
         shared.opts.sd_checkpoint_cache = 0
     else:
         shared.opts.sd_checkpoint_cache = orig_cache
@@ -1640,7 +1648,7 @@ def clearcache(model_c):
     del modelcache
     modelcache = {}
     
-    if forge:
+    if forge or neo:
         unload_forge()
         unload_forge()
         from modules.sd_models import forge_model_reload, model_data
@@ -1697,12 +1705,14 @@ def casterr(*args,hear=hear):
 def model_loader(checkpoint_info, state_dict,metadata, currentmodel): 
     if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
 
-    if not forge:
+    if neo:
         sd_models.model_data.__init__()
-        load_model(checkpoint_info, already_loaded_state_dict=state_dict)
+        load_forge_model(state_dict,checkpoint_info)
+    elif not forge:
+        sd_models.model_data.__init__()
+        sd_models.load_model(checkpoint_info, already_loaded_state_dict=state_dict)
     else:
         memory_management.free_memory(1e30,torch.device("cpu"))
-        
         load_forge_model(state_dict,checkpoint_info)
     print("SuperMerger: Merged Model Loaded.")
 
@@ -1716,12 +1726,12 @@ def unload_forge():
     gc.collect()
 
 def reload_model_weights(info=None):
-    pass
+    return sd_models.model_data.sd_model, False
 
 orig_reload_model_weights = None
 
 
-if forge:
+if forge or neo:
     from modules import sd_models as fsd
     from modules.timer import Timer
     from backend import loader as fld

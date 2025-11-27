@@ -16,9 +16,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pprint import pprint
 import gradio as gr
-from modules import (script_callbacks, sd_models,sd_vae, shared)
+from modules import script_callbacks, sd_models,sd_vae, shared, sd_models
 from modules.scripts import basedir
-from modules.sd_models import checkpoints_loaded, load_model,unload_model_weights
 from modules.shared import opts
 from modules.ui_components import ResizeHandleRow
 from modules.sd_samplers import samplers
@@ -29,6 +28,13 @@ import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG,EXCLUDE_CHOICES, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
 from scripts.mergers.xyplot import freezetime, nulister
 from scripts.mergers.model_util import filenamecutter, savemodel
+
+if hasattr(sd_models, "checkpoints_loaded"):
+    checkpoints_loaded = sd_models.checkpoints_loaded
+    load_model = sd_models.load_model
+else:
+    checkpoints_loaded = sd_models.checkpoints_list
+    load_model = None
 
 path_root = basedir()
 xyzpath = os.path.join(path_root,"xyzpresets.json")
@@ -616,7 +622,7 @@ def on_ui_tabs():
 
         def unload():
             if shared.sd_model == None: return "already unloaded"
-            load_model,unload_model_weights()
+            sd_models.unload_model_weights()
             return "model unloaded"
 
         unloadmodel.click(fn=unload,outputs=[components.submit_result])

@@ -1,16 +1,13 @@
 import random
 import gc
 import re
-from tracemalloc import Statistic
 import cv2
 import numpy as np
 import os
 import copy
 import csv
-import textwrap
-from PIL import Image, ImageFont, ImageDraw, ImageColor, PngImagePlugin
+from PIL import Image, ImageDraw, ImageColor
 from modules import images, sd_models, devices
-from modules.sd_models import load_model
 from modules.shared import opts
 from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,BLOCKID,BLOCKIDXLL,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font,model_loader,rwmergelog
 from scripts.mergers.model_util import savemodel

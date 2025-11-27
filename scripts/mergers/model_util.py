@@ -3,7 +3,6 @@ import torch
 import safetensors.torch
 import threading
 from modules import shared, sd_hijack, sd_models
-from modules.sd_models import load_model
 import json
 
 try:
@@ -143,6 +142,7 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
         for key in other_dict.keys():
             state_dict[key] = other_dict[key]
         del other_dict
+        from modules.sd_models import load_model
         load_model(checkpoint_info, already_loaded_state_dict=state_dict)
     return "Merged model saved in "+fname
 
