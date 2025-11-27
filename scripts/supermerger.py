@@ -2,16 +2,18 @@ import gc
 import os
 import os.path
 import re
+from PIL import Image
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import json
 import shutil
 from tqdm import tqdm
-from functools import wraps
 import torch
 from statistics import mean
 import csv
 import torch.nn as nn
 import torch.nn.functional as F
-from importlib import reload
 from pprint import pprint
 import gradio as gr
 from modules import (script_callbacks, sd_models,sd_vae, shared)
@@ -21,14 +23,7 @@ from modules.shared import opts
 from modules.ui_components import ResizeHandleRow
 from modules.sd_samplers import samplers
 from modules.ui import create_output_panel, create_refresh_button
-import scripts.mergers.mergers
-import scripts.mergers.pluslora
-import scripts.mergers.xyplot
 import scripts.mergers.components as components
-from importlib import reload
-reload(scripts.mergers.mergers)
-reload(scripts.mergers.xyplot)
-reload(scripts.mergers.pluslora)
 import csv
 import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG,EXCLUDE_CHOICES, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
@@ -304,7 +299,7 @@ def on_ui_tabs():
 
                     with gr.Accordion("Elemental Merge",open = False):
                         with gr.Row():
-                            components.esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                            dsettings = gr.CheckboxGroup(label = "settings",choices=["print change", "use extended XL"],type="value",interactive=True)
                         with gr.Row():
                             deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
 
@@ -340,9 +335,9 @@ def on_ui_tabs():
                         with gr.Row():
                             gr.HTML(value="<p>R:0~1, U: -0.5~1.5</p>")
                         with gr.Row():
-                            luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "ER", "EU", "EX","custom"], value = "off") 
+                            luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "D", "ER", "EU", "EX","custom"], value = "off") 
                         with gr.Row():
-                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta","save E-list"],value=["alpha"],type="value",interactive=True)
+                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta","save E-list", "extend XL"],value=["alpha"],type="value",interactive=True)
                         with gr.Row():
                             luckseed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed for Random Ratio', value=-1, elem_id="luckseed")
                             luckround = gr.Number(minimum=1, maximum=4294967295, step=1, label='Round', value=3, elem_id="luckround")
@@ -350,9 +345,17 @@ def on_ui_tabs():
                         with gr.Row():  
                             luckcustom = gr.Textbox(label="custom",value = "U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R")
                         with gr.Row():  
-                            lucklimits_u = gr.Textbox(label="Upper limit for X",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+                            lucklimits_u = gr.Textbox(label="Upper limit for X, mid point of D",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
                         with gr.Row(): 
-                            lucklimits_l = gr.Textbox(label="Lower limit for X",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+                            read_from_mbw= gr.Button(value="Load from Weight:",elem_classes=["compact_button"],variant='primary')
+                            read_from_id = gr.Button(value="Load from ID:",elem_classes=["compact_button"],variant='primary')
+                            mergeid_dice = gr.Textbox(label="merged model ID (-1 for last)", elem_id="model_converter_custom_name",value = "-1")
+                        with gr.Row(): 
+                            lucklimits_l = gr.Textbox(label="Lower limit for X, range of D",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+                        with gr.Row():  
+                            lucklimits_u_d = gr.Textbox(label="Upper limit for X, D",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+                        with gr.Row(): 
+                            lucklimits_l_d = gr.Textbox(label="Lower limit for X, D",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
                         components.rand_merge = gr.Button(elem_id="runrandmerge", value="Run Rand",variant='primary')
 
                     with gr.Accordion("Generation Parameters",open = False):
@@ -485,6 +488,118 @@ def on_ui_tabs():
                 with gr.Row():
                     metadata = gr.TextArea()
 
+        # 指定IDから比率を抽出して解析
+        def analyze_ids(id_text):
+            ids = [int(x.strip()) for x in id_text.split(",") if x.strip().isdigit()]
+            wlen = 0
+            label = None
+
+            ratios = []
+            for id in ids:
+                r = reversparams(id, readweight=True)
+                if r is not None:
+                    r = r.split(",")
+                    if wlen == 0:
+                        wlen = len(r)
+                        for bid in BLOCKIDS:
+                            if len(bid) == wlen:
+                                label = bid
+                    if len(r) != wlen:
+                        return "Weight length mismatch!"
+                    ratios.append(r)
+    
+            ratios_matrix = np.array(ratios)
+
+            ratios_matrix = ratios_matrix.astype(float)
+
+            mean_ratios = np.mean(ratios_matrix, axis=0)
+            std_ratios = np.std(ratios_matrix, axis=0)
+
+            def plot_bar_with_std_band(mean_ratios, std_ratios, layer_names):
+                import matplotlib.pyplot as plt
+                import numpy as np
+
+                fig, ax = plt.subplots(figsize=(14, 5))
+                x = np.arange(len(mean_ratios))
+
+                # ±1σ の帯を棒で描く
+                for xi, mu, sigma in zip(x, mean_ratios, std_ratios):
+                    bottom = mu - sigma
+                    height = sigma * 2
+                    ax.bar(xi, height, bottom=bottom, width=0.8, color='yellow', alpha=0.7, edgecolor='black')
+                    ax.plot(xi, mu, 'ko', markersize=3)  # 平均点
+
+                ax.set_title("マージ比率の平均 ± 標準偏差（±1σ）")
+                ax.set_xlabel("層名")
+                ax.set_ylabel("alpha 値")
+
+                # 層名を表示（多いので回転あり）
+                ax.set_xticks(x)
+                ax.set_xticklabels(layer_names, rotation=90, fontsize=6)
+
+                plt.tight_layout()
+                return fig
+
+            # 図を作成
+            if label is None:
+                label = [""] * wlen
+            fig = plot_bar_with_std_band(mean_ratios, std_ratios, label)
+
+            # カンマ区切りテキスト
+            mean_str = ",".join(f"{v:.3f}" for v in mean_ratios)
+            std_str = ",".join(f"{v:.3f}" for v in std_ratios)
+            std_str2 = ",".join(f"{v*2:.3f}" for v in std_ratios)
+            std_str3 = ",".join(f"{v*3:.3f}" for v in std_ratios)
+
+            # 結果テキスト
+            result_text = (
+                f"有効なID数: {len(ids)}\n"
+                f"\n平均α:\n{mean_str}\n"
+                f"\n標準偏差:\n{std_str}"
+                f"\n標準偏差x2:\n{std_str2}"
+                f"\n標準偏差x3:\n{std_str3}"
+            )
+
+            return result_text, fig
+
+        # Gradio UI
+        with gr.Tab("Weight Analysis", elem_id="tab_w_ana"):
+            with gr.Blocks() as demo:
+                gr.Markdown("## 🔍 Stable Diffusion XL - Merge Ratio Analysis Tool（マージ比率解析ツール）")
+                gr.Markdown(
+                    """
+                    Enter one or more Merge IDs separated by commas to analyze and compare their weight ratios.  
+                    カンマ区切りで複数のマージIDを入力すると、それぞれの比率を比較して解析できます。
+                    """
+                )
+                id_input = gr.Textbox(label="Target Merge ID(s)（対象のマージID）", placeholder="例: merge_001, merge_002")
+                analyze_btn = gr.Button("Analyze（解析する）")
+                result_text = gr.Textbox(label="Result Summary（結果概要）")
+                graph_output = gr.Plot(label="Ratio Graph（比率グラフ）")
+
+                analyze_btn.click(
+                    analyze_ids,
+                    inputs=[id_input],
+                    outputs=[result_text, graph_output]
+                )
+
+
+        with gr.Tab("IDs from images", elem_id="ids"):
+            # Gradioインターフェースの作成
+            with gr.Blocks() as demo:
+                gr.Markdown("# Merge IDs from images, drag and drop multiple images")
+                
+                with gr.Row():
+                    image_input = gr.File(
+                        file_count="multiple", 
+                        file_types=["png"], 
+                        label="PNGファイルをここにドラッグ＆ドロップ"
+                    )
+                    
+                output_textbox = gr.Textbox(label="抽出されたPNG Info（配列形式）")
+
+                # ファイルがアップロードされたら関数を実行
+
         smd_loadmetadata.click(
             fn=loadmetadata,
             inputs=[meta_model_a],
@@ -509,12 +624,12 @@ def on_ui_tabs():
         load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
         reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
 
-        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,finetune,bake_in_vae,opt_value,inex,ex_blocks,ex_elems]
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,dsettings,finetune,bake_in_vae,opt_value,inex,ex_blocks,ex_elems]
         components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
         components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
         components.hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
-        components.lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,luckseed,luckserial,luckcustom,luckround]
+        components.lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,lucklimits_u_d,lucklimits_l_d,luckseed,luckserial,luckcustom,luckround]
 
         setdefault.click(fn = configdealer,
             inputs =[*components.genparams,*components.hiresfix[1:],components.dfalse],
@@ -531,6 +646,8 @@ def on_ui_tabs():
             outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune,opt_value,inex,ex_blocks,ex_elems]
         )
 
+        read_from_id.click(reversparams,[mergeid_dice,components.dtrue],lucklimits_u)
+        read_from_mbw.click(lambda x: x,weights_a,lucklimits_u)
         search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
 
         s_reloadreserve.click(fn=nulister,inputs=[components.dfalse],outputs=[components.numaframe])
@@ -817,6 +934,32 @@ def on_ui_tabs():
         deletexyzpreset_b.click(fn=deletexyzpreset_f,inputs=[xyzpresets],outputs=[xyzpresets])
         refreshxyzpresets_b.click(fn=refreshxyzpresets_f,outputs=[xyzpresets])
 
+        def process_images(files):
+            all_ids = []
+
+            for file in files:
+                try:
+                    img = Image.open(file.name)
+                    info_text = img.info.get('parameters', '')
+
+                    if info_text:
+                        # カンマで分割し、前後の空白を削除
+                        id = [item.strip() for item in info_text.split(' ID ')][-1]
+                        id = [item.strip() for item in id.split(',')][0]
+                        if id not in all_ids:
+                            all_ids.append(id)
+                    else:
+                        # 'parameters'キーがない場合や、情報が空の場合
+                        all_ids.append(["[この画像には指定のPNG Infoがありませんでした]"])
+
+                except Exception as e:
+                    # ファイルがPNGでない場合などのエラー処理
+                    all_ids.append([f"[エラー: {e}]"])
+                    
+            return ",".join(all_ids), None
+        
+        image_input.upload(fn=process_images, inputs=image_input, outputs=[output_textbox,image_input])
+
     return (supermergerui, "SuperMerger", "supermerger"),
 
 msearch = []
@@ -885,7 +1028,7 @@ def searchhistory(words,searchmode):
 #13  deep,14 calcmode,15 luckseed 16:opt_value 17 include/exclude 18: exclude_blocks, 19: exclude_elements
 MSETSNUM = 20
 
-def reversparams(id):
+def reversparams(id, only_w = False, readweight = False):
     def selectfromhash(hash):
         for model in sd_models.checkpoints_list.values():
             if str(hash) == str(model.shorthash):
@@ -893,7 +1036,8 @@ def reversparams(id):
         return ""
     try:
         idsets = rwmergelog(id = id)
-    except:
+    except Exception as e:
+        print(e)
         return [gr.update(value = "ERROR: history file could not open"),*[gr.update() for x in range(MSETSNUM)]]
     if type(idsets) == str:
         print("ERROR")
@@ -920,7 +1064,14 @@ def reversparams(id):
     mgs[17] = "Off" if mgs[17] == "" else mgs[17]
     mgs[18] = cutter(mgs[18])
     mgs[18] = [x for x in mgs[18] if x in EXCLUDE_CHOICES + ["print"]]
-    return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:MSETSNUM]]]
+    
+    if readweight:
+        return mgs[0]
+    
+    if only_w:
+        return gr.update(value = mgs[0])
+    else:
+        return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:MSETSNUM]]]
 
 def add_to_seq(seq,maker):
     return gr.Textbox.update(value = maker if seq=="" else seq+"\r\n"+maker)
@@ -1048,7 +1199,9 @@ def find_preset_by_name(presets, preset):
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
 BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
 BLOCKIDXLL=['BASE', 'IN00', 'IN01', 'IN02', 'IN03', 'IN04', 'IN05', 'IN06', 'IN07', 'IN08', 'M00', 'OUT00', 'OUT01', 'OUT02', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'VAE']
+BLOCKIDXLLL = ["CLIPL","CLIPG","IN0","IN00","IN10","IN20","IN30","IN40","IN41","IN410","IN411","IN50","IN51", "IN510","IN511","IN60","IN70","IN71","IN710","IN711","IN712","IN713","IN714", "IN715","IN716","IN717","IN718","IN719","IN80","IN81","IN810","IN811","IN812","IN813","IN814", "IN815","IN816","IN817","IN818","IN819","MID00","MID10","MID100","MID101","MID102","MID103", "MID104","MID105","MID106","MID107","MID108","MID109","MID20","OUT00","OUT01","OUT010","OUT011", "OUT012","OUT013","OUT014","OUT015","OUT016","OUT017","OUT018","OUT019","OUT10", "OUT11","OUT110","OUT111","OUT112","OUT113","OUT114","OUT115","OUT116","OUT117","OUT118","OUT119", "OUT20","OUT21","OUT210","OUT211","OUT212","OUT213","OUT214","OUT215","OUT216", "OUT217","OUT218","OUT219","OUT22","OUT30","OUT31","OUT310","OUT311","OUT40","OUT41","OUT410", "OUT411","OUT50","OUT51","OUT510","OUT511","OUT52","OUT60","OUT70","OUT80","OUT9", "TIME","LABEL", "VAE"]
 ISXLBLOCK=[True,  True,  True,  True,  True,  True,  True,  True,  True,  True, False, False, False, True,   True,   True,   True,   True,   True,   True,   True,   True,   True,  False,  False,  False]
+BLOCKIDS = [BLOCKID,BLOCKIDXL,BLOCKIDXLL,BLOCKIDXLLL]
 
 def modeltype(sd):
     if "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.weight" in sd.keys():

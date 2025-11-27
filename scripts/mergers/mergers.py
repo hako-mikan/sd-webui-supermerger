@@ -46,17 +46,15 @@ except:
     ui_version = 100
 
 try:
+    from modules import launch_utils
+    forge = launch_utils.git_tag()[0:2] == "f2"
+    reforge = launch_utils.git_tag()[0:2] == "f1" or launch_utils.git_tag() == "classic"
+except:
+    forge = reforge = False
+
+if forge:
     from backend import memory_management
     from backend.utils import load_torch_file
-    forge = True
-    reforge = False
-except:
-    try:
-        from modules.ui import versions_html
-        reforge = "reForge" in versions_html()
-        forge = False
-    except:
-        forge = reforge = False
 
 revert_target = ""
 orig_cache = 0
@@ -85,11 +83,11 @@ mergedmodel=[]
 FINETUNEX = ["IN","OUT","OUT2","CONT","BRI","COL1","COL2","COL3"]
 TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed",
                     "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)",
-                    "include blocks", "exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)",
-                    "calcmode","prompt","random"]
+                    "include blocks", "exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element","pinpoint element ext","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)",
+                    "calcmode","prompt","prompt2","prompt3","random","merge ID"]
 TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta",
-                "model_A","model_B","model_C","pinpoint blocks","include blocks","exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element",
-                "effective","adjust","pinpoint adjust","calcmode","prompt","random"]
+                "model_A","model_B","model_C","pinpoint blocks","include blocks","exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element","pinpoint element ext",
+                "effective","adjust","pinpoint adjust","calcmode","prompt","prompt2","prompt3","random","merge ID"]
 MODES=["Weight" ,"Add" ,"Triple","Twice"]
 SAVEMODES=["save model", "overwrite"]
 EXCLUDE_CHOICES = ["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11",
@@ -110,22 +108,21 @@ informer = sd_models.get_closet_checkpoint_match
 #msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
 
 def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
-                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,
-                       esettings,
+                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,dsettings,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,
                        s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                        genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-                       lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
+                       lmode,lsets,llimits_u,llimits_l,llimits_u_d,llimits_l_d,lseed,lserial,lcustom,lround,
                        currentmodel,imggen,
                        *txt2imgparams):
 
-    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
-    deepprint  = "print change" in esettings
+    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"uppd":llimits_u_d,"lowd":llimits_l_d,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
+    print(dsettings)
 
     cachedealer(True)
 
     result,currentmodel,modelid,theta_0,metadata = smerge(
                         weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,deepprint,lucks
+                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,dsettings,lucks
                         )
 
     if "ERROR" in result or "STOPPED" in result: 
@@ -207,8 +204,9 @@ NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
 BLOCKIDXLL=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","VAE"]
 BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
+BLOCKIDXLLL=["CLIPL","CLIPG","IN0","IN00","IN10","IN20","IN30","IN40","IN41","IN410","IN411","IN50","IN51","IN510","IN511","IN60","IN70","IN71","IN710","IN711","IN712","IN713","IN714","IN715","IN716","IN717","IN718","IN719","IN80","IN81","IN810","IN811","IN812","IN813","IN814","IN815","IN816","IN817","IN818","IN819","MID00","MID10","MID100","MID101","MID102","MID103","MID104","MID105","MID106","MID107","MID108","MID109","MID20","OUT00","OUT01","OUT010","OUT011","OUT012","OUT013","OUT014","OUT015","OUT016","OUT017","OUT018","OUT019","OUT10","OUT11","OUT110","OUT111","OUT112","OUT113","OUT114","OUT115","OUT116","OUT117","OUT118","OUT119","OUT20","OUT21","OUT210","OUT211","OUT212","OUT213","OUT214","OUT215","OUT216","OUT217","OUT218","OUT219","OUT22","OUT30","OUT31","OUT310","OUT311","OUT40","OUT41","OUT410","OUT411","OUT50","OUT51","OUT510","OUT511","OUT52","OUT60","OUT70","OUT80","OUT9","TIME","LABEL", "VAE"]
+BLOCKIDXLLS=["BASE", "BASE" ,"IN0","IN00","IN01","IN02","IN03","IN04","IN04","IN04" ,"IN04" ,"IN05","IN05","IN05" ,"IN05" ,"IN06","IN07","IN07","IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN08","IN08","IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"M00"  ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"  ,"M00"  ,"OUT00","OUT00","OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT01","OUT01","OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT02","OUT02","OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02","OUT03","OUT03","OUT03" ,"OUT03" ,"OUT04","OUT04","OUT04" ,"OUT04" ,"OUT05","OUT05","OUT05" ,"OUT05","OUT05","OUT06","OUT07","OUT08","OUT08", "Not Merge", "Not Merge", "VAE"]
 BLOCKIDFLUX = ["CLIP", "T5", "IN"] + ["D{:002}".format(x) for x in range(19)] + ["S{:002}".format(x) for x in range(38)] + ["OUT"] # Len: 61
-
 RANDMAP = [0,50,100] #alpha,beta,elements
 
 statistics = {"sum":{},"mean":{},"max":{},"min":{}}
@@ -217,7 +215,7 @@ statistics = {"sum":{},"mean":{},"max":{},"min":{}}
 ##### Main Merging Code
 
 def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,deepprint,lucks,main = [False,False,False]):
+                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,esettings,lucks,main = [False,False,False]):
 
     caster("merge start",hearm)
     theta_0 = theta_1 = theta_2 = None
@@ -225,9 +223,14 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     global hear,mergedmodel,stopmerge,statistics, revert_target
     stopmerge = False
     
+    deepprint  = "print change" in esettings
+    print(esettings,"use extended XL" in esettings)
+    
     debug = "debug" in save_sets
     uselerp = "use old calc method" not in save_sets
     device = "cuda" if "use cuda" in save_sets else "cpu"
+    use32 = "use float32" in save_sets
+    to_cpu = "offload" in save_sets
 
     if forge:
         fcinfo = sd_models.get_closet_checkpoint_match(shared.opts.sd_model_checkpoint)
@@ -258,8 +261,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     weights_a,deep = randdealer(weights_a,randomer,0,lucks,deep)
     weights_b,_ = randdealer(weights_b,randomer,1,lucks,None)
 
-    weights_a_orig = weights_a
-    weights_b_orig = weights_b
+    weights_a_orig = weights_a_excluded = weights_a
+    weights_b_orig = weights_b_excluded = weights_b
 
     # preset to weights
     if wpresets != False and useblocks:
@@ -305,18 +308,21 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     ex_elems = ex_elems.split(",")
 
     #for MBW text to list
+    weights_a_excluded = [float(w) for w in weights_a.split(',')] if useblocks else [None] * 110
+    weights_b_excluded = [float(w) for w in weights_b.split(',')] if useblocks and usebeta else [None] * 110
+    
     if useblocks:
         weights_a_t=weights_a.split(',',1)
         weights_b_t=weights_b.split(',',1)
         base_alpha  = float(weights_a_t[0])    
         weights_a = [float(w) for w in weights_a_t[1].split(',')]
         caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
-        if not (len(weights_a) == 25 or len(weights_a) == 19 or len(weights_a) == 60):return f"ERROR: weights alpha value must be 20 or 26 or 61.",*NON4
+        if not (len(weights_a) == 25 or len(weights_a) == 19 or len(weights_a) == 60 or len(weights_a) ==109):return f"ERROR: weights alpha value must be 20 or 26 or 61, or 110.",*NON4
         if usebeta:
             base_beta = float(weights_b_t[0]) 
             weights_b = [float(w) for w in weights_b_t[1].split(',')]
             caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
-            if not(len(weights_b) == 25 or len(weights_b) == 19 or len(weights_a) == 60): return f"ERROR: weights beta value must be 20 or 26 or 61.",*NON4
+            if not(len(weights_b) == 25 or len(weights_b) == 19 or len(weights_a) == 60 or len(weights_a) == 109): return f"ERROR: weights beta value must be 20 or 26 or 61, or 110.",*NON4
 
     #model loading start 
     caster("Model loading start",hearm)
@@ -410,15 +416,15 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     key_and_alpha = {}
 
     for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
+        if debug:print(key)
         if stopmerge: return "STOPPED", *NON4
         if (isflux and key not in theta_1) or (not isflux and not ("model" in key and key in theta_1)):continue
         if not ("weight" in key or "bias" in key): continue
         if theta_2 is not None and key not in theta_2: continue
-
-        theta_0[key] = theta_0[key].to(device)
-        theta_1[key] = theta_1[key].to(device)
-        if theta_2 is not None:
-            theta_2[key] = theta_2[key].to(device)
+                
+        if theta_0[key].device.type != device:theta_0[key] = theta_0[key].to(device)
+        if theta_1[key].device.type != device:theta_1[key] = theta_1[key].to(device)
+        if theta_2 is not None and theta_2[key].device.type != device:theta_2[key] = theta_2[key].to(device)
 
         weight_index = -1
         current_alpha = alpha
@@ -430,8 +436,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         assert_inpaint(a, b, key)
 
         block,blocks26 = blockfromkey(key,isxl,isflux)
+        
         #if block == "Not Merge": continue
-        if inex != "Off" and (ex_blocks or (ex_elems != [""])) and excluder(blocks26,inex,ex_blocks,ex_elems,key): continue
+        skip = inex != "Off" and (ex_blocks or (ex_elems != [""])) and excluder(block,blocks26,inex,ex_blocks,ex_elems,key)
         if isflux and blocks26 in BLOCKIDFLUX:
             weight_index = BLOCKIDFLUX.index(blocks26)
         elif isxl and blocks26 in BLOCKIDXLL:
@@ -440,18 +447,42 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             weight_index = BLOCKID.index(blocks26)
         else:
             continue
+        
+        weight_index_xl = BLOCKIDXLLL.index(block)
 
         if useblocks:
-            if weight_index > 0: 
+            if weight_index > 0:
+                if skip:weights_a_excluded[weight_index] = 0
                 current_alpha = weights_a[weight_index - 1] 
+                if len(weights_a) == 109:
+                    if skip:weights_a_excluded[weight_index_xl] = 0
+                    current_alpha = weights_a[weight_index_xl - 1] 
+                
                 if usebeta:
-                    current_beta = weights_b[weight_index - 1] 
+                    if skip:weights_b_excluded[weight_index] = 0
+                    current_beta = weights_b[weight_index - 1]
+                    if len(weights_b) == 109:
+                        if skip:weights_b_excluded[weight_index_xl] = 0
+                        current_alpha = weights_b[weight_index_xl - 1]
+            if weight_index == 0:
+                if len(weights_a) == 109 and weight_index_xl == 1:
+                    if skip:weights_a_excluded[weight_index_xl] = 0
+                    current_alpha = weights_a[weight_index_xl - 1] 
+                if len(weights_b) == 109 and usebeta and weight_index_xl == 1:
+                    if skip:weights_b_excluded[weight_index_xl] = 0
+                    current_alpha = weights_b[weight_index_xl - 1]
+                
+                if skip:weights_a_excluded[0] = 0
+                if skip:weights_b_excluded[0] = 0
+        
+        if skip:continue
 
         if len(deep) > 0:
-            current_alpha = elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha)
+            current_alpha = elementals(key,weight_index,weight_index_xl,deep,randomer,num,lucks,deepprint,current_alpha,len(weights_a) == 109 or "use extended XL" in esettings)
 
         keyratio.append([key,current_alpha, current_beta])
         #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
+        if debug:print(current_alpha,current_beta)
 
         if calcmode == "normal":
             if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
@@ -463,15 +494,24 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             if MODES[1] in mode:#Add
                 caster(f"{num}, {block}, {model_a}+{current_alpha}+*({model_b}-{model_c}),{key}",hear)
                 if uselerp:
-                    theta_0_a = torch.lerp(theta_0_a.to(torch.float32),theta_0_a.to(torch.float32) + current_alpha * theta_1[key].to(torch.float32),1.0).to(theta_0_a.dtype)
+                    if use32:
+                        theta_0_a = torch.lerp(theta_0_a,theta_0_a.to(torch.float32) + current_alpha * theta_1[key].to(torch.float32),1.0).to(theta_0_a.dtype)
+                    else:
+                        theta_0_a = torch.lerp(theta_0_a,theta_0_a + current_alpha * theta_1[key],1.0)
                 else:
-                    theta_0_a = (theta_0_a.to(torch.float32) + current_alpha * theta_1[key].to(torch.float32)).to(theta_0_a.dtype)
-                
+                    if use32:
+                        theta_0_a = (theta_0_a.to(torch.float32) + current_alpha * theta_1[key].to(torch.float32)).to(theta_0_a.dtype)
+                    else:
+                        theta_0_a = (theta_0_a + current_alpha * theta_1[key])
+
             elif MODES[2] in mode:#Triple
                 caster(f"{num}, {block}, {model_a}+{1-current_alpha-current_beta}+{model_b}*{current_alpha}+ {model_c}*{current_beta}",hear)
                 #
                 if uselerp and current_alpha + current_beta != 0:
-                    theta_0_a =lerp(theta_0_a.to(torch.float32),lerp(theta_1[key].to(torch.float32),theta_2[key].to(torch.float32),current_beta/(current_alpha + current_beta)),current_alpha + current_beta).to(theta_0_a.dtype)
+                    if use32:
+                        theta_0_a =lerp(theta_0_a.to(torch.float32),lerp(theta_1[key].to(torch.float32),theta_2[key].to(torch.float32),current_beta/(current_alpha + current_beta)),current_alpha + current_beta).to(theta_0_a.dtype)
+                    else:
+                        theta_0_a =lerp(theta_0_a,lerp(theta_1[key],theta_2[key],current_beta/(current_alpha + current_beta)),current_alpha + current_beta)
                 else:
                     theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key] 
 
@@ -556,7 +596,9 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
             theta_1[key] = None
             del theta_1[key]
 
-        theta_0[key] = theta_0[key].to("cpu")
+        if to_cpu:
+            theta_0[key] = theta_0[key].to("cpu")
+            
         try:
             theta_1[key] = theta_1[key].to("cpu")
         except:
@@ -573,8 +615,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if need_revert:
         prefixer(theta_0, True)
-
-    currentmodel = makemodelname(weights_a,weights_b,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
 
     for key in tqdm(theta_1.keys(), desc="Stage 2/2"):
         if key in CHCKPOINT_DICT_SKIP_ON_MERGE or isflux:
@@ -601,20 +641,27 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 theta_0[theta_0_key] = vae_dict[key]
         vae_dict = None
         del vae_dict
-
-    modelid = rwmergelog(currentmodel,mergedmodel)
+ 
     if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
 
     caster(mergedmodel,False)
     if "Reset CLIP ids" in save_sets: resetclip(theta_0)
+
+    weights_a_excluded = ",".join(str(x) for x in weights_a_excluded if x is not None)
+    weights_b_excluded = ",".join(str(x) for x in weights_b_excluded if x is not None)
+    
+    currentmodel = makemodelname(weights_a_excluded,weights_b_excluded,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
+    modelid = rwmergelog(currentmodel,mergedmodel)
+    
+    overwrite_last_weights(weights_a_excluded,weights_b_excluded)
 
     if True: # always set metadata. savemodel() will check save_sets later
         merge_recipe = {
             "type": "sd-webui-supermerger",
             "weights_alpha": weights_a if useblocks else None,
             "weights_beta": weights_b if useblocks else None,
-            "weights_alpha_orig": weights_a_orig if useblocks else None,
-            "weights_beta_orig": weights_b_orig if useblocks else None,
+            "weights_alpha_orig":weights_a_excluded if useblocks else None,
+            "weights_beta_orig": weights_b_excluded if useblocks else None,
             "model_a": longhashfromname(model_a),
             "model_b": longhashfromname(model_b),
             "model_c": longhashfromname(model_c),
@@ -899,23 +946,22 @@ def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_th
 
 ################################################
 ##### Elementals
-def elementals(key,weight_index,deep,randomer,num,lucks,deepprint,current_alpha):
-    skey = key + BLOCKID[weight_index]
+def elementals(key,weight_index,weight_index_xl,deep,randomer,num,lucks,deepprint,current_alpha,extend):
     for d in deep:
         if d.count(":") != 2 :continue
-        dbs,dws,dr = d.split(":")[0],d.split(":")[1],d.split(":")[2]
-        dbs = blocker(dbs,BLOCKID)
+        dbs,dws,dr = d.split(":")
+        dbs = blocker(dbs,BLOCKIDXLLL if extend else BLOCKID)
         dbs,dws = dbs.split(" "), dws.split(" ")
         dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
         dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
         flag = dbn
         for db in dbs:
-            if db in skey:
+            if db == (BLOCKIDXLLL[weight_index_xl] if extend else BLOCKID[weight_index]):
                 flag = not dbn
-        if flag:flag = dwn
+        if flag or dbs == [""]:flag = dwn
         else:continue
         for dw in dws:
-            if dw in skey:
+            if dw in key:
                 flag = not dwn
         if flag:
             dr = eratiodealer(dr,randomer,weight_index,num,lucks)
@@ -967,13 +1013,13 @@ def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,usebl
 
     if useblocks:
         if MODES[1] in mode:#add
-            currentmodel =f"{model_a} + ({model_b} - {model_c}) x alpha ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)})"
+            currentmodel =f"{model_a} + ({model_b} - {model_c}) x alpha ({str(round(alpha,3))},{weights_a})"
         elif MODES[2] in mode:#triple
-            currentmodel =f"{model_a} x (1-alpha-beta) + {model_b} x alpha + {model_c} x beta (alpha = {str(round(alpha,3))},{','.join(str(s) for s in weights_a)},beta = {beta},{','.join(str(s) for s in weights_b)})"
+            currentmodel =f"{model_a} x (1-alpha-beta) + {model_b} x alpha + {model_c} x beta (alpha = {str(round(alpha,3))},{weights_a},beta = {beta},{weights_b})"
         elif MODES[3] in mode:#twice
-            currentmodel =f"({model_a} x (1-alpha) + {model_b} x alpha)x(1-beta)+  {model_c} x beta ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)})_({str(round(beta,3))},{','.join(str(s) for s in weights_b)})"
+            currentmodel =f"({model_a} x (1-alpha) + {model_b} x alpha)x(1-beta)+  {model_c} x beta ({str(round(alpha,3))},{weights_a})_({str(round(beta,3))},{weights_b})"
         else:
-            currentmodel =f"{model_a} x (1-alpha) + {model_b} x alpha ({str(round(alpha,3))},{','.join(str(s) for s in weights_a)})"
+            currentmodel =f"{model_a} x (1-alpha) + {model_b} x alpha ({str(round(alpha,3))},{weights_a})"
     else:
         if MODES[1] in mode:#add
             currentmodel =f"{model_a} + ({model_b} -  {model_c}) x {str(round(alpha,3))}"
@@ -1033,6 +1079,27 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             out = "ERROR: OUT of ID index"
         return out
 
+def overwrite_last_weights(weights_a, weights_b):
+    filepath = os.path.join(path_root, "mergehistory.csv")
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError("mergehistory.csv not found.")
+
+    with open(filepath, 'r', newline='') as f:
+        reader = list(csv.reader(f))
+
+    if len(reader) <= 1:
+        raise ValueError("No data rows to update in mergehistory.csv.")
+
+    # 最後のデータ行に対して weights を上書き
+    last_row_index = len(reader) - 1
+    reader[last_row_index][3] = str(weights_a)  # "weights alpha"
+    reader[last_row_index][4] = str(weights_b)  # "weights beta"
+
+    # 上書き保存
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(reader)
+
 def saveekeys(keyratio,modelid):
     import csv
     path_root = scripts.basedir()
@@ -1067,6 +1134,9 @@ def draw_origin(grid, text,width,height,width_one):
     color_active = (0, 0, 0)
     fontsize = (width+height)//25
     fnt = get_font(fontsize)
+    
+    if not text:
+        text = " "
 
     if grid.width != width_one:
         while d.multiline_textbbox((0,0), text, font=fnt)[2] > width_one*0.75 and fontsize > 0:
@@ -1126,22 +1196,43 @@ def longhashfromname(name):
 RANCHA = ["R","U","X"]
 
 def randdealer(w:str,randomer,ab,lucks,deep):
-    up,low = lucks["upp"],lucks["low"]
-    up,low = (up.split(","),low.split(","))
+    up,low = (lucks["upp"].split(","),lucks["low"].split(","))
+    upd,lowd = (lucks["uppd"].split(","),lucks["lowd"].split(","))
+    
+    if upd and len(upd) == 1:
+        upd = [upd[0]] * len(up)
+    if lowd and len(lowd) == 1:
+        lowd = [lowd[0]] * len(up)
+        
+    def limitter(ratio,i):
+        ratio = min(ratio, float(upd[i]))
+        ratio = max(ratio, float(lowd[i]))
+        return ratio
+    
     out = []
     outd = {"R":[],"U":[],"X":[]}
     add = RANDMAP[ab]
     for i, r in enumerate (w.split(",")):
         if r.strip() =="R":
-            out.append(str(round(randomer[i+add],lucks["round"])))
+            out.append(str(round(limitter(randomer[i+add],i),lucks["round"])))
         elif r.strip() == "U":
-            out.append(str(round(-2 * randomer[i+add] + 1.5,lucks["round"])))
+            out.append(str(round(limitter(-2 * randomer[i+add] + 1.5,i),lucks["round"])))
         elif r.strip() == "X":
-            out.append(str(round((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),lucks["round"])))
+            if "R" in low[i]:
+                if random.random() > float(low[i].split("R")[1]):
+                    low[i] = 0
+                    up[i] = 0
+                else:
+                    low[i] = low[i].split("R")[0]
+            out.append(str(round(limitter((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),i),lucks["round"])))
         elif "E" in r:
             key = r.strip().replace("E","")
             outd[key].append(BLOCKID[i])
             out.append("0")
+        elif r.strip() == "D":
+            if "R" in low[i]:
+                low[i] = 0 if random.random() > float(low[i].split("R")[1]) else low[i].split("R")[0]
+            out.append(str(round(limitter(float(up[i]) + float(low[i]) * (randomer[i+add] - 0.5),i),lucks["round"])))
         else:
             out.append(r)
     for key in outd.keys():
@@ -1171,7 +1262,8 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
             genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
             mergeinfo,id_sets,modelid,
             *txt2imgparams,
-            debug = False
+            debug = False,
+            batch = False
             ):
     shared.state.begin()
     from scripts.mergers.components import paramsnames
@@ -1278,7 +1370,15 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     p.cached_hr_c = [None, None]
     p.cached_hr_uc = [None, None]
 
-    if type(p.prompt) == list:
+    if batch:
+        prompts = p.prompt.split("\n\n")
+        p.all_prompts = prompts
+        p.prompt = prompts
+        p.batch_size = len(prompts)
+        p.all_seeds = p.seed = [p.seed] * len(prompts)
+        p.subseeds = [p.subseed] * len(prompts)
+        p.negative_prompt = [p.negative_prompt] * len(prompts)
+    elif type(p.prompt) == list:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
     else:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(p.prompt, p.styles)]
@@ -1288,7 +1388,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     else:
         p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(p.negative_prompt, p.styles)]
 
-    print("SuperMerger: Start Image Generation", reforge)
+    print("SuperMerger: Start Image Generation")
     if forge or reforge:
         global orig_reload_model_weights
         orig_reload_model_weights = sd_models.reload_model_weights
@@ -1317,7 +1417,7 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     infotext= ",".join(infotexts)
 
     for i, image in enumerate(processed.images):
-        images.save_image(image, opts.outdir_txt2img_samples, "",p.seed, p.prompt,shared.opts.samples_format, p=p,info=infotext)
+        images.save_image(image, opts.outdir_txt2img_samples, "", p.seed[0] if isinstance(p.seed, list) else p.seed, p.prompt,shared.opts.samples_format, p=p,info=infotext)
 
     if s_batch_size > 1:
         grid = images.image_grid(processed.images, p.batch_size)
@@ -1363,7 +1463,7 @@ def blockfromkey(key,isxl,isflux=False):
         NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
 
         if 'time_embed' in key:
-            weight_index = -2                # before input blocks
+            weight_index = 0                # before input blocks
         elif '.out.' in key:
             weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
         else:
@@ -1404,11 +1504,13 @@ def blockfromkey(key,isxl,isflux=False):
     
     else:
         if not ("weight" in key or "bias" in key):return "Not Merge","Not Merge"
-        if "label_emb" in key or "time_embed" in key: return "Not Merge","Not Merge"
-        if "conditioner.embedders" in key : return "BASE","BASE"
+        if "label_emb" in key:return "LABEL","IN00"
+        if "time_embed" in key:return "TIME","IN00"
+        if "conditioner.embedders.0." in key : return "CLIPL","BASE"
+        if "conditioner.embedders.1." in key : return "CLIPG","BASE"
         if "first_stage_model" in key : return "VAE","BASE"
         if "model.diffusion_model" in key:
-            if "model.diffusion_model.out." in key: return "OUT8","OUT08"
+            if "model.diffusion_model.out." in key: return "OUT9","OUT08"
             block = re.findall(r'input|mid|output', key)
             block = block[0].upper().replace("PUT","") if block else ""
             nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
@@ -1488,18 +1590,22 @@ FINETUNES = [
 
 ################################################
 ##### Include/Exclude
-def excluder(block:str,inex:bool,ex_blocks:list,ex_elems:list, key:str):
+def excluder(block:str, block26:str,inex:bool,ex_blocks:list,ex_elems:list, key:str):
     if ex_blocks == [] and ex_elems == [""]:
         return False
-    out = True if inex == "Include" else False
-    if block in ex_blocks:out = not out
-    if "Adjust" in ex_blocks and key in FINETUNES:out = not out
+    include = True if inex == "Include" else False
+    if block26 in ex_blocks:return ex_returner(include, ex_blocks, block26, key)
+    if block in ex_elems or block in ex_blocks:return ex_returner(include, ex_blocks, block, key)
+    if "Adjust" in ex_blocks and key in FINETUNES:return ex_returner(include, ex_blocks, "Adjust", key)
     for ke in ex_elems:
-        if ke != "" and ke in key:out = not out
-    if "VAE" in ex_blocks and "first_stage_model"in key:out = not out
-    if "print" in ex_blocks and (out ^ (inex == "Include")):
-        print("Include" if inex else "Exclude",block,ex_blocks,ex_elems,key)
-    return out
+        if ke != "" and ke in key:return ex_returner(include, ex_blocks, ke, key)
+    if "VAE" in ex_blocks and "first_stage_model"in key:return ex_returner(include, ex_blocks, "VAE", key)
+    return include
+
+def ex_returner(include, ex_blocks, target, key):
+    if "print" in ex_blocks:
+        print("Include" if include else "Exclude", target, key)
+    return not include
 
 ################################################
 ##### Reset Broken CliP IDs

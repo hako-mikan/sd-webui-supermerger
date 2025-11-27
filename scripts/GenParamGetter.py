@@ -120,13 +120,13 @@ class GenParamGetter(scripts.Script):
             with demo:
                 components.merge.click(
                     fn=smergegen,
-                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dfalse,*components.txt2img_params],
+                    inputs=[*components.msettings,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dfalse,*components.txt2img_params],
                     outputs=[components.submit_result,components.currentmodel]
                 )
 
                 components.mergeandgen.click(
                     fn=smergegen,
-                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dtrue,*components.txt2img_params],
+                    inputs=[*components.msettings,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dtrue,*components.txt2img_params],
                     outputs=[components.submit_result,components.currentmodel,*components.imagegal]
                 )
 
@@ -138,13 +138,13 @@ class GenParamGetter(scripts.Script):
 
                 components.merge2.click(
                     fn=smergegen,
-                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dfalse,*components.txt2img_params],
+                    inputs=[*components.msettings,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dfalse,*components.txt2img_params],
                     outputs=[components.submit_result,components.currentmodel]
                 )
 
                 components.mergeandgen2.click(
                     fn=smergegen,
-                    inputs=[*components.msettings,components.esettings1,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dtrue,*components.txt2img_params],
+                    inputs=[*components.msettings,*components.genparams,*components.hiresfix,*components.lucks,components.currentmodel,components.dtrue,*components.txt2img_params],
                     outputs=[components.submit_result,components.currentmodel,*components.imagegal]
                 )
 

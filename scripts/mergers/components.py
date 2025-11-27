@@ -10,7 +10,6 @@ paramsnames = None
 frompromptf = None
 
 msettings = None
-esettings1 = None
 genparams = None
 hiresfix = None
 lucks = None

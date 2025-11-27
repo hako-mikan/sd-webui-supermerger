@@ -12,7 +12,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageColor, PngImagePlugin
 from modules import images, sd_models, devices
 from modules.sd_models import load_model
 from modules.shared import opts
-from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,BLOCKID,BLOCKIDXLL,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font,model_loader
+from scripts.mergers.mergers import TYPES,FINETUNEX,EXCLUDE_CHOICES,BLOCKID,BLOCKIDXLL,smerge,simggen,filenamecutter,draw_origin,wpreseter,savestatics,cachedealer,get_font,model_loader,rwmergelog
 from scripts.mergers.model_util import savemodel
 from scripts.mergers.bcolors import bcolors
 
@@ -33,10 +33,10 @@ def freezetime():
 
 def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                     weights_a,weights_b,model_a,model_b,model_c,alpha,beta,mode,calcmode,
-                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,optv,inex,ex_blocks,ex_elems,
+                    useblocks,custom_name,save_sets,id_sets,wpresets,deep,dsettings,fine,bake_in_vae,optv,inex,ex_blocks,ex_elems,
                     s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
                     genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-                    lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,lround,
+                    lmode,lsets,llimits_u,llimits_l,llimits_u_d,llimits_l_d,lseed,lserial,lcustom,lround,
                     *txt2imgparams):
 
     cachedealer(True)
@@ -52,9 +52,9 @@ def numanager(startmode,xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         if lserial > 0 : lseed = -1
         useblocks = True
     if RAND in startmode or TYPES.index(RAND) in [xtype,ytype,ztype]:
-        xtype,xmen,ytype,ymen,weights_a,weights_b = crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,startmode)
+        xtype,xmen,ytype,ymen,weights_a,weights_b,llimits_u,llimits_l = crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,ytype,ymen,weights_a,weights_b,startmode)
 
-    lucks = {"on":startmode == RAND, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
+    lucks = {"on":startmode == RAND, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"uppd":llimits_u_d,"lowd":llimits_l_d,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
     gensets_s = [s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale]
 
     allsets = [xtype,xmen,ytype,ymen,ztype,zmen,esettings,
@@ -190,7 +190,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     xs=ys=ys=0
     weights_a_in=weights_b_in="0"
 
-    deepprint  = True if "print change" in esettings else False
+    deepprint  = ["print change"] if "print change" in esettings else []
+    if "pinpoint element ext" in XYZ:
+        deepprint.append("use extended XL")
 
     def castall(hear):
         if hear :print(f"xmen:{xmen}, ymen:{ymen},zmen:{zmen}, xtype:{xtype}, ytype:{ytype}, ztype:{ztype}\
@@ -238,7 +240,11 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     #adjust parameters, alpha,beta,models,seed: list of single parameters, mbw(no beta):list of text,mbw(usebeta); list of pair text
     def adjuster(wmen,wtype,awtype,bwtype):
-        if "mbw" in wtype or "prompt" in wtype or "adjust" == wtype:#men separated by newline
+        if "prompt3" in wtype:
+            ws = [wmen]
+        elif "prompt2" in wtype:
+            ws = wmen.split("\n\n")
+        elif "mbw" in wtype or "prompt" in wtype or "adjust" == wtype:#men separated by newline
             ws = wmen.splitlines()
             caster(ws,hear)
             if "mbw alpha and beta" in wtype:
@@ -247,7 +253,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
         elif "elemental" in wtype:
             ws = wmen.split("\n\n")
         elif RAND in wtype:
-            ws = [""] * int(wmen)
+            ws = [str(random.randrange(4294967294)) for i in range(int(wmen))]
         else:
             if "pinpoint element" in wtype:
                 wmen = wmen.replace("\n",",")
@@ -341,7 +347,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
     def xydealer(w,wt,awt,bwt):
         wta = awt + bwt
-        nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,fine,inex,ex_blocks
+        nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,calcmode,fine,inex,ex_blocks,lucks
         if "prompt" in wt:
             gensets[1] = w
             return
@@ -377,9 +383,40 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
             else:
                 inex = wt.split(" ")[0].capitalize()
                 ex_blocks = excluder(w)
+        if RAND in wt and not lucks["on"]:lucks["seed"] = w
+        
+    def merge_ID_dealer(id):
+        nonlocal alpha,beta,gensets,weights_a_in,weights_b_in,model_a,model_b,model_c,deep,mode,calcmode,useblocks,fine,inex,ex_blocks,lucks
+        try:
+            idsets = rwmergelog(id = id)
+        except Exception as e:
+            print(e)
+        mgs = idsets[3:]
+        weights_a_in = mgs[0] 
+        weights_b_in = mgs[1] 
+        def cutter(text):
+            text = text.replace("[","").replace("]","").replace("'", "") 
+            return [x.strip() for x in text.split(",") if x != ""]
+        def selectfromhash(hash):
+            for model in sd_models.checkpoints_list.values():
+                if str(hash) == str(model.shorthash):
+                    return model.name
+            return ""        
+        model_a = selectfromhash(mgs[2])
+        model_b = selectfromhash(mgs[3])
+        model_c = selectfromhash(mgs[4])
+        alpha = mgs[5]
+        beta = mgs[6]
+        mode = mgs[7].split(":")[0]
+        useblocks = mgs[8] =="True"
+        calcmode = mgs[13]
+        ex_blocks = cutter(mgs[17])
     
     def elementdealer(xyzval,xyztype):
-        t = "pinpoint element" if "pinpoint element" in xyztype else "effective"
+        if not "pinpoint element ext" in xyztype:
+            t = "pinpoint element" if "pinpoint element" in xyztype else "effective"
+        else:
+            t = "pinpoint element ext"
         return str(xyzval[xyztype.index(t)]) + ":" + str(xyzval[xyztype.index("alpha")])
 
     def finedealer(fine,xyzval: list,xyztype: list):
@@ -395,17 +432,23 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
     stocker = Stocker()
     for z in zs:
         ycount = 0
-        xyimage = []
+        xyimage = [[]]
         xydealer(z,ztype,xtype,ytype)
+        if ztype == "merge ID":
+            merge_ID_dealer(z)
         for y in ys:
             deep = deep_ori
             xydealer(y,ytype,xtype,ztype)
             xcount = 0
+            if ytype == "merge ID":
+                merge_ID_dealer(y)
             for x in xs:
                 deepy = deep
                 xyzv= [x,y,z]
                 xyzt = [xtype,ytype,ztype]
                 xydealer(x,xtype,ytype,ztype)
+                if xtype == "merge ID":
+                    merge_ID_dealer(x)
                 if pinpoint and "alpha" in XYZ:
                     weights_a_in = weightsdealer(xyzv,xyzt,weights_a,"alpha")
                     weights_b_in = weights_b
@@ -424,9 +467,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
 
                 print(f"{bcolors.OKGREEN}XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount}){bcolors.ENDC}")
                 
-                if "stock" in esettings: stocker.check_alpha(useblocks,alpha,weights_a_in,calcmode)
+                if "stock" in esettings: stocker.check_alpha(useblocks,alpha,weights_a_in,calcmode, "element" in ",".join(xyzt), x)
 
-                if (((xtype=="seed") or (xtype=="prompt")) and xcount > 0) or (stocker.now and stocker.stock is not None):
+                if (((xtype=="seed") or (xtype=="prompt") or (xtype=="prompt2") or (xtype=="prompt3")) and xcount > 0) or (stocker.now and stocker.stock is not None):
                     print(f"{bcolors.WARNING}Merge is skipped{bcolors.ENDC}")
                 else:
                     _, currentmodel,modelid,theta_0, metadata =smerge(weights_a_in,weights_b_in, model_a,model_b,model_c, float(alpha),float(beta),mode,calcmode,
@@ -441,24 +484,30 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 del theta_0
 
                 if xcount == 0: statid = modelid
-
+                
+                print(f"{bcolors.OKGREEN}XY plot: X: {xtype}, {str(x)}, Y: {ytype}, {str(y)}, Z: {ztype}, {str(z)} ({len(xs)*len(ys)*zcount + ycount*len(xs) +xcount +1}/{allcount}){bcolors.ENDC}")
+                
                 if stocker.now and stocker.stock is not None:
                     image_temp = stocker.stock
                     print("Stocked image used")
                 else:
-                    image_temp = simggen(*gensets_s,currentmodel,id_sets,modelid,*gensets)
+                    image_temp = simggen(*gensets_s,currentmodel,id_sets,modelid,*gensets, batch= xtype == "prompt3")
                     if stocker.now and stocker.stock is None:
                         stocker.stock = image_temp
 
                 gc.collect()
                 devices.torch_gc()
-
-                for i, image_t in enumerate(image_temp[0]):
-                    if len(xyimage) <= i:
-                        xyimage.append([])
-
-                    xyimage[i].append(image_t)
-
+                
+                if xtype == "prompt3":
+                    print("len(xyimage[0]), len(image_temp[0])", len(xyimage[0]), len(image_temp[0]))
+                    xyimage[0].extend(image_temp[0])
+                    
+                else:
+                    for i, image_t in enumerate(image_temp[0]):
+                        if len(xyimage) < i + 1:
+                            xyimage.append([])
+                        xyimage[i].append(image_t)  
+                        
                 xcount+=1
                 deep = deepy
                 if state_mergen:
@@ -493,6 +542,10 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 xyimage[i], xs_t, ys_t = effectivechecker(xyimage[i], xs_t, ys_t, model_a, model_b, esettings)
 
         output = []
+        
+        if xtype == "prompt3":
+            xs_t = xs_t[0].split("\n\n")
+                    
         if not "grid" in esettings:
             if "swap XY" in esettings:
                 for i in range(len(xyimage)):
@@ -503,12 +556,15 @@ def sgenxyplot(xtype,xmen,ytype,ymen,ztype,zmen,esettings,
                 output.append(smakegrid(xy,xs_t,ys_t,gridmodel,image_temp[4]))
         else:
             for xy in xyimage:
+                if len(xy) > 100:
+                    xy = xy[:100]
                 output.extend(xy)
 
         if savestat: savestatics(statid)
 
         zcount+=1
         xyzimage.extend(output)
+
         if flag: break
 
     state_mergen = False
@@ -719,19 +775,28 @@ def crazyslot(lmode,lsets,llimits_u,llimits_l,lseed,lserial,lcustom,xtype,xmen,y
             xtype = TYPES.index(RAND)
             xmen = lserial
 
+    if "," not in llimits_u:
+        llimits_u = ",".join([llimits_u] * (110 if "extend XL" in lsets else 26))
+        
+    if "," not in llimits_l:
+        llimits_l = ",".join([llimits_l] * (110 if "extend XL" in lsets else 26))
+
+    if "," not in lcustom:
+        lcustom = ",".join([lcustom] * (110 if "extend XL" in lsets else 26))
+
     if "alpha" in lsets:
         if "custom" in lmode:
             weights_a = lcustom
         else:
-            weights_a = ",".join([lmode]*26)
+            weights_a = ",".join([lmode]*110) if "extend XL" in lsets else ",".join([lmode]*26)
 
     if "beta" in lsets:
         if "custom" in lmode:
             weights_b = lcustom
         else:
-            weights_b = ",".join([lmode]*26)
+            weights_b = ",".join([lmode]*110) if "extend XL" in lsets else ",".join([lmode]*26)
 
-    return xtype,xmen,ytype,ymen,weights_a,weights_b
+    return xtype,xmen,ytype,ymen,weights_a,weights_b,llimits_u,llimits_l
 
 def alldealer(mens,types):
     for i, men in enumerate(mens):
@@ -851,11 +916,16 @@ class Stocker:
         self.stock = None
         self.now = False
 
-    def check_alpha(self,useblocks, alpha,weights_a_in,calcmode):
-        now = False
+    def check_alpha(self,useblocks, alpha,weights_a_in,calcmode, elemental, x):
+        self.now = False
+        print(useblocks, alpha,weights_a_in,calcmode, elemental, x)
         if "cosine" not in calcmode:
-            if useblocks:
-                if re.fullmatch(r"^(0,)+$", weights_a_in): now = True
+            if elemental:
+                if float(x) == 0:
+                    self.now = True
+                else:
+                    self.now = False
+            elif useblocks:
+                if re.fullmatch(r"^(0,)+$", weights_a_in): self.now = True
             else:
-                if float(alpha) == 0: now = True
-        self.now = now
+                if float(alpha) == 0: self.now = True
