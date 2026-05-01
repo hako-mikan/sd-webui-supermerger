@@ -22,8 +22,19 @@ from modules import shared, devices, sd_models, errors, scripts, launch_utils
 try:
     from modules import sd_hijack
 except ImportError:
+    # Forge NEO removed sd_hijack; provide minimal interface SuperMerger expects
+    class _DummyModelHijack:
+        def __init__(self):
+            self.comments = []
+            self.embedding_db = None
+    
     class _DummyHijack:
-        def __getattr__(self, _): return None
+        def __init__(self):
+            self.model_hijack = _DummyModelHijack()
+        
+        def __getattr__(self, _):
+            return None
+    
     sd_hijack = _DummyHijack()
 import modules.textual_inversion.textual_inversion as textual_inversion
 
