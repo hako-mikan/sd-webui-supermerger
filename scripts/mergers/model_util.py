@@ -2,7 +2,14 @@ import os
 import torch
 import safetensors.torch
 import threading
-from modules import shared, sd_hijack, sd_models
+from modules import shared, sd_models
+try:
+    from modules import sd_hijack
+except ImportError:
+    # Forge NEO removed sd_hijack; create a safe fallback
+    class _DummyHijack:
+        def __getattr__(self, _): return None
+    sd_hijack = _DummyHijack()
 import json
 
 try:
