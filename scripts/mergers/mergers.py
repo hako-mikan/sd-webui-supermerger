@@ -1796,32 +1796,46 @@ COMP_NAME_AND_PREFIX = {"transformer":PREFIX_M, "text_encoder": "clip_l" , "text
 
 @torch.inference_mode()
 def forge_loader(state_dict, additional_state_dicts):
-
-    state_dicts, estimated_config = split_state_dict(state_dict, additional_state_dicts)
+    state_dicts, estimated_config = split_state_dict(state_dict,
+                                                     additional_state_dicts)
     state_dict = None
     del state_dict
-    
+
     repo_name = estimated_config.huggingface_repo
 
-    local_path = os.path.join(fld.dir_path, 'huggingface', repo_name)
+    # Forge/NEO compatibility: backend.loader.dir_path was removed
+    try:
+        base_dir = fld.dir_path
+    except AttributeError:
+        from modules.paths import models_path
+        base_dir = models_path
+
+    local_path = os.path.join(base_dir, 'huggingface', repo_name)
     config: dict = fld.DiffusionPipeline.load_config(local_path)
     huggingface_components = {}
     for component_name, v in config.items():
         if isinstance(v, list) and len(v) == 2:
             lib_name, cls_name = v
             component_sd = state_dicts.get(component_name, None)
-            component = fld.load_huggingface_component(estimated_config, component_name, lib_name, cls_name, local_path, component_sd)
+            component = fld.load_huggingface_component(estimated_config,
+                                                       component_name,
+                                                       lib_name, cls_name,
+                                                       local_path,
+                                                       component_sd)
             if component_sd is not None:
+                # fixed an indentation
                 del state_dicts[component_name]
             if component is not None:
                 huggingface_components[component_name] = component
 
     for M in fld.possible_models:
         if any(isinstance(estimated_config, x) for x in M.matched_guesses):
-            return M(estimated_config=estimated_config, huggingface_components=huggingface_components)
+            return M(estimated_config=estimated_config,
+                     huggingface_components=huggingface_components)
 
     print('Failed to recognize model type!')
     return None
+
 
 def split_state_dict(sd, additional_state_dicts: list = None):
     sd = fld.preprocess_state_dict(sd)
