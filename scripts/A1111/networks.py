@@ -18,7 +18,13 @@ import scripts.A1111.network_oft as network_oft
 import torch
 from typing import Union
 
-from modules import shared, devices, sd_models, errors, scripts, sd_hijack, launch_utils
+from modules import shared, devices, sd_models, errors, scripts, launch_utils
+try:
+    from modules import sd_hijack
+except ImportError:
+    class _DummyHijack:
+        def __getattr__(self, _): return None
+    sd_hijack = _DummyHijack()
 import modules.textual_inversion.textual_inversion as textual_inversion
 
 class QkvLinear(torch.nn.Linear):
