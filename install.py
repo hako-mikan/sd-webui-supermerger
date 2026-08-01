@@ -34,10 +34,21 @@ def is_installed(pip_package):
         return False
     
 requirements = [
-"diffusers==0.31.0",
 "scikit-learn",
 "accelerate"
 ]
+
+# Forge Neo pins diffusers==0.37.1 in its own requirements.txt. SuperMerger used to
+# pin ==0.31.0 here, which downgraded it on every launch only for Neo's post-extension
+# requirements check to reinstall 0.37.1 immediately afterwards. Nothing SuperMerger
+# does needs the older version, so just require diffusers to be present.
+try:
+    if launch.git_tag() == "neo":
+        requirements.append("diffusers")
+    else:
+        requirements.append("diffusers==0.31.0")
+except Exception:
+    requirements.append("diffusers==0.31.0")
 
 for module in requirements:
     if not is_installed(module):
