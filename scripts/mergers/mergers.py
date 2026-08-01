@@ -27,7 +27,10 @@ from modules.ui import  plaintext_to_html
 from modules.shared import opts, cmd_opts
 from modules.sd_models import unload_model_weights
 from modules.processing import create_infotext,Processed
-from modules.generation_parameters_copypaste import create_override_settings_dict
+try:
+    from modules.generation_parameters_copypaste import create_override_settings_dict
+except ModuleNotFoundError:  # Forge Neo renamed the module
+    from modules.infotext_utils import create_override_settings_dict
 from scripts.mergers.model_util import filenamecutter,savemodel
 from math import ceil
 import sys
@@ -1277,10 +1280,16 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
     # 'Hires checkpoint', 'Hires sampling method', 'Hires prompt', 'Hires negative prompt', 'Override settings', 'Script', 'Refiner', 
     # 'Checkpoint', 'Switch at', 'Seed', 'Extra', 'Variation seed', 'Variation strength', 'Resize seed from width', 'Resize seed from height', '', 'Active', 'Active', 'X Types', 'X Values', 'Y Types', 'Y Values']  
 
+    lowernames = [x.lower() if isinstance(x, str) else x for x in paramsnames]
+
     def g(wanted,wantedv=None):
-        if wanted in paramsnames:return txt2imgparams[paramsnames.index(wanted)]
-        elif wantedv and wantedv in paramsnames:return txt2imgparams[paramsnames.index(wantedv)]
-        else:return None
+        # Forge Neo renamed several labels (case changes, e.g. "Hires checkpoint"
+        # -> "Hires Checkpoint"), so fall back to a case-insensitive lookup
+        for target in (wanted, wantedv):
+            if not target: continue
+            if target in paramsnames: return txt2imgparams[paramsnames.index(target)]
+            if target.lower() in lowernames: return txt2imgparams[lowernames.index(target.lower())]
+        return None
 
     sampler_index = g("Sampling method","Sampling Method")
     if type(sampler_index) is str:
@@ -1329,8 +1338,19 @@ def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_si
         do_not_reload_embeddings=True,
     )
     p.hr_checkpoint_name=None if g("Hires checkpoint") == 'Use same checkpoint' else g("Hires checkpoint")
+    if neo:
+        # Neo splits guidance into CFG + distilled CFG (Flux/SD3/Qwen "shift")
+        for _attr, _label in (("distilled_cfg_scale", "Distilled CFG Scale"),
+                              ("hr_cfg", "Hires CFG Scale"),
+                              ("hr_distilled_cfg", "Hires Distilled CFG Scale")):
+            _v = g(_label)
+            if _v is not None: setattr(p, _attr, _v)
+        _hr_sched = g("Hires schedule type")
+        p.hr_scheduler = None if _hr_sched in (None, "Use same scheduler") else _hr_sched
+        _hr_mods = g("Hires VAE / Text Encoder")
+        _hr_mods = [] if _hr_mods in (None, ["Use same choices"]) else _hr_mods
     p.hr_sampler_name=None if hr_sampler_name == 'Use same sampler' else  hr_sampler_name
-    p.hr_additional_modules = []
+    p.hr_additional_modules = _hr_mods if neo else []
 
     if s_sampler is None: s_sampler = 0
 
@@ -1706,8 +1726,10 @@ def model_loader(checkpoint_info, state_dict,metadata, currentmodel):
     if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
 
     if neo:
-        sd_models.model_data.__init__()
-        load_forge_model(state_dict,checkpoint_info)
+        # do NOT re-init model_data here: it would wipe forge_loading_parameters
+        # (additional_modules / unet_storage_dtype) that load_forge_model reads back
+        memory_management.free_memory(1e30, torch.device("cpu"))
+        load_forge_model(state_dict, checkpoint_info)
     elif not forge:
         sd_models.model_data.__init__()
         sd_models.load_model(checkpoint_info, already_loaded_state_dict=state_dict)
@@ -1761,9 +1783,15 @@ def load_forge_model(state_dict,checkpoint_info = None):
     additional_state_dicts = fsd.model_data.forge_loading_parameters.get('additional_modules', [])
     timer.record("cache state dict")
 
-    fsd.dynamic_args['forge_unet_storage_dtype'] = fsd.model_data.forge_loading_parameters.get('unet_storage_dtype', None)
-    fsd.dynamic_args['embedding_dir'] = fsd.cmd_opts.embeddings_dir
-    fsd.dynamic_args['emphasis_name'] = opts.emphasis
+    unet_storage_dtype = fsd.model_data.forge_loading_parameters.get('unet_storage_dtype', None)
+    if neo:
+        # Neo's dynamic_args is a class with typed attributes, not a dict
+        fsd.dynamic_args.forge_unet_storage_dtype = unet_storage_dtype
+        fsd.dynamic_args.embedding_dir = fsd.cmd_opts.embeddings_dir
+    else:
+        fsd.dynamic_args['forge_unet_storage_dtype'] = unet_storage_dtype
+        fsd.dynamic_args['embedding_dir'] = fsd.cmd_opts.embeddings_dir
+        fsd.dynamic_args['emphasis_name'] = opts.emphasis
     sd_model = forge_loader(state_dict, additional_state_dicts)
     timer.record("forge model load")
 
@@ -1789,13 +1817,114 @@ def load_forge_model(state_dict,checkpoint_info = None):
     fsd.model_data.forge_loading_parameters = dict(
         checkpoint_info=checkpoint_info,
         additional_modules=shared.opts.forge_additional_modules,
-        unet_storage_dtype=fsd.dynamic_args['forge_unet_storage_dtype']
+        unet_storage_dtype=unet_storage_dtype
     )
 
 COMP_NAME_AND_PREFIX = {"transformer":PREFIX_M, "text_encoder": "clip_l" , "text_encoder2": "t5xxl", "vae": "vae."}
 
+def split_state_dict_neo(sd, additional_state_dicts: list = None):
+    """Forge Neo's backend.loader.split_state_dict() only accepts a file path;
+    SuperMerger holds the merged model in memory, so mirror it over a state dict."""
+    from backend.state_dict import convert_quantization, try_filter_state_dict
+
+    sd, _ = convert_quantization(sd, {})
+    sd = fld.preprocess_state_dict(sd)
+    guess = huggingface_guess.guess(sd)
+
+    if isinstance(additional_state_dicts, list):
+        for asd in additional_state_dicts:
+            _asd, _meta = load_torch_file(asd, return_metadata=True)
+            _asd, _ = convert_quantization(_asd, _meta)
+            sd = fld.replace_state_dict(sd, _asd, guess, asd)
+            del _asd
+
+    guess.clip_target = guess.clip_target(sd)
+    guess.model_type = guess.model_type(sd)
+    guess.ztsnr = "ztsnr" in sd
+
+    sd = guess.process_vae_state_dict(sd)
+
+    state_dict = {
+        guess.unet_target: try_filter_state_dict(sd, guess.unet_key_prefix),
+        guess.vae_target: try_filter_state_dict(sd, guess.vae_key_prefix),
+    }
+
+    sd = guess.process_clip_state_dict(sd)
+
+    for k, v in guess.clip_target.items():
+        state_dict[v] = try_filter_state_dict(sd, [k + "."])
+
+    state_dict["ignore"] = sd
+
+    if "Anima" in guess.huggingface_repo:
+        fld.process_anima(state_dict["transformer"], state_dict["text_encoder"])
+    if "PiD" in guess.huggingface_repo:
+        fld.process_pid(state_dict["transformer"])
+        state_dict["vae"]["_dim"] = guess.unet_config["lq_latent_channels"]
+
+    print(f'StateDict Keys: {({k: len(v) for k, v in state_dict.items()})}')
+
+    del state_dict["ignore"]
+
+    return state_dict, guess
+
+
+@torch.inference_mode()
+def forge_loader_neo(state_dict, additional_state_dicts):
+    import backend.args
+    from diffusers import DiffusionPipeline
+
+    state_dicts, estimated_config = split_state_dict(state_dict, additional_state_dicts)
+    state_dict = None
+    del state_dict
+
+    repo_name: str = estimated_config.huggingface_repo
+
+    backend.args.dynamic_args.reset()
+    backend.args.dynamic_args.nunchaku = getattr(estimated_config, "nunchaku", False)
+    backend.args.dynamic_args.klein = "klein" in repo_name
+    backend.args.dynamic_args.wan = "Wan" in repo_name
+    backend.args.dynamic_args.pid = "PiD" in repo_name
+
+    local_path = os.path.join(fld.HF, repo_name)
+    config: dict = DiffusionPipeline.load_config(local_path)
+
+    huggingface_components = {}
+    for component_name, v in config.items():
+        if isinstance(v, list) and len(v) == 2:
+            lib_name, cls_name = v
+            component_sd = state_dicts.pop(component_name, None)
+            component = fld.load_huggingface_component(estimated_config, component_name, lib_name, cls_name, local_path, component_sd)
+            if component_sd is not None:
+                del component_sd
+            if component is not None:
+                huggingface_components[component_name] = component
+
+    del state_dicts
+
+    PRED_TYPES = {
+        "EPS": "epsilon",
+        "V_PREDICTION": "v_prediction",
+        "FLUX": "const",
+        "FLOW": "const",
+    }
+
+    if "prediction_type" in getattr(huggingface_components.get("scheduler", None), "config", {}):
+        if estimated_config.model_type.name in PRED_TYPES:
+            huggingface_components["scheduler"].config.prediction_type = PRED_TYPES[estimated_config.model_type.name]
+
+    for M in fld.possible_models:
+        if any(type(estimated_config) is x for x in M.matched_guesses):
+            return M(estimated_config=estimated_config, huggingface_components=huggingface_components)
+
+    print('Failed to recognize model type!')
+    return None
+
+
 @torch.inference_mode()
 def forge_loader(state_dict, additional_state_dicts):
+    if neo:
+        return forge_loader_neo(state_dict, additional_state_dicts)
 
     state_dicts, estimated_config = split_state_dict(state_dict, additional_state_dicts)
     state_dict = None
@@ -1824,6 +1953,9 @@ def forge_loader(state_dict, additional_state_dicts):
     return None
 
 def split_state_dict(sd, additional_state_dicts: list = None):
+    if neo:
+        return split_state_dict_neo(sd, additional_state_dicts)
+
     sd = fld.preprocess_state_dict(sd)
     guess = huggingface_guess.guess(sd)
 

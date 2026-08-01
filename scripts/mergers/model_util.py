@@ -2,7 +2,11 @@ import os
 import torch
 import safetensors.torch
 import threading
-from modules import shared, sd_hijack, sd_models
+from modules import shared, sd_models
+try:
+    from modules import sd_hijack
+except ImportError:  # Forge Neo has no sd_hijack
+    sd_hijack = None
 import json
 
 try:
@@ -55,7 +59,8 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
             print("load from shared.sd_model..")
 
             # restore textencoder
-            sd_hijack.model_hijack.undo_hijack(shared.sd_model)
+            if sd_hijack is not None:
+                sd_hijack.model_hijack.undo_hijack(shared.sd_model)
 
             for name,module in shared.sd_model.named_modules():
                 if hasattr(module,"network_weights_backup"):
@@ -67,7 +72,8 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
                     other_dict[key] = state_dict[key]
                     del state_dict[key]
 
-            sd_hijack.model_hijack.hijack(shared.sd_model)
+            if sd_hijack is not None:
+                sd_hijack.model_hijack.hijack(shared.sd_model)
         else:
             return "No current loaded model found"
 
@@ -96,7 +102,13 @@ def savemodel(state_dict,currentmodel,fname,savesets,metadata={}):
     else:
         fname = fname if ext in fname else fname +pre+ext
 
-    fname = os.path.join(shared.cmd_opts.ckpt_dir if shared.cmd_opts.ckpt_dir is not None else sd_models.model_path, fname)
+    # Forge Neo replaced --ckpt-dir with the repeatable --ckpt-dirs (a list);
+    # save into the first configured directory, else the default model path
+    ckpt_dir = getattr(shared.cmd_opts, "ckpt_dir", None)
+    if ckpt_dir is None:
+        ckpt_dirs = getattr(shared.cmd_opts, "ckpt_dirs", None) or []
+        ckpt_dir = ckpt_dirs[0] if ckpt_dirs else None
+    fname = os.path.join(ckpt_dir if ckpt_dir is not None else sd_models.model_path, fname)
     fname = fname.replace("ProgramFiles_x86_","Program Files (x86)")
 
     if len(fname) > 255:

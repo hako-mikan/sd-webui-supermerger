@@ -1,6 +1,6 @@
 import torch
 
-import networks
+import scripts.A1111.networks as networks
 from modules import patches
 
 

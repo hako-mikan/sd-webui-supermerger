@@ -18,7 +18,11 @@ import scripts.A1111.network_oft as network_oft
 import torch
 from typing import Union
 
-from modules import shared, devices, sd_models, errors, scripts, sd_hijack, launch_utils
+from modules import shared, devices, sd_models, errors, scripts, launch_utils
+try:
+    from modules import sd_hijack
+except ImportError:  # Forge Neo has no sd_hijack
+    sd_hijack = None
 import modules.textual_inversion.textual_inversion as textual_inversion
 
 class QkvLinear(torch.nn.Linear):
@@ -384,7 +388,8 @@ def load_networks(names, te_multipliers=None, unet_multipliers=None, dyn_dims=No
 
     if failed_to_load_networks:
         lora_not_found_message = f'Lora not found: {", ".join(failed_to_load_networks)}'
-        sd_hijack.model_hijack.comments.append(lora_not_found_message)
+        if sd_hijack is not None:
+            sd_hijack.model_hijack.comments.append(lora_not_found_message)
         if shared.opts.lora_not_found_warning_console:
             print(f'\n{lora_not_found_message}\n')
         if shared.opts.lora_not_found_gradio_warning:
