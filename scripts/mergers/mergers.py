@@ -691,8 +691,6 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
         vae_dict = None
         del vae_dict
  
-    if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
-
     caster(mergedmodel,False)
     if "Reset CLIP ids" in save_sets: resetclip(theta_0)
 
@@ -701,6 +699,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
     
     currentmodel = makemodelname(weights_a_excluded,weights_b_excluded,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
     modelid = rwmergelog(currentmodel,mergedmodel)
+    if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
     
     overwrite_last_weights(weights_a_excluded,weights_b_excluded)
 
