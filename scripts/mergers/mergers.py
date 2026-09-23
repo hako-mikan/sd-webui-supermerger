@@ -1,2220 +1,1477 @@
-import random
-import os
 import gc
-import hashlib
-import numpy as np
+import os
 import os.path
-
 import re
-import torch
-import tqdm
-import datetime
-from typing import Union, Optional
-import csv
+from PIL import Image
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import json
-import launch
-import torch.nn as nn
-import scipy.ndimage
-from unittest.mock import patch
-from copy import deepcopy
-from PIL import Image, ImageFont, ImageDraw
+import shutil
 from tqdm import tqdm
-from functools import partial
-from torch import Tensor, lerp
-from torch.nn.functional import cosine_similarity, relu, softplus
-from modules import shared, processing, sd_models, sd_vae, images, sd_samplers, scripts,devices, extras, script_callbacks
-from modules.ui import  plaintext_to_html
-from modules.shared import opts, cmd_opts
-from modules.sd_models import unload_model_weights
-from modules.processing import create_infotext,Processed
+import torch
+from statistics import mean
+import csv
+import torch.nn as nn
+import torch.nn.functional as F
+from pprint import pprint
+import gradio as gr
+from modules import script_callbacks, sd_models,sd_vae, shared, sd_models
+from modules.scripts import basedir
+from modules.shared import opts
+from modules.ui_components import ResizeHandleRow
+from modules.sd_samplers import samplers
+from modules.ui import create_output_panel, create_refresh_button
+import scripts.mergers.components as components
+import csv
+import scripts.mergers.pluslora as pluslora
+from scripts.mergers.mergers import (TYPESEG,EXCLUDE_CHOICES, freezemtime, rwmergelog, blockfromkey, clearcache, getcachelist)
+from scripts.mergers.xyplot import freezetime, nulister
+from scripts.mergers.model_util import filenamecutter, savemodel
+
+if hasattr(sd_models, "checkpoints_loaded"):
+    checkpoints_loaded = sd_models.checkpoints_loaded
+    load_model = sd_models.load_model
+else:
+    checkpoints_loaded = sd_models.checkpoints_list
+    load_model = None
+
+path_root = basedir()
+xyzpath = os.path.join(path_root,"xyzpresets.json")
+
+CALCMODES  = ["normal", "cosineA", "cosineB","trainDifference","smoothAdd","smoothAdd MT","extract","tensor","tensor2","self","plus random"]
+
 try:
-    from modules.generation_parameters_copypaste import create_override_settings_dict
-except ModuleNotFoundError:  # Forge Neo renamed the module
-    from modules.infotext_utils import create_override_settings_dict
-from scripts.mergers.model_util import filenamecutter,savemodel
-from math import ceil
-import sys
-from multiprocessing import cpu_count
-from threading import Lock
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from scripts.mergers.bcolors import bcolors
-import collections
-
-PREFIXFIX = ("double_blocks","single_blocks","time_in","vector_in","txt_in")
-PREFIX_M = "model.diffusion_model."
-BNB = ".quant_state.bitsandbytes__"
-QTYPES = ["fp4", "nf4"]
-
-try:
-    ui_version = int(launch.git_tag().split("-",1)[0].replace("v","").replace(".",""))
-except:
-    ui_version = 100
-
-try:
-    from modules import launch_utils
-    forge = launch_utils.git_tag()[0:2] == "f2"
-    reforge = launch_utils.git_tag()[0:2] == "f1" or launch_utils.git_tag() == "classic" 
-    neo = launch_utils.git_tag().split(" ", 1)[0] == "neo"
-except:
-    forge = reforge = neo = False
-
-if forge or neo:
-    from backend import memory_management
     from backend.utils import load_torch_file
+    forge = True
+except:
+    forge = False
 
-revert_target = ""
-orig_cache = 0
-modelcache = collections.OrderedDict()
+from typing import Union
+def network_reset_cached_weight(self: Union[torch.nn.Conv2d, torch.nn.Linear]):
+    self.network_current_names = ()
+    self.network_weights_backup = None
+    self.network_bias_backup = None
+    
 
-from inspect import currentframe
-
-SELFKEYS = ["to_out","proj_out","norm"]
-
-module_path = os.path.dirname(os.path.abspath(sys.modules[__name__].__file__))
-scriptpath = os.path.dirname(module_path)
-
-def tryit(func):
+def fix_network_reset_cached_weight():
     try:
-        func() 
+        import networks as net
+        net.network_reset_cached_weight = network_reset_cached_weight
     except:
-        pass 
+        pass
 
-stopmerge = False
+def on_ui_tabs():
+    fix_network_reset_cached_weight()
 
-def freezemtime():
-    global stopmerge
-    stopmerge = True
-
-mergedmodel=[]
-FINETUNEX = ["IN","OUT","OUT2","CONT","BRI","COL1","COL2","COL3"]
-TYPESEG = ["none","alpha","beta (if Triple or Twice is not selected,Twice automatically enable)","alpha and beta","seed",
-                    "mbw alpha","mbw beta","mbw alpha and beta", "model_A","model_B","model_C","pinpoint blocks (alpha or beta must be selected for another axis)",
-                    "include blocks", "exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element","pinpoint element ext","effective elemental checker","adjust","pinpoint adjust (IN,OUT,OUT2,CONT,BRI,COL1,COL2,COL3)",
-                    "calcmode","prompt","prompt2","prompt3","random","merge ID"]
-TYPES = ["none","alpha","beta","alpha and beta","seed", "mbw alpha ","mbw beta","mbw alpha and beta",
-                "model_A","model_B","model_C","pinpoint blocks","include blocks","exclude blocks","add include", "add exclude","elemental","add elemental","pinpoint element","pinpoint element ext",
-                "effective","adjust","pinpoint adjust","calcmode","prompt","prompt2","prompt3","random","merge ID"]
-MODES=["Weight" ,"Add" ,"Triple","Twice"]
-SAVEMODES=["save model", "overwrite"]
-EXCLUDE_CHOICES = ["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11",
-                                  "M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11",
-                                  "Adjust","VAE"]           
-CHCKPOINT_DICT_SKIP_ON_MERGE = ["cond_stage_model.transformer.text_model.embeddings.position_ids"]
-
-#type[0:aplha,1:beta,2:seed,3:mbw,4:model_A,5:model_B,6:model_C]
-#msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
-#id sets "image", "PNG info","XY grid"
-
-hear = False
-hearm = False
-NON4 = [None]*4
-
-informer = sd_models.get_closet_checkpoint_match
-
-#msettings=[weights_a,weights_b,model_a,model_b,model_c,device,base_alpha,base_beta,mode,loranames,useblocks,custom_name,save_sets,id_sets,wpresets,deep]  
-
-def smergegen(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,
-                       calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,dsettings,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,
-                       s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-                       genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-                       lmode,lsets,llimits_u,llimits_l,llimits_u_d,llimits_l_d,lseed,lserial,lcustom,lround,
-                       currentmodel,imggen,
-                       *txt2imgparams):
-
-    lucks = {"on":False, "mode":lmode,"set":lsets,"upp":llimits_u,"low":llimits_l,"uppd":llimits_u_d,"lowd":llimits_l_d,"seed":lseed,"num":lserial,"cust":lcustom,"round":int(lround)}
-    print(dsettings)
-
-    cachedealer(True)
-
-    result,currentmodel,modelid,theta_0,metadata = smerge(
-                        weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                        useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,dsettings,lucks
-                        )
-
-    if "ERROR" in result or "STOPPED" in result: 
-        return result,"not loaded",*NON4
-
-    checkpoint_info = sd_models.get_closet_checkpoint_match(model_a)
-
-    save = True if SAVEMODES[0] in save_sets else False
-
-    result = savemodel(theta_0,currentmodel,custom_name,save_sets,metadata) if save else "Merged model loaded:"+currentmodel
-
-    model_loader(checkpoint_info, theta_0, metadata, currentmodel)
-
-    cachedealer(False)
-
-    del theta_0
-    devices.torch_gc()
-
-    debug = "debug" in save_sets
-
-    if ("copy config" in save_sets) and ("(" not in result):
+    weights_presets=""
+    userfilepath = os.path.join(path_root, "scripts","mbwpresets.txt")
+    
+    if os.path.isfile(userfilepath):
         try:
-            extras.create_config(result.replace("Merged model saved in ",""), 0, informer(model_a), informer(model_b), informer(model_b))
-        except:
-            pass
-
-    if imggen :
-        images = simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-                        genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-                        currentmodel,id_sets,modelid,
-                        *txt2imgparams,debug = debug)
-
-        return result,currentmodel,*images[:4]
+            with open(userfilepath) as f:
+                weights_presets = f.read()
+                filepath = userfilepath
+        except OSError as e:
+                pass
     else:
-        return result,currentmodel
+        filepath = os.path.join(path_root, "scripts","mbwpresets_master.txt")
+        try:
+            with open(filepath) as f:
+                weights_presets = f.read()
+                shutil.copyfile(filepath, userfilepath)
+        except OSError as e:
+                pass
 
-def checkpointer_infomer(name):
-    return sd_models.get_closet_checkpoint_match(name)
+    if "ALLR" not in weights_presets: weights_presets += ADDRAND
 
-# XXX hack. fake checkpoint_info
-def fake_checkpoint_info(checkpoint_info,metadata={},currentmodel=""):
-    from modules import cache
-    dump_cache = cache.dump_cache
-    c_cache = cache.cache
+    with gr.Blocks() as supermergerui:
+        with gr.Tab("Merge") as tabn , ResizeHandleRow(equal_height=False):
+                with gr.Column(variant="compact"):
+                    gr.HTML(value="<p>Merge models and load it for generation</p>")
+
+                    with gr.Row():
+                        s_reverse= gr.Button(value="Load settings from:",elem_classes=["compact_button"],variant='primary')
+                        mergeid = gr.Textbox(label="merged model ID (-1 for last)", elem_id="model_converter_custom_name",value = "-1")
+                        mclearcache= gr.Button(value="Clear Cache",elem_classes=["compact_button"],variant='primary')
+
+                    with gr.Row(variant="compact"):
+                        model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model A",interactive=True)
+                        create_refresh_button(model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+
+                        model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model B",interactive=True)
+                        create_refresh_button(model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+
+                        model_c = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model C",interactive=True)
+                        create_refresh_button(model_c, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")
+
+                    mode = gr.Radio(label = "Merge Mode",choices = ["Weight sum", "Add difference", "Triple sum", "sum Twice"], value="Weight sum", info="A*(1-alpha)+B*alpha")
+                    calcmode = gr.Radio(label = "Calculation Mode",choices = CALCMODES, value = "normal") 
+                    with gr.Row(variant="compact"):
+                        with gr.Column(scale = 1):
+                            useblocks =  gr.Checkbox(label="use MBW", info="use Merge Block Weights")
+                        with gr.Column(scale = 3), gr.Group() as alpha_group:
+                            with gr.Row():
+                                base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
+                                base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25, interactive=False)
+                        #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
+
+                    with gr.Accordion("Options", open=False):
+                        with gr.Row(variant="compact"):
+                            save_sets = gr.CheckboxGroup(["use cuda","save model", "overwrite","safetensors","fp16","save metadata","copy config","prune","Reset CLIP ids","use old calc method","debug"], value=["safetensors"], show_label=False, label="save settings")
+                        with gr.Row():
+                            components.id_sets = gr.CheckboxGroup(["image", "PNG info"], label="save merged model ID to")
+                            opt_value = gr.Slider(label="option(gamma) ", minimum=-1.0, maximum=20, step=0.1, value=0.3, interactive=True)
+                        with gr.Row(variant="compact"):
+                            with gr.Column(min_width = 50):
+                                with gr.Row():
+                                    custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
+
+                            with gr.Column():
+                                with gr.Row():
+                                    bake_in_vae = gr.Dropdown(choices=["None"] + list(sd_vae.vae_dict), value="None", label="Bake in VAE", elem_id="modelmerger_bake_in_vae")
+                                    create_refresh_button(bake_in_vae, sd_vae.refresh_vae_list, lambda: {"choices": ["None"] + list(sd_vae.vae_dict)}, "modelmerger_refresh_bake_in_vae")
+
+                        with gr.Row(variant="compact"):
+                            savecurrent = gr.Button(elem_id="savecurrent", elem_classes=["compact_button"], value="Save current merge(fp16 only)")
+
+                    with gr.Row():
+                        components.merge = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
+                        components.mergeandgen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge&Gen",variant='primary')
+                        components.gen = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Gen",variant='primary')
+                        stopmerge = gr.Button(elem_id="stopmerge", elem_classes=["compact_button"], value="Stop")
+
+
+                    with gr.Accordion("Merging Block Weights", open=False):
+                        with gr.Row():
+                            isxl = gr.Radio(label = "Block Type",choices = ["1.X or 2.X", "XL"], value = "1.X or 2.X", type="index")
+
+                        with gr.Tab("Weights Setting"):
+                            with gr.Group(), gr.Tabs():
+                                with gr.Tab("Weights for alpha"):
+                                    with gr.Row(variant="compact"):
+                                        weights_a = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5", show_copy_button=True)
+                                    with gr.Row():
+                                        setalpha = gr.Button(elem_id="copytogen", value="↑ Set alpha",variant='primary', scale=3)
+                                        readalpha = gr.Button(elem_id="copytogen", value="↓ Read alpha",variant='primary', scale=3)
+                                        setx = gr.Button(elem_id="copytogen", value="↑ Set X", min_width="80px", scale=1)
+                                with gr.Tab("beta"):
+                                    with gr.Row(variant="compact"):
+                                        weights_b = gr.Textbox(label="BASE,IN00,IN02,...IN11,M00,OUT00,...,OUT11",value = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2", show_copy_button=True)
+                                    with gr.Row():
+                                        setbeta = gr.Button(elem_id="copytogen", value="↑ Set beta",variant='primary', scale=3)
+                                        readbeta = gr.Button(elem_id="copytogen", value="↓ Read beta",variant='primary', scale=3)
+                                        sety = gr.Button(elem_id="copytogen", value="↑ Set Y", min_width="80px", scale=1)
+
+                            with gr.Group(), gr.Tabs():
+                                with gr.Tab("Preset"):
+                                    with gr.Row():
+                                        dd_preset_weight = gr.Dropdown(label="Select preset", choices=preset_name_list(weights_presets), interactive=True, elem_id="refresh_presets")
+                                        preset_refresh = gr.Button(value='\U0001f504', elem_classes=["tool"])
+
+                                with gr.Tab("Random Preset"):
+                                    with gr.Row():
+                                        dd_preset_weight_r = gr.Dropdown(label="Load Romdom preset", choices=preset_name_list(weights_presets,True), interactive=True, elem_id="refresh_presets")
+                                        preset_refresh_r = gr.Button(value='\U0001f504', elem_classes=["tool"])
+                                        luckab = gr.Radio(label = "for",choices = ["none", "alpha", "beta"], value = "none", type="value")
+
+                                with gr.Tab("Helper"):
+                                    with gr.Column():
+                                        resetval = gr.Slider(label="Value", show_label=False, info="Value to set/add/mul", minimum=0, maximum=2, step=0.0001, value=0)
+                                        resetopt = gr.Radio(label="Pre defined", show_label=False, choices = ["0", "0.25", "0.5", "0.75", "1"], value = "0", type="value")
+                                    with gr.Column():
+                                        resetblockopt = gr.CheckboxGroup(["BASE","INP*","MID","OUT*"], value=["INP*","OUT*"], label="Blocks", show_label=False, info="Select blocks to change")
+                                    with gr.Column():
+                                        with gr.Row():
+                                            resetweight = gr.Button(elem_classes=["reset"], value="Set")
+                                            addweight = gr.Button(elem_classes=["reset"], value="Add")
+                                            mulweight = gr.Button(elem_classes=["reset"], value="Mul")
+                                        with gr.Row():
+                                            lower = gr.Slider(label="Slider Lower Limit", minimum=-2, maximum=3, step=0.1, value=0)
+                                            upper = gr.Slider(label="Slider Upper Limit", minimum=-2, maximum=3, step=0.1, value=1)
+
+                            with gr.Row():
+                                with gr.Column(scale=1, min_width=100):
+                                    gr.Slider(visible=False)
+                                with gr.Column(scale=2, min_width=200):
+                                    base = gr.Slider(label="Base", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                with gr.Column(scale=1, min_width=100):
+                                    gr.Slider(visible=False)
+                            with gr.Row():
+                                with gr.Column(scale=2, min_width=200):
+                                    in00 = gr.Slider(label="IN00", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in01 = gr.Slider(label="IN01", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in02 = gr.Slider(label="IN02", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in03 = gr.Slider(label="IN03", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in04 = gr.Slider(label="IN04", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in05 = gr.Slider(label="IN05", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in06 = gr.Slider(label="IN06", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in07 = gr.Slider(label="IN07", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in08 = gr.Slider(label="IN08", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in09 = gr.Slider(label="IN09", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in10 = gr.Slider(label="IN10", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    in11 = gr.Slider(label="IN11", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                with gr.Column(scale=2, min_width=200):
+                                    ou11 = gr.Slider(label="OUT11", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou10 = gr.Slider(label="OUT10", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou09 = gr.Slider(label="OUT09", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou08 = gr.Slider(label="OUT08", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou07 = gr.Slider(label="OUT07", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou06 = gr.Slider(label="OUT06", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou05 = gr.Slider(label="OUT05", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou04 = gr.Slider(label="OUT04", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou03 = gr.Slider(label="OUT03", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou02 = gr.Slider(label="OUT02", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou01 = gr.Slider(label="OUT01", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                    ou00 = gr.Slider(label="OUT00", minimum=0, maximum=1, step=0.0001, value=0.5)
+                            with gr.Row():
+                                with gr.Column(scale=1, min_width=100):
+                                    gr.Slider(visible=False)
+                                with gr.Column(scale=2, min_width=200):
+                                    mi00 = gr.Slider(label="M00", minimum=0, maximum=1, step=0.0001, value=0.5)
+                                with gr.Column(scale=1, min_width=100):
+                                    gr.Slider(visible=False)
+
+                        with gr.Tab("Weights Presets"):
+                            with gr.Row():
+                                s_reloadtext = gr.Button(value="Reload Presets",variant='primary')
+                                s_reloadtags = gr.Button(value="Reload Tags",variant='primary')
+                                s_savetext = gr.Button(value="Save Presets",variant='primary')
+                                s_openeditor = gr.Button(value="Open TextEditor",variant='primary')
+                            weightstags= gr.Textbox(label="available",lines = 2,value=tagdicter(weights_presets),visible =True,interactive =True)
+                            wpresets= gr.TextArea(label="",value=(weights_presets+ADDRAND),visible =True,interactive = True)
+
+                    with gr.Accordion("XYZ Plot", open=False):
+                        with gr.Row():
+                            x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
+                            x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
+                        xgrid = gr.Textbox(label="X Values",lines=3,value="0.25,0.5,0.75")
+                        y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")
+                        ygrid = gr.Textbox(label="Y Values (Disabled if blank)",lines=3,value="",visible =False)
+                        z_type = gr.Dropdown(label="Z type", choices=[y for y in TYPESEG], value="none", type="index")
+                        zgrid = gr.Textbox(label="Z Values (Disabled if blank)",lines=3,value="",visible =False)
+                        esettings = gr.CheckboxGroup(label = "XYZ plot settings",choices=["swap XY","save model","save csv","save anime gif","not save grid","print change","0 stock"],type="value",interactive=True)
+
+                        with gr.Row():
+                            components.gengrid = gr.Button(elem_id="model_merger_merge", value="Run XYZ Plot",variant='primary')
+                            stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XYZ Plot")
+                            components.s_reserve1 = gr.Button(value="Reserve XYZ Plot",variant='primary')
+                        
+                        with gr.Accordion("XYZ presets",open = True):
+                            with gr.Row():
+                                xyzpresets = gr.Dropdown(label="Preset name",allow_custom_value=True,choices=get_xyzpreset_keylist(),scale=10)
+                                refreshxyzpresets_b = gr.Button(value='\U0001f504', elem_classes=["tool"],scale=1)
+                                savexyzpreset_overwrite = gr.CheckboxGroup(label = " ",choices=["Overwrite"],type="index",interactive=True,scale=1)
+                            with gr.Row():
+                                loadxyzpreset_b = gr.Button(value="Load preset",variant='primary')
+                                savexyzpreset_b = gr.Button(value="Save current plot as preset",variant='primary')
+                                deletexyzpreset_b = gr.Button(value="Delete preset",variant='primary')
+                                openxyzpreset = gr.Button(value="Open XYZ Preset file")
+
+                                openxyzpreset.click(fn=lambda:subprocess.Popen(['start', xyzpath], shell=True))
+                                
+                        with gr.Column(visible = False, variant="compact") as row_inputers:
+                            with gr.Row(variant="compact"):
+                                inputer = gr.Textbox(label="Selected", lines=1, value="", show_copy_button=True)
+                            with gr.Row(variant="compact"):
+                                addtox = gr.Button(value="↑ Add to X Values")
+                                addtoy = gr.Button(value="↑ Add to Y Values")
+                                addtoz = gr.Button(value="↑ Add to Z Values")
+                        with gr.Row(visible = False) as row_blockids:
+                            blockids = gr.CheckboxGroup(label = "block IDs",choices=BLOCKID[:-1],type="value",interactive=True)
+                        with gr.Row(visible = False) as row_calcmode:
+                            calcmodes = gr.CheckboxGroup(label = "calcmode",choices=CALCMODES,type="value",interactive=True)
+                        with gr.Row(visible = False) as row_checkpoints:
+                            checkpoints = gr.CheckboxGroup(label = "checkpoints",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
+                            create_refresh_button(checkpoints, sd_models.list_models, lambda: {"choices": [x.model_name for x in sd_models.checkpoints_list.values()]}, "refresh_checkpoint_xyz")
+                        with gr.Row(visible = False) as row_blocks:
+                            gr.HTML(value="<p>BASE,IN00,IN01,IN02,IN03,IN04,IN05,IN06,IN07,IN08,IN09,IN10,IN11<br>,M00,OUT00,OUT01,OUT02,OUT03,OUT04,OUT05,OUT06,OUT07,OUT08,OUT09,OUT10,OUT11,Adjust,VAE,print</p>")
+
+                        with gr.Accordion("Reservation", open=False):
+                            with gr.Row():
+                                components.s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
+                                s_reloadreserve = gr.Button(value="Reloat List",variant='primary')
+                                components.s_startreserve = gr.Button(value="Start XY plot",variant='primary')
+                                s_delreserve = gr.Button(value="Delete list(-1 for all)",variant='primary')
+                                s_delnum = gr.Number(value=1, label="Delete num : ", interactive=True, visible = True,precision =0)
+                            with gr.Row():
+                                components.numaframe = gr.Dataframe(
+                                    headers=["No.","status","xtype","xmenber","ytype","ymenber","ztype","zmenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
+                                    row_count=5,)
+
+                    components.dtrue =  gr.Checkbox(value = True, visible = False)
+                    components.dfalse =  gr.Checkbox(value = False,visible = False)
+                    dummy_t =  gr.Textbox(value = "",visible = False)
+
+                    with gr.Accordion("Elemental Merge",open = False):
+                        with gr.Row():
+                            dsettings = gr.CheckboxGroup(label = "settings",choices=["print change", "use extended XL"],type="value",interactive=True)
+                        with gr.Row():
+                            deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
+
+                    with gr.Accordion("Adjust", open=False) as acc_ad:
+                        with gr.Row(variant="compact"):
+                            finetune = gr.Textbox(label="Adjust", show_label=False, info="Adjust IN,OUT,OUT2,Contrast,Brightness,COL1,COL2,COL3", visible=True, value="", lines=1)
+                            finetune_write = gr.Button(value="↑", elem_classes=["tool"])
+                            finetune_read = gr.Button(value="↓", elem_classes=["tool"])
+                            finetune_reset = gr.Button(value="\U0001f5d1\ufe0f", elem_classes=["tool"])
+                        with gr.Row(variant="compact"):
+                            with gr.Column(scale=1, min_width=100):
+                                detail1 = gr.Slider(label="IN", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                            with gr.Column(scale=1, min_width=100):
+                                detail2 = gr.Slider(label="OUT", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                            with gr.Column(scale=1, min_width=100):
+                                detail3 = gr.Slider(label="OUT2", minimum=-6, maximum=6, step=0.01, value=0, info="Detail/Noise")
+                        with gr.Row(variant="compact"):
+                            with gr.Column(scale=1, min_width=100):
+                                contrast = gr.Slider(label="Contrast", minimum=-10, maximum=10, step=0.01, value=0, info="Contrast/Detail")
+                            with gr.Column(scale=1, min_width=100):
+                                bri = gr.Slider(label="Brightness", minimum=-10, maximum=10, step=0.01, value=0, info="Dark(Minius)-Bright(Plus)")
+                        with gr.Row(variant="compact"):
+                            with gr.Column(scale=1, min_width=100):
+                                col1 = gr.Slider(label="Cyan-Red", minimum=-10, maximum=10, step=0.01, value=0, info="Cyan(Minius)-Red(Plus)")
+                            with gr.Column(scale=1, min_width=100):
+                                col2 = gr.Slider(label="Magenta-Green", minimum=-10, maximum=10, step=0.01, value=0, info="Magenta(Minius)-Green(Plus)")
+                            with gr.Column(scale=1, min_width=100):
+                                col3 = gr.Slider(label="Yellow-Blue", minimum=-10, maximum=10, step=0.01, value=0, info="Yellow(Minius)-Blue(Plus)")
+                        
+                            finetune.change(fn=lambda x:gr.update(label = f"Adjust : {x}"if x != "" and x !="0,0,0,0,0,0,0,0" else "Adjust"),inputs=[finetune],outputs = [acc_ad])
+
+                    with gr.Accordion("Let the Dice roll",open = False,visible=True):
+                        with gr.Row():
+                            gr.HTML(value="<p>R:0~1, U: -0.5~1.5</p>")
+                        with gr.Row():
+                            luckmode = gr.Radio(label = "Random Mode",choices = ["off", "R", "U", "X", "D", "ER", "EU", "EX","custom"], value = "off") 
+                        with gr.Row():
+                            lucksets = gr.CheckboxGroup(label = "Settings",choices=["alpha","beta","save E-list", "extend XL"],value=["alpha"],type="value",interactive=True)
+                        with gr.Row():
+                            luckseed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed for Random Ratio', value=-1, elem_id="luckseed")
+                            luckround = gr.Number(minimum=1, maximum=4294967295, step=1, label='Round', value=3, elem_id="luckround")
+                            luckserial = gr.Number(minimum=1, maximum=4294967295, step=1, label='Num of challenge', value=1, elem_id="luckchallenge")
+                        with gr.Row():  
+                            luckcustom = gr.Textbox(label="custom",value = "U,0,0,0,0,0,0,0,0,0,0,0,0,R,R,R,R,R,R,R,R,R,R,R,R,R")
+                        with gr.Row():  
+                            lucklimits_u = gr.Textbox(label="Upper limit for X, mid point of D",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+                        with gr.Row(): 
+                            read_from_mbw= gr.Button(value="Load from Weight:",elem_classes=["compact_button"],variant='primary')
+                            read_from_id = gr.Button(value="Load from ID:",elem_classes=["compact_button"],variant='primary')
+                            mergeid_dice = gr.Textbox(label="merged model ID (-1 for last)", elem_id="model_converter_custom_name",value = "-1")
+                        with gr.Row(): 
+                            lucklimits_l = gr.Textbox(label="Lower limit for X, range of D",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+                        with gr.Row():  
+                            lucklimits_u_d = gr.Textbox(label="Upper limit for X, D",value = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+                        with gr.Row(): 
+                            lucklimits_l_d = gr.Textbox(label="Lower limit for X, D",value = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+                        components.rand_merge = gr.Button(elem_id="runrandmerge", value="Run Rand",variant='primary')
+
+                    with gr.Accordion("Generation Parameters",open = False):
+                        gr.HTML(value='If blank or set to 0, parameters in the "txt2img" tab are used.<br>batch size, restore face, hires fix settigns must be set here')
+                        prompt = gr.Textbox(label="prompt",lines=1,value="")
+                        neg_prompt = gr.Textbox(label="neg_prompt",lines=1,value="")
+                        with gr.Row():
+                            sampler = gr.Dropdown(label='Sampling method', elem_id=f"sampling", choices=[" ",*[x.name for x in samplers]], value=" ", type="index")
+                            steps = gr.Slider(minimum=0.0, maximum=150, step=1, label='Steps',value=0, elem_id="Steps")
+                            cfg = gr.Slider(minimum=0.0, maximum=30, step=0.5, label='CFG scale', value=0, elem_id="cfg")
+                        with gr.Row():
+                            width = gr.Slider(minimum=0, maximum=2048, step=8, label="Width", value=0, elem_id="txt2img_width")
+                            height = gr.Slider(minimum=0, maximum=2048, step=8, label="Height", value=0, elem_id="txt2img_height")
+                            seed = gr.Number(minimum=-1, maximum=4294967295, step=1, label='Seed', value=0, elem_id="seed")
+                        batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
+                        genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value")    
+                        with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
+                            hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
+                            hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
+                            denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
+                            hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
+                        with gr.Row():
+                            setdefault = gr.Button(elem_id="setdefault", value="set to default",variant='primary')
+                            resetdefault = gr.Button(elem_id="resetdefault", value="reset default",variant='primary')
+                            resetcurrent = gr.Button(elem_id="resetcurrent", value="reset current",variant='primary')
+
+                    with gr.Accordion("Include/Exclude", open=False) as acc_ex:
+                        with gr.Row():
+                            inex = gr.Radio(label="Mode", choices=["Off","Include","Exclude"], value="Off")
+                        with gr.Row():
+                            ex_blocks = gr.CheckboxGroup(choices=EXCLUDE_CHOICES + ["print"], visible = True,interactive=True,type="value")
+                        with gr.Row():
+                            ex_elems = gr.Textbox(label="Elements")
+                        inex.change(fn=lambda i, x,y: gr.update(label =f"{i} : " + ",".join(x) +","+ y if x != [] or y != "" else "Include/Exclude"), inputs = [inex,ex_blocks,ex_elems],outputs = [acc_ex])
+                        ex_blocks.change(fn=lambda i, x,y: gr.update(label =f"{i} : " + ",".join(x) +","+ y if x != [] or y != "" else "Include/Exclude"), inputs = [inex,ex_blocks,ex_elems],outputs = [acc_ex])
+                        ex_elems.change(fn=lambda i, x,y: gr.update(label =f"{i} : " + ",".join(x) +","+ y if x != [] or y != "" else "Include/Exclude"),inputs=[inex,ex_blocks,ex_elems],outputs = [acc_ex])
+
+                    with gr.Accordion("Advanced", open=False):
+                        with gr.Row():
+                            currentcache = gr.Textbox(label="Current Cache")
+                            loadcachelist = gr.Button(elem_id="model_merger_merge", value="Reload Cache List",variant='primary')
+                            unloadmodel = gr.Button(value="unload model",variant='primary')
+
+                with gr.Column(variant="compact",elem_id="txt2img_results"):
+                    components.currentmodel = gr.Textbox(label="Current Model",lines=1,value="")
+                    components.submit_result = gr.Textbox(label="Message")
+                    
+                    output_panel = create_output_panel("txt2img", opts.outdir_txt2img_samples)
+                    
+                    mgallery = output_panel[0]  if isinstance(output_panel, tuple) else output_panel.gallery
+                    mgeninfo = output_panel[1]   if isinstance(output_panel, tuple) else output_panel.generation_info
+                    mhtmlinfo = output_panel[2]   if isinstance(output_panel, tuple) else output_panel.infotext
+                    mhtmllog = output_panel[3]   if isinstance(output_panel, tuple) else output_panel.html_log
+
+                    with gr.Row():
+                        components.merge2 = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge!",variant='primary')
+                        components.mergeandgen2 = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Merge&Gen",variant='primary')
+                        components.gen2 = gr.Button(elem_id="model_merger_merge", elem_classes=["compact_button"], value="Gen",variant='primary')
+                        stopmerge2 = gr.Button(elem_id="stopmerge", elem_classes=["compact_button"], value="Stop")
+                    
+        # main ui end 
     
-    checkpoint_info = deepcopy(checkpoint_info)
-    # change model name etc.
-    sha256 = hashlib.sha256(json.dumps(metadata).encode("utf-8")).hexdigest()
-    checkpoint_info.sha256 = sha256
-    checkpoint_info.name_for_extra = currentmodel
-    checkpoint_info.isfake = True
-
-    checkpoint_info.name = checkpoint_info.name_for_extra + ".safetensors"
-    checkpoint_info.model_name = checkpoint_info.name_for_extra.replace("/", "_").replace("\\", "_")
-    checkpoint_info.title = f"{checkpoint_info.name} [{sha256[0:10]}]"
-    checkpoint_info.metadata = metadata
-
-    # for sd-webui  v1.5.x
-    sd_models.checkpoints_list[checkpoint_info.title] = checkpoint_info
-
-        # force to set a new sha256 hash
-    if c_cache is not None: 
-        hashes = c_cache("hashes")
-        hashes[f"checkpoint/{checkpoint_info.name}"] = {
-        "mtime": os.path.getmtime(checkpoint_info.filename),
-        "sha256": sha256,
-        }
-        # save cache
-        dump_cache()
-
-    # set ids for a fake checkpoint info
-    checkpoint_info.ids = [checkpoint_info.model_name, checkpoint_info.name, checkpoint_info.name_for_extra]
-    return checkpoint_info
-
-NUM_INPUT_BLOCKS = 12
-NUM_MID_BLOCK = 1
-NUM_OUTPUT_BLOCKS = 12
-NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
-BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11"]
-BLOCKIDXLL=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","VAE"]
-BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
-BLOCKIDXLLL=["CLIPL","CLIPG","IN0","IN00","IN10","IN20","IN30","IN40","IN41","IN410","IN411","IN50","IN51","IN510","IN511","IN60","IN70","IN71","IN710","IN711","IN712","IN713","IN714","IN715","IN716","IN717","IN718","IN719","IN80","IN81","IN810","IN811","IN812","IN813","IN814","IN815","IN816","IN817","IN818","IN819","MID00","MID10","MID100","MID101","MID102","MID103","MID104","MID105","MID106","MID107","MID108","MID109","MID20","OUT00","OUT01","OUT010","OUT011","OUT012","OUT013","OUT014","OUT015","OUT016","OUT017","OUT018","OUT019","OUT10","OUT11","OUT110","OUT111","OUT112","OUT113","OUT114","OUT115","OUT116","OUT117","OUT118","OUT119","OUT20","OUT21","OUT210","OUT211","OUT212","OUT213","OUT214","OUT215","OUT216","OUT217","OUT218","OUT219","OUT22","OUT30","OUT31","OUT310","OUT311","OUT40","OUT41","OUT410","OUT411","OUT50","OUT51","OUT510","OUT511","OUT52","OUT60","OUT70","OUT80","OUT9","TIME","LABEL", "VAE"]
-BLOCKIDXLLS=["BASE", "BASE" ,"IN0","IN00","IN01","IN02","IN03","IN04","IN04","IN04" ,"IN04" ,"IN05","IN05","IN05" ,"IN05" ,"IN06","IN07","IN07","IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN08","IN08","IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"M00"  ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"  ,"M00"  ,"OUT00","OUT00","OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT01","OUT01","OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT02","OUT02","OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02","OUT03","OUT03","OUT03" ,"OUT03" ,"OUT04","OUT04","OUT04" ,"OUT04" ,"OUT05","OUT05","OUT05" ,"OUT05","OUT05","OUT06","OUT07","OUT08","OUT08", "Not Merge", "Not Merge", "VAE"]
-BLOCKIDFLUX = ["CLIP", "T5", "IN"] + ["D{:002}".format(x) for x in range(19)] + ["S{:002}".format(x) for x in range(38)] + ["OUT"] # Len: 61
-
-# The DiT models of Forge Neo (Z-Image, Anima, Krea2) have a single stack of
-# transformer blocks instead of the double/single split of Flux. Same length as
-# BLOCKIDFLUX so a weight string written for Flux can be used here unchanged.
-# T5 covers the text side that ships inside the diffusion model: the LLM adapter
-# of Anima and the text fusion tower of Krea2.
-BLOCKIDDIT = ["CLIP", "T5", "IN"] + ["B{:002}".format(x) for x in range(57)] + ["OUT"] # Len: 61
-
-# keys that only appear in one of the Forge Neo DiT architectures
-DIT_MARKERS = ("cap_embedder", "noise_refiner", "llm_adapter", "txtfusion", "adaln_modulation_cross_attn")
-RANDMAP = [0,50,100] #alpha,beta,elements
-
-statistics = {"sum":{},"mean":{},"max":{},"min":{}}
-    
-################################################
-##### Main Merging Code
-
-def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,
-                useblocks,custom_name,save_sets,id_sets,wpresets,deep,fine,bake_in_vae,opt_value,inex,ex_blocks,ex_elems,esettings,lucks,main = [False,False,False]):
-
-    caster("merge start",hearm)
-    theta_0 = theta_1 = theta_2 = None
-    qdtypes = [None, None, None]
-    global hear,mergedmodel,stopmerge,statistics, revert_target
-    stopmerge = False
-    
-    deepprint  = "print change" in esettings
-    print(esettings,"use extended XL" in esettings)
-    
-    debug = "debug" in save_sets
-    uselerp = "use old calc method" not in save_sets
-    device = "cuda" if "use cuda" in save_sets else "cpu"
-    use32 = "use float32" in save_sets
-    to_cpu = "offload" in save_sets
-
-    if forge or neo:
-        fcinfo = sd_models.get_closet_checkpoint_match(shared.opts.sd_model_checkpoint)
-        revert_target = revert_target if hasattr(fcinfo, "isfake") else fcinfo
-        unload_forge()
-    else:
-        unload_model_weights(sd_models.model_data.sd_model)
-
-    # for from file
-    if type(useblocks) is str:
-        useblocks = True if useblocks =="True" else False
-    if type(base_alpha) == str:base_alpha = float(base_alpha)
-    if type(base_beta) == str:base_beta  = float(base_beta)
-
-    #random
-    if lucks != {}:
-        if lucks["seed"] == -1: lucks["ceed"] = str(random.randrange(4294967294))
-        else: lucks["ceed"] = lucks["seed"] 
-    else: lucks["ceed"]  = 0
-    np.random.seed(int(lucks["ceed"]))
-    randomer = np.random.rand(3000)
-
-    cachetarget =[]
-    for model,num in zip([model_a,model_b,model_c],main):
-        if model != "" and num:
-            cachetarget.append(model)
-
-    weights_a,deep = randdealer(weights_a,randomer,0,lucks,deep)
-    weights_b,_ = randdealer(weights_b,randomer,1,lucks,None)
-
-    weights_a_orig = weights_a_excluded = weights_a
-    weights_b_orig = weights_b_excluded = weights_b
-
-    # preset to weights
-    if wpresets != False and useblocks:
-        weights_a = wpreseter(weights_a,wpresets)
-        weights_b = wpreseter(weights_b,wpresets)
-
-    # mode select booleans
-    usebeta = MODES[2] in mode or MODES[3] in mode or "tensor" in calcmode
-    metadata = {"format": "pt"}
-
-    if (calcmode == "trainDifference" or calcmode == "extract") and "Add" not in mode:
-        print(f"{bcolors.WARNING}Mode changed to add difference{bcolors.ENDC}")
-        mode = "Add"
-    if model_c == "" or model_c is None:
-        #fallback to avoid crash
-        model_c = model_a
-        print(f"{bcolors.WARNING}Substituting empty model_c with model_a{bcolors.ENDC}")
-
-    if not useblocks:
-        weights_a = weights_b = ""
-    #for save log and save current model
-    mergedmodel =[weights_a,weights_b,
-                            hashfromname(model_a),hashfromname(model_b),hashfromname(model_c),
-                            base_alpha,base_beta,mode,useblocks,custom_name,save_sets,id_sets,deep,calcmode,lucks["ceed"],fine,opt_value,inex,ex_blocks,ex_elems].copy()
-
-    model_a = namefromhash(model_a)
-    model_b = namefromhash(model_b)
-    model_c = namefromhash(model_c)
-
-    caster(mergedmodel,False)
-
-    #elementals
-    if len(deep) > 0:
-        deep = deep.replace("\n",",")
-        deep = deep.replace(calcmode+",","")
-        deep = deep.split(",")
-
-    #format check
-    if model_a =="" or model_b =="" or ((not MODES[0] in mode) and model_c=="") : 
-        return "ERROR: Necessary model is not selected",*NON4
-    
-    #exclude/include
-    ex_elems = ex_elems.split(",")
-
-    #for MBW text to list
-    weights_a_excluded = [float(w) for w in weights_a.split(',')] if useblocks else [None] * 110
-    weights_b_excluded = [float(w) for w in weights_b.split(',')] if useblocks and usebeta else [None] * 110
-    
-    if useblocks:
-        weights_a_t=weights_a.split(',',1)
-        weights_b_t=weights_b.split(',',1)
-        base_alpha  = float(weights_a_t[0])    
-        weights_a = [float(w) for w in weights_a_t[1].split(',')]
-        caster(f"from {weights_a_t}, alpha = {base_alpha},weights_a ={weights_a}",hearm)
-        if not (len(weights_a) == 25 or len(weights_a) == 19 or len(weights_a) == 60 or len(weights_a) ==109):return f"ERROR: weights alpha value must be 20 or 26 or 61, or 110.",*NON4
-        if usebeta:
-            base_beta = float(weights_b_t[0]) 
-            weights_b = [float(w) for w in weights_b_t[1].split(',')]
-            caster(f"from {weights_b_t}, beta = {base_beta},weights_a ={weights_b}",hearm)
-            if not(len(weights_b) == 25 or len(weights_b) == 19 or len(weights_a) == 60 or len(weights_a) == 109): return f"ERROR: weights beta value must be 20 or 26 or 61, or 110.",*NON4
-
-    #model loading start 
-    caster("Model loading start",hearm)
-    printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks['ceed'],fine,inex,ex_blocks,ex_elems,device)
-
-    theta_1 = load_model_weights_m(model_b,2,cachetarget,device).copy()
-    qdtypes[1] = qdtyper(theta_1)
-    prefixer(theta_1)
-    
-    isxl = any(k.startswith("conditioner.embedders.1.") for k in theta_1.keys())
-    isflux = any("double_block" in k for k in theta_1.keys())
-    isdit = not isxl and not isflux and any(any(m in k for m in DIT_MARKERS) for k in theta_1.keys())
-
-    #adjust
-    if fine.rstrip(",0") != "":
-        fine = fineman(fine,isxl)
-    else:
-        fine = ""
-
-    if isxl and useblocks:
-        if len(weights_a) == 25:
-            weights_a = weighttoxl(weights_a)
-            print(f"alpha weight converted for XL{weights_a}")
-        if usebeta:
-            if len(weights_b) == 25:
-                weights_b = weighttoxl(weights_b)
-                print(f"beta weight converted for XL{weights_b}")
-        if len(weights_a) == 19: weights_a = weights_a + [0]
-        if len(weights_b) == 19: weights_b = weights_b + [0]
-
-    if stopmerge: return "STOPPED", *NON4
-    if not (MODES[0] in mode): #Add, Twice, Triple
-        theta_2 = load_model_weights_m(model_c,3,cachetarget,device).copy()
-        prefixer(theta_2)
-        qdtypes[2] = qdtyper(theta_2)
-  
-    if MODES[1] in mode: #Add
-        if not(calcmode == "trainDifference" or calcmode == "extract"):
-            if isflux and qdtypes[1] != qdtypes[2]:
-                to_qdtype(theta_1, theta_2, qdtypes[1], qdtypes[2], device, "Model B", "Model C")
-            for key in tqdm(theta_1, desc="Stage 0/2, Add difference"):
-                if 'model' in key:
-                    if stopmerge: return "STOPPED", *NON4
-                    if not ("weight" in key or "bias" in key): continue
-                    if key in theta_2:
-                        a = list(theta_1[key].shape)
-                        b = list(theta_2[key].shape)
-                        assert_inpaint(a, b, key)
-                        if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
-                            # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
-                            theta_1_a = theta_1[key][:, 0:4, :, :]
-                        else:
-                            theta_1_a = theta_1[key]
-                        theta_1[key] = (theta_1_a.to(torch.float32) -theta_2[key].to(torch.float32)).to(theta_1[key].dtype)
-                    else:
-                        theta_1[key] = torch.zeros_like(theta_1[key].to(torch.float16))
-            del theta_2
-            theta_2 = None
-            devices.torch_gc()
-    
-    if  "tensor" in calcmode or "self" in calcmode:
-        theta_t = load_model_weights_m(model_a,1,cachetarget,device).copy()
-        theta_0 ={}
-        for key in theta_t:
-            theta_0[key] = theta_t[key].clone()
-        del theta_t
-    else:
-        theta_0 = load_model_weights_m(model_a,1,cachetarget,device).copy()
-
-    if not isxl:
-        isxl = any(k.startswith("conditioner.embedders.1.") for k in theta_0.keys())
-    if not isdit and not isxl and not isflux:
-        isdit = any(any(m in k for m in DIT_MARKERS) for k in theta_0.keys())
-
-    qdtypes[0] = qdtyper(theta_0)
-    need_revert = prefixer(theta_0)
-
-    print(f"Model precisions : {qdtypes}")
-
-    unify_fp8_scales(theta_0, theta_1, theta_2)
-
-    quants = [(name, quant_formats(sd)) for name, sd in
-              (("A", theta_0), ("B", theta_1), ("C", theta_2)) if sd is not None]
-    quants = [(name, fmt) for name, fmt in quants if fmt]
-    if len({tuple(sorted(fmt)) for _, fmt in quants}) > 1:
-        described = ", ".join(f"{name}: {'/'.join(sorted(fmt))}" for name, fmt in quants)
-        return f"ERROR: the models are quantized differently ({described}). Merging their raw values would produce noise, use checkpoints quantized the same way.", *NON4
-
-    if qdtypes[0] != qdtypes[1]:
-        print(f"Precision of model B (or B-C) is changing to {qdtypes[0]}...")
-        to_qdtype(theta_0, theta_1, qdtypes[0], qdtypes[1], device, "Model A", "Model B")
-
-    if theta_2 is not None: 
-        to_qdtype(theta_0, theta_2, qdtypes[0], qdtypes[2], device, "Model A", "Model C")
-
-    ##### Stage 0/2 in Cosine
-    if "cosine" in calcmode:
-        sim, sims = precosine("A" in calcmode,theta_0,theta_1)
-
-    ##### Stage 1/2   
-
-    alpha = base_alpha
-    beta = base_beta
-
-    keyratio = []
-    key_and_alpha = {}
-
-    for num, key in enumerate(tqdm(theta_0.keys(), desc="Stage 1/2") if not False else theta_0.keys()):
-        if debug:print(key)
-        if stopmerge: return "STOPPED", *NON4
-        if (isflux and key not in theta_1) or (not isflux and not ("model" in key and key in theta_1)):continue
-        if not ("weight" in key or "bias" in key): continue
-        if theta_2 is not None and key not in theta_2: continue
-                
-        if theta_0[key].device.type != device:theta_0[key] = theta_0[key].to(device)
-        if theta_1[key].device.type != device:theta_1[key] = theta_1[key].to(device)
-        if theta_2 is not None and theta_2[key].device.type != device:theta_2[key] = theta_2[key].to(device)
-
-        weight_index = -1
-        current_alpha = alpha
-        current_beta = beta
-
-        a = list(theta_0[key].shape)
-        b = list(theta_1[key].shape)
-
-        assert_inpaint(a, b, key)
-
-        block,blocks26 = blockfromkey(key,isxl,isflux,isdit)
-        
-        #if block == "Not Merge": continue
-        skip = inex != "Off" and (ex_blocks or (ex_elems != [""])) and excluder(block,blocks26,inex,ex_blocks,ex_elems,key)
-        if isflux and blocks26 in BLOCKIDFLUX:
-            weight_index = BLOCKIDFLUX.index(blocks26)
-        elif isdit and blocks26 in BLOCKIDDIT:
-            weight_index = BLOCKIDDIT.index(blocks26)
-        elif isxl and blocks26 in BLOCKIDXLL:
-            weight_index = BLOCKIDXLL.index(blocks26)
-        elif blocks26 in BLOCKID:
-            weight_index = BLOCKID.index(blocks26)
-        else:
-            continue
-        
-        weight_index_xl = BLOCKIDXLLL.index(block) if isxl and block in BLOCKIDXLLL else -1
-
-        if useblocks:
-            if weight_index > 0:
-                if skip:weights_a_excluded[weight_index] = 0
-                current_alpha = weights_a[weight_index - 1] 
-                if len(weights_a) == 109:
-                    if skip:weights_a_excluded[weight_index_xl] = 0
-                    current_alpha = weights_a[weight_index_xl - 1] 
-                
-                if usebeta:
-                    if skip:weights_b_excluded[weight_index] = 0
-                    current_beta = weights_b[weight_index - 1]
-                    if len(weights_b) == 109:
-                        if skip:weights_b_excluded[weight_index_xl] = 0
-                        current_alpha = weights_b[weight_index_xl - 1]
-            if weight_index == 0:
-                if len(weights_a) == 109 and weight_index_xl == 1:
-                    if skip:weights_a_excluded[weight_index_xl] = 0
-                    current_alpha = weights_a[weight_index_xl - 1] 
-                if len(weights_b) == 109 and usebeta and weight_index_xl == 1:
-                    if skip:weights_b_excluded[weight_index_xl] = 0
-                    current_alpha = weights_b[weight_index_xl - 1]
-                
-                if skip:weights_a_excluded[0] = 0
-                if skip:weights_b_excluded[0] = 0
-        
-        if skip:continue
-
-        if len(deep) > 0:
-            current_alpha = elementals(key,weight_index,weight_index_xl,deep,randomer,num,lucks,deepprint,current_alpha,len(weights_a) == 109 or "use extended XL" in esettings)
-
-        keyratio.append([key,current_alpha, current_beta])
-        #keyratio.append([key,current_alpha, current_beta,list(theta_0[key].shape),torch.sum(theta_0[key]).item(), torch.mean(theta_0[key]).item(), torch.max(theta_0[key]).item(),  torch.min(theta_0[key]).item()])
-        if debug:print(current_alpha,current_beta)
-
-        if calcmode == "normal":
-            if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
-                # Merge only the vectors the models have in common.  Otherwise we get an error due to dimension mismatch.
-                theta_0_a = theta_0[key][:, 0:4, :, :]
-            else:
-                theta_0_a = theta_0[key]
-
-            if MODES[1] in mode:#Add
-                caster(f"{num}, {block}, {model_a}+{current_alpha}+*({model_b}-{model_c}),{key}",hear)
-                if uselerp:
-                    if use32:
-                        theta_0_a = torch.lerp(theta_0_a,theta_0_a.to(torch.float32) + current_alpha * theta_1[key].to(torch.float32),1.0).to(theta_0_a.dtype)
-                    else:
-                        theta_0_a = torch.lerp(theta_0_a,theta_0_a + current_alpha * theta_1[key],1.0)
-                else:
-                    if use32:
-                        theta_0_a = (theta_0_a.to(torch.float32) + current_alpha * theta_1[key].to(torch.float32)).to(theta_0_a.dtype)
-                    else:
-                        theta_0_a = (theta_0_a + current_alpha * theta_1[key])
-
-            elif MODES[2] in mode:#Triple
-                caster(f"{num}, {block}, {model_a}+{1-current_alpha-current_beta}+{model_b}*{current_alpha}+ {model_c}*{current_beta}",hear)
-                #
-                if uselerp and current_alpha + current_beta != 0:
-                    if use32:
-                        theta_0_a =lerp(theta_0_a.to(torch.float32),lerp(theta_1[key].to(torch.float32),theta_2[key].to(torch.float32),current_beta/(current_alpha + current_beta)),current_alpha + current_beta).to(theta_0_a.dtype)
-                    else:
-                        theta_0_a =lerp(theta_0_a,lerp(theta_1[key],theta_2[key],current_beta/(current_alpha + current_beta)),current_alpha + current_beta)
-                else:
-                    theta_0_a = (1 - current_alpha-current_beta) * theta_0_a + current_alpha * theta_1[key]+current_beta * theta_2[key] 
-
-            elif MODES[3] in mode:#Twice
-                caster(f"{num}, {block}, {key},{model_a} +  {1-current_alpha} + {model_b}*{current_alpha}",hear)
-                caster(f"{num}, {block}, {key}({model_a}+{model_b}) +{1-current_beta}+{model_c}*{current_beta}",hear)
-                if uselerp:
-                    theta_0_a = torch.lerp(torch.lerp(theta_0_a.to(torch.float32), theta_1[key].to(torch.float32), current_alpha), theta_2[key].to(torch.float32), current_beta).to(theta_0_a.dtype)
-                else:
-                    theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
-                    theta_0_a = (1 - current_beta) * theta_0_a + current_beta * theta_2[key]
-
-            else:#Weight
-                if current_alpha == 1:
-                    caster(f"{num}, {block}, {key} alpha = 1,{model_a}={model_b}",hear)
-                    theta_0_a = theta_1[key]
-                elif current_alpha !=0:
-                    caster(f"{num}, {block}, {key}, {model_a}*{1-current_alpha}+{model_b}*{current_alpha}",hear)
-                    if uselerp:
-                        theta_0_a = torch.lerp(theta_0_a.to(torch.float32), theta_1[key].to(torch.float32), current_alpha).to(theta_0_a.dtype)
-                    else:
-                        theta_0_a = (1 - current_alpha) * theta_0_a + current_alpha * theta_1[key]
-
-            if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
-                theta_0[key][:, 0:4, :, :] = theta_0_a
-            else:
-                theta_0[key] = theta_0_a
-
-            theta_0_a = a = b = None
-            del theta_0_a, a, b
-
-        elif "cosine" in calcmode:
-            if "first_stage_model" in key: continue
-            cosine(calcmode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp)
-
-        elif calcmode == "trainDifference":
-            if torch.allclose(theta_1[key].float(), theta_2[key].float().to(device=theta_1[key].device), rtol=0, atol=0):
-                theta_2[key] = theta_0[key]
-                continue
-            traindiff(key,current_alpha,theta_0,theta_1,theta_2)
-
-        elif calcmode == "smoothAdd":
-            caster(f"{num}, {block}, model A[{key}] +  {current_alpha} + * (model B - model C)[{key}]", hear)
-            # Apply median filter to the weight differences
-            filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
-            # Apply Gaussian filter to the filtered differences
-            filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
-            theta_1[key] = torch.tensor(filtered_diff).to(theta_0[key].device)
-            # Add the filtered differences to the original weights
-            theta_0[key] = theta_0[key] + current_alpha * theta_1[key]
-
-        elif calcmode == "smoothAdd MT":
-            key_and_alpha[key] = current_alpha
-
-        elif "tensor" in calcmode:
-            dim = theta_0[key].dim()
-            if dim == 0 : continue
-            tensormerge("2" not in calcmode,key,dim,theta_0,theta_1,current_alpha,current_beta)
-
-        elif "extract" == calcmode:
-            theta_0[key] = extract_super(theta_0[key],theta_1[key],theta_2[key],current_alpha,current_beta,opt_value)
-
-        elif calcmode == "self":
-            if any(selfkey in key for selfkey in SELFKEYS):continue
-            if current_alpha == 0: continue
-            theta_0[key] = (theta_0[key].clone()) * current_alpha
-
-        elif calcmode == "plus random":
-            if any(selfkey in key for selfkey in SELFKEYS):continue
-            if current_alpha == 0: continue
-            theta_0[key] +=  torch.randn_like(theta_0[key].clone()) * current_alpha
-
-        ##### Adjust
-        if any(item in key for item in FINETUNES) and fine:
-            index = FINETUNES.index(key)
-            if 5 > index : 
-                theta_0[key] =theta_0[key]* fine[index] 
-            else :theta_0[key] =theta_0[key] + torch.tensor(fine[5]).to(theta_0[key].device)
-
-        ##### del quantize info
-        if isflux and not calcmode == "smoothAdd MT":
-            theta_1[key] = None
-            del theta_1[key]
-
-        if to_cpu:
-            theta_0[key] = theta_0[key].to("cpu")
+        with gr.Tab("LoRA", elem_id="tab_lora"):
+            pluslora.on_ui_tabs()
+                    
+        with gr.Tab("Analysis", elem_id="tab_analysis"):
+            with gr.Tab("Models"):
+                with gr.Row():
+                    an_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint A",interactive=True)
+                    create_refresh_button(an_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                    an_model_b = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint B",interactive=True)
+                    create_refresh_button(an_model_b, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z") 
+                with gr.Row():
+                    an_mode  = gr.Radio(label = "Analysis Mode",choices = ["ASimilarity","Block","Element","Both"], value = "ASimilarity",type  = "value") 
+                    an_calc  = gr.Radio(label = "Block method",choices = ["Mean","Min","attn2"], value = "Mean",type  = "value") 
+                    an_include  = gr.CheckboxGroup(label = "Include",choices = ["Textencoder(BASE)","U-Net","VAE"], value = ["Textencoder(BASE)","U-Net"],type  = "value") 
+                    an_settings = gr.CheckboxGroup(label = "Settings",choices=["save as txt", "save as csv"],type="value",interactive=True)
+                with gr.Row():
+                    run_analysis = gr.Button(value="Run Analysis",variant='primary')
+                with gr.Row():
+                    analysis_cosdif = gr.Dataframe(headers=["block","key","similarity[%]"],)
+            with gr.Tab("Text Encoder"):
+                    with gr.Row():
+                        te_smd_loadkeys = gr.Button(value="Calculate Textencoer",variant='primary')
+                        te_smd_searchkeys = gr.Button(value="Search Word(red,blue,girl,...)",variant='primary')
+                        exclude = gr.Checkbox(label="exclude non numeric,alphabet,symbol word")
+                    pickupword = gr.TextArea()
+                    encoded = gr.Dataframe()
+
+        run_analysis.click(fn=calccosinedif,inputs=[an_model_a,an_model_b,an_mode,an_settings,an_include,an_calc],outputs=[analysis_cosdif])    
+
+        with gr.Tab("History", elem_id="tab_history"):
             
-        try:
-            theta_1[key] = theta_1[key].to("cpu")
-        except:
-            pass
+            with gr.Row():
+                with gr.Column(scale = 2):
+                    with gr.Row():
+                        count = gr.Dropdown(choices=["20", "30", "40", "50", "100"], value="20", label="Load count")
+                        load_history = gr.Button(value="Load history",variant='primary', elem_classes=["reset"])
+                        reload_history = gr.Button(value="Reload history", elem_classes=["reset"])
+                with gr.Column(scale = 2):
+                    with gr.Row():
+                        searchwrods = gr.Textbox(label="",lines=1,value="")
+                        search = gr.Button(value="search", elem_classes=["reset"])
+                        searchmode = gr.Radio(label = "Search Mode",choices = ["or","and"], value = "or",type  = "value") 
+            with gr.Row():
+                history = gr.Dataframe(
+                        headers=["ID","Time","Name","Weights alpha","Weights beta","Model A","Model B","Model C","alpha","beta","Mode","use MBW","custum name","save setting","use ID"],
+                )
     
-    if calcmode == "smoothAdd MT":
-        # setting threads to higher than 8 doesn't significantly affect the time for merging
-        threads = cpu_count()
-        tasks_per_thread = 8
+        import lora
 
-        theta_0, theta_1, stopped = multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear)
-        if stopped:
-            return "STOPPED", *NON4
+        with gr.Tab("Elements", elem_id="tab_deep"):
+                with gr.Row():
+                    smd_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Checkpoint",interactive=True)
+                    create_refresh_button(smd_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
+                    smd_loadkeys = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    smd_lora = gr.Dropdown(list(lora.available_loras.keys()),elem_id="model_converter_model_name",label="LoRA",interactive=True)
+                    create_refresh_button(smd_lora, lora.list_available_loras, lambda: {"choices": list(lora.available_loras.keys())},"refresh_checkpoint_Z")
+                    smd_loadkeys_l = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    keys = gr.Dataframe(headers=["No.","block","key"],)
+                    keys_t = gr.TextArea()
 
-    for key in tqdm(theta_1.keys(), desc="Stage 2/2"):
-        if key in CHCKPOINT_DICT_SKIP_ON_MERGE or isflux:
-            continue
-        if "model" in key and key not in theta_0:
-            theta_0.update({key:theta_1[key]})
+        with gr.Tab("Metadata", elem_id="tab_metadata"):
+                with gr.Row():
+                    meta_model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="read metadata",interactive=True)
+                    create_refresh_button(meta_model_a, sd_models.list_models,lambda: {"choices": sd_models.checkpoint_tiles()},"refresh_checkpoint_Z")    
+                    smd_loadmetadata = gr.Button(value="load keys",variant='primary')
+                with gr.Row():
+                    metadata = gr.TextArea()
 
-    # both dicts carry the prefix until here, reverting earlier made every key of
-    # theta_1 look missing from theta_0 and the stage above duplicated all of them
-    if need_revert:
-        prefixer(theta_0, True)
+        # 指定IDから比率を抽出して解析
+        def analyze_ids(id_text):
+            ids = [int(x.strip()) for x in id_text.split(",") if x.strip().isdigit()]
+            wlen = 0
+            label = None
 
-    theta_1 = None
-    del theta_1
-    if calcmode == "trainDifference" or calcmode == "extract":
-        theta_2 = None
-        del theta_2
-    gc.collect()
-
-    ##### Sanity check: repair NaN/Inf produced by the merge (fp16 overflow etc.)
-    bad_keys = []
-    for key, tensor in theta_0.items():
-        if not torch.is_tensor(tensor) or not torch.is_floating_point(tensor):
-            continue
-        # torch has no isfinite kernel for the float8 types, so an fp8 checkpoint
-        # such as the Krea2 releases has to be checked through a float32 view
-        check = tensor.float() if tensor.element_size() == 1 else tensor
-        if not torch.isfinite(check).all():
-            bad_keys.append(key)
-            theta_0[key] = torch.nan_to_num(check, nan=0.0, posinf=65504.0, neginf=-65504.0).to(tensor.dtype)
-    if bad_keys:
-        print(f"WARNING: merge produced NaN/Inf in {len(bad_keys)} tensor(s), values were clamped/zeroed. First few: {bad_keys[:10]}")
-
-    ##### BakeVAE
-    bake_in_vae_filename = sd_vae.vae_dict.get(bake_in_vae, None)
-    if bake_in_vae_filename is not None:
-        print(f"Baking in VAE from {bake_in_vae_filename}")
-        vae_dict = load_torch_file(bake_in_vae_filename, device = torch.device(device)) if forge or neo else sd_vae.load_vae_dict(bake_in_vae_filename, map_location=device)
-
-        for key in vae_dict.keys():
-            theta_0_key = 'first_stage_model.' + key
-            if theta_0_key in theta_0:
-                theta_0[theta_0_key] = vae_dict[key]
-        vae_dict = None
-        del vae_dict
- 
-    caster(mergedmodel,False)
-    if "Reset CLIP ids" in save_sets: resetclip(theta_0)
-
-    weights_a_excluded = ",".join(str(x) for x in weights_a_excluded if x is not None)
-    weights_b_excluded = ",".join(str(x) for x in weights_b_excluded if x is not None)
+            ratios = []
+            for id in ids:
+                r = reversparams(id, readweight=True)
+                if r is not None:
+                    r = r.split(",")
+                    if wlen == 0:
+                        wlen = len(r)
+                        for bid in BLOCKIDS:
+                            if len(bid) == wlen:
+                                label = bid
+                    if len(r) != wlen:
+                        return "Weight length mismatch!"
+                    ratios.append(r)
     
-    currentmodel = makemodelname(weights_a_excluded,weights_b_excluded,model_a, model_b,model_c, base_alpha,base_beta,useblocks,mode,calcmode)
-    modelid = rwmergelog(currentmodel,mergedmodel)
-    if "save E-list" in lucks["set"]: saveekeys(keyratio,modelid)
-    
-    overwrite_last_weights(weights_a_excluded,weights_b_excluded)
+            ratios_matrix = np.array(ratios)
 
-    if True: # always set metadata. savemodel() will check save_sets later
-        merge_recipe = {
-            "type": "sd-webui-supermerger",
-            "weights_alpha": weights_a if useblocks else None,
-            "weights_beta": weights_b if useblocks else None,
-            "weights_alpha_orig":weights_a_excluded if useblocks else None,
-            "weights_beta_orig": weights_b_excluded if useblocks else None,
-            "model_a": longhashfromname(model_a),
-            "model_b": longhashfromname(model_b),
-            "model_c": longhashfromname(model_c),
-            "base_alpha": base_alpha,
-            "base_beta": base_beta,
-            "mode": mode,
-            "mbw": useblocks,
-            "elemental_merge": deep,
-            "calcmode" : calcmode,
-            f"{inex}":ex_blocks + ex_elems
-            }
-        metadata["sd_merge_recipe"] = json.dumps(merge_recipe)
-        metadata["sd_merge_models"] = {}
+            ratios_matrix = ratios_matrix.astype(float)
 
-        def add_model_metadata(checkpoint_name):
-            checkpoint_info = sd_models.get_closet_checkpoint_match(checkpoint_name)
-            checkpoint_info.calculate_shorthash()
-            metadata["sd_merge_models"][checkpoint_info.sha256] = {
-                "name": checkpoint_name,
-                "legacy_hash": checkpoint_info.hash
-            }
+            mean_ratios = np.mean(ratios_matrix, axis=0)
+            std_ratios = np.std(ratios_matrix, axis=0)
 
-            #metadata["sd_merge_models"].update(checkpoint_info.metadata.get("sd_merge_models", {}))
+            def plot_bar_with_std_band(mean_ratios, std_ratios, layer_names):
+                import matplotlib.pyplot as plt
+                import numpy as np
 
-        if model_a:
-            add_model_metadata(model_a)
-        if model_b:
-            add_model_metadata(model_b)
-        if model_c:
-            add_model_metadata(model_c)
+                fig, ax = plt.subplots(figsize=(14, 5))
+                x = np.arange(len(mean_ratios))
 
-        metadata["sd_merge_models"] = json.dumps(metadata["sd_merge_models"])
+                # ±1σ の帯を棒で描く
+                for xi, mu, sigma in zip(x, mean_ratios, std_ratios):
+                    bottom = mu - sigma
+                    height = sigma * 2
+                    ax.bar(xi, height, bottom=bottom, width=0.8, color='yellow', alpha=0.7, edgecolor='black')
+                    ax.plot(xi, mu, 'ko', markersize=3)  # 平均点
 
-    return "",currentmodel,modelid,theta_0,metadata
+                ax.set_title("マージ比率の平均 ± 標準偏差（±1σ）")
+                ax.set_xlabel("層名")
+                ax.set_ylabel("alpha 値")
 
-################################################
-##### cosineA/B
-def precosine(calcmode,theta_0,theta_1):
-    if calcmode: #favors modelA's structure with details from B
-        if stopmerge: return "STOPPED", *NON4
-        sim = torch.nn.CosineSimilarity(dim=0)
-        sims = np.array([], dtype=np.float64)
-        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
-            # skip VAE model parameters to get better results
-            if "first_stage_model" in key: continue
-            if "model" in key and key in theta_1:
-                theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
-                theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
-                simab = sim(theta_0_norm, theta_1_norm)
-                sims = np.append(sims,simab.cpu().numpy())
-        sims = sims[~np.isnan(sims)]
-        sims = np.delete(sims, np.where(sims<np.percentile(sims, 1 ,method = 'midpoint')))
-        sims = np.delete(sims, np.where(sims>np.percentile(sims, 99 ,method = 'midpoint')))
-    else: #favors modelB's structure with details from A
-        if stopmerge: return "STOPPED", *NON4
-        sim = torch.nn.CosineSimilarity(dim=0)
-        sims = np.array([], dtype=np.float64)
-        for key in (tqdm(theta_0.keys(), desc="Stage 0/2")):
-            # skip VAE model parameters to get better results
-            if "first_stage_model" in key: continue
-            if "model" in key and key in theta_1:
-                simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
-                dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
-                magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
-                combined_similarity = (simab + magnitude_similarity) / 2.0
-                sims = np.append(sims, combined_similarity.cpu().numpy())
-        sims = sims[~np.isnan(sims)]
-        sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
-        sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
-    return sim, sims
+                # 層名を表示（多いので回転あり）
+                ax.set_xticks(x)
+                ax.set_xticklabels(layer_names, rotation=90, fontsize=6)
 
-def cosine(mode,key,sim,sims,current_alpha,theta_0,theta_1,num,block,uselerp):
-    if "A" in mode: #favors modelA's structure with details from B
-        # skip VAE model parameters to get better results
-        if "model" in key and key in theta_0:
-            # Normalize the vectors before merging
-            theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
-            theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
-            simab = sim(theta_0_norm, theta_1_norm)
-            dot_product = torch.dot(theta_0_norm.view(-1), theta_1_norm.view(-1))
-            magnitude_similarity = dot_product / (torch.norm(theta_0_norm) * torch.norm(theta_1_norm))
-            combined_similarity = (simab + magnitude_similarity) / 2.0
-            k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-            k = k - abs(current_alpha)
-            k = k.clip(min=0,max=1.0)
-            caster(f"{num}, {block}, model A[{key}] {1-k} +  (model B)[{key}]*{k}",hear)
-            if uselerp:
-                theta_0[key] = lerp(theta_1[key].to(torch.float32), theta_0[key].to(torch.float32),k).to(theta_0[key].dtype)
+                plt.tight_layout()
+                return fig
+
+            # 図を作成
+            if label is None:
+                label = [""] * wlen
+            fig = plot_bar_with_std_band(mean_ratios, std_ratios, label)
+
+            # カンマ区切りテキスト
+            mean_str = ",".join(f"{v:.3f}" for v in mean_ratios)
+            std_str = ",".join(f"{v:.3f}" for v in std_ratios)
+            std_str2 = ",".join(f"{v*2:.3f}" for v in std_ratios)
+            std_str3 = ",".join(f"{v*3:.3f}" for v in std_ratios)
+
+            # 結果テキスト
+            result_text = (
+                f"有効なID数: {len(ids)}\n"
+                f"\n平均α:\n{mean_str}\n"
+                f"\n標準偏差:\n{std_str}"
+                f"\n標準偏差x2:\n{std_str2}"
+                f"\n標準偏差x3:\n{std_str3}"
+            )
+
+            return result_text, fig
+
+        # Gradio UI
+        with gr.Tab("Weight Analysis", elem_id="tab_w_ana"):
+            with gr.Blocks() as demo:
+                gr.Markdown("## 🔍 Stable Diffusion XL - Merge Ratio Analysis Tool（マージ比率解析ツール）")
+                gr.Markdown(
+                    """
+                    Enter one or more Merge IDs separated by commas to analyze and compare their weight ratios.  
+                    カンマ区切りで複数のマージIDを入力すると、それぞれの比率を比較して解析できます。
+                    """
+                )
+                id_input = gr.Textbox(label="Target Merge ID(s)（対象のマージID）", placeholder="例: merge_001, merge_002")
+                analyze_btn = gr.Button("Analyze（解析する）")
+                result_text = gr.Textbox(label="Result Summary（結果概要）")
+                graph_output = gr.Plot(label="Ratio Graph（比率グラフ）")
+
+                analyze_btn.click(
+                    analyze_ids,
+                    inputs=[id_input],
+                    outputs=[result_text, graph_output]
+                )
+
+
+        with gr.Tab("IDs from images", elem_id="ids"):
+            # Gradioインターフェースの作成
+            with gr.Blocks() as demo:
+                gr.Markdown("# Merge IDs from images, drag and drop multiple images")
+                
+                with gr.Row():
+                    image_input = gr.File(
+                        file_count="multiple", 
+                        file_types=["png"], 
+                        label="PNGファイルをここにドラッグ＆ドロップ"
+                    )
+                    
+                output_textbox = gr.Textbox(label="抽出されたPNG Info（配列形式）")
+
+                # ファイルがアップロードされたら関数を実行
+
+        smd_loadmetadata.click(
+            fn=loadmetadata,
+            inputs=[meta_model_a],
+            outputs=[metadata]
+        )                 
+
+        mclearcache.click(fn=clearcache)
+        smd_loadkeys.click(fn=loadkeys,inputs=[smd_model_a,components.dfalse],outputs=[keys,keys_t])
+        smd_loadkeys_l.click(fn=loadkeys,inputs=[smd_lora,components.dtrue],outputs=[keys,keys_t])
+
+        te_smd_loadkeys.click(fn=encodetexts,inputs=[exclude],outputs=[encoded])
+        te_smd_searchkeys.click(fn=pickupencode,inputs=[pickupword],outputs=[encoded])
+        
+
+        def unload():
+            if shared.sd_model == None: return "already unloaded"
+            sd_models.unload_model_weights()
+            return "model unloaded"
+
+        unloadmodel.click(fn=unload,outputs=[components.submit_result])
+
+        load_history.click(fn=load_historyf,inputs=[history,count],outputs=[history])
+        reload_history.click(fn=load_historyf,inputs=[history,count,components.dtrue],outputs=[history])
+
+        components.msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,components.id_sets,wpresets,deep,dsettings,finetune,bake_in_vae,opt_value,inex,ex_blocks,ex_elems]
+        components.imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
+        components.xysettings=[x_type,xgrid,y_type,ygrid,z_type,zgrid,esettings]
+        components.genparams=[prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size]
+        components.hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
+        components.lucks = [luckmode,lucksets,lucklimits_u,lucklimits_l,lucklimits_u_d,lucklimits_l_d,luckseed,luckserial,luckcustom,luckround]
+
+        setdefault.click(fn = configdealer,
+            inputs =[*components.genparams,*components.hiresfix[1:],components.dfalse],
+        )
+
+        resetdefault.click(fn = configdealer,
+            inputs =[*components.genparams,*components.hiresfix[1:],components.dtrue],
+        )
+
+        resetcurrent.click(fn = lambda x : [gr.update(value = x) for x in RESETVALS] ,outputs =[*components.genparams,*components.hiresfix[1:]],)
+
+        s_reverse.click(fn = reversparams,
+            inputs =mergeid,
+            outputs = [components.submit_result,*components.msettings[0:8],*components.msettings[9:13],deep,calcmode,luckseed,finetune,opt_value,inex,ex_blocks,ex_elems]
+        )
+
+        read_from_id.click(reversparams,[mergeid_dice,components.dtrue],lucklimits_u)
+        read_from_mbw.click(lambda x: x,weights_a,lucklimits_u)
+        search.click(fn = searchhistory,inputs=[searchwrods,searchmode],outputs=[history])
+
+        s_reloadreserve.click(fn=nulister,inputs=[components.dfalse],outputs=[components.numaframe])
+        s_delreserve.click(fn=nulister,inputs=[s_delnum],outputs=[components.numaframe])
+        loadcachelist.click(fn=getcachelist,inputs=[],outputs=[currentcache])
+        addtox.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[xgrid])
+        addtoy.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[ygrid])
+        addtoz.click(fn=lambda x:gr.Textbox.update(value = x),inputs=[inputer],outputs=[zgrid])
+
+        stopgrid.click(fn=freezetime)
+        stopmerge.click(fn=freezemtime)
+        stopmerge2.click(fn=freezemtime)
+
+        checkpoints.change(fn=lambda x:",".join(x),inputs=[checkpoints],outputs=[inputer])
+        blockids.change(fn=lambda x:" ".join(x),inputs=[blockids],outputs=[inputer])
+        calcmodes.change(fn=lambda x:",".join(x),inputs=[calcmodes],outputs=[inputer])
+
+        menbers = [base,in00,in01,in02,in03,in04,in05,in06,in07,in08,in09,in10,in11,mi00,ou00,ou01,ou02,ou03,ou04,ou05,ou06,ou07,ou08,ou09,ou10,ou11]
+        menbers_plus = menbers + [resetval]
+
+        lower.change(fn = lambda x: [gr.update(minimum = x) for i in range(len(menbers_plus))],inputs = [lower],outputs = menbers_plus)
+        upper.change(fn = lambda x: [gr.update(maximum = x) for i in range(len(menbers_plus))],inputs = [upper],outputs = menbers_plus)
+
+        setalpha.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_a])
+        setbeta.click(fn=slider2text,inputs=[*menbers,wpresets, dd_preset_weight,isxl],outputs=[weights_b])
+        setx.click(fn=add_to_seq,inputs=[xgrid,weights_a],outputs=[xgrid])     
+        sety.click(fn=add_to_seq,inputs=[ygrid,weights_b],outputs=[ygrid])
+
+        mode_info = {
+            "Weight sum": "A*(1-alpha)+B*alpha",
+            "Add difference": "A+(B-C)*alpha",
+            "Triple sum": "A*(1-alpha-beta)+B*alpha+C*beta",
+            "sum Twice": "(A*(1-alpha)+B*alpha)*(1-beta)+C*beta"
+        }
+        mode.change(fn=lambda mode,calcmode: [gr.update(info=mode_info[mode]), gr.update(interactive=True if mode in ["Triple sum", "sum Twice"] or calcmode in ["tensor", "tensor2"] else False)], inputs=[mode,calcmode], outputs=[mode, base_beta], show_progress=False)
+        calcmode.change(fn=lambda calcmode: gr.update(interactive=True) if calcmode in ["tensor", "tensor2","extract"] else gr.update(), inputs=[calcmode], outputs=base_beta, show_progress=False)
+        useblocks.change(fn=lambda mbw: gr.update(visible=False if mbw else True), inputs=[useblocks], outputs=[alpha_group])
+
+        def save_current_merge(custom_name, save_settings):
+            msg = savemodel(None,None,custom_name,save_settings)
+            return gr.update(value=msg)
+
+        def addblockweights(val, blockopt, *blocks):
+            if val == "none":
+                val = 0
+
+            value = float(val)
+
+            if "BASE" in blockopt:
+                vals = [blocks[0] + value]
             else:
-                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+                vals = [blocks[0]]
 
-    else: #favors modelB's structure with details from A
-        # skip VAE model parameters to get better results
-        if "model" in key and key in theta_0:
-            simab = sim(theta_0[key].to(torch.float32), theta_1[key].to(torch.float32))
-            dot_product = torch.dot(theta_0[key].view(-1).to(torch.float32), theta_1[key].view(-1).to(torch.float32))
-            magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
-            combined_similarity = (simab + magnitude_similarity) / 2.0
-            k = (combined_similarity - sims.min()) / (sims.max() - sims.min())
-            k = k - current_alpha
-            k = k.clip(min=0,max=1.0)
-            caster(f"{num}, {block}, model A[{key}] *{1-k} + (model B)[{key}]*{k}",hear)
-            if uselerp:
-                theta_0[key] = lerp(theta_1[key].to(torch.float32), theta_0[key].to(torch.float32),k).to(theta_0[key].dtype)
+            if "INP*" in blockopt:
+                inp = [blocks[i + 1] + value for i in range(12)]
             else:
-                theta_0[key] = theta_1[key] * (1 - k) + theta_0[key] * k
+                inp = [blocks[i + 1] for i in range(12)]
+            vals = vals + inp
 
-################################################
-##### Traindiff
-def traindiff(key,current_alpha,theta_0,theta_1,theta_2):
-            # Check if theta_1[key] is equal to theta_2[key]
-    diff_AB = theta_1[key].float() - theta_2[key].float()
+            if "MID" in blockopt:
+                mid = [blocks[13] + value]
+            else:
+                mid = [blocks[13]]
+            vals = vals + mid
 
-    distance_A0 = torch.abs(theta_1[key].float() - theta_2[key].float())
-    distance_A1 = torch.abs(theta_1[key].float() - theta_0[key].float())
+            if "OUT*" in blockopt:
+                out = [blocks[i + 14] + value for i in range(12)]
+            else:
+                out = [blocks[i + 14] for i in range(12)]
+            vals = vals + out
 
-    sum_distances = distance_A0 + distance_A1
+            return setblockweights(vals, blockopt)
 
-    scale = torch.where(sum_distances != 0, distance_A1 / sum_distances, torch.tensor(0.).float())
-    sign_scale = torch.sign(theta_1[key].float() - theta_2[key].float())
-    scale = sign_scale * torch.abs(scale)
+        def mulblockweights(val, blockopt, *blocks):
+            if val == "none":
+                val = 0
 
-    new_diff = scale * torch.abs(diff_AB)
-    theta_0[key] = theta_0[key] + (new_diff * (current_alpha*1.8))
+            value = float(val)
 
-################################################
-##### Extract
-def extract_super(base: Optional[Tensor], a: Tensor, b: Tensor, alpha: float, beta: float, gamma: float) -> Tensor:
-    assert base is None or base.shape == a.shape
-    assert a.shape == b.shape
-    assert 0 <= alpha <= 1
-    assert 0 <= beta <= 1
-    assert 0 <= gamma
-    dtype = base.dtype if base is not None else a.dtype
-    base = base.float() if base is not None else 0
-    a = a.float() - base
-    b = b.float() - base
-    c = cosine_similarity(a, b, -1).clamp(-1, 1).unsqueeze(-1)
-    d = ((c + 1) / 2) ** gamma
-    result = base + lerp(a, b, alpha) * lerp(d, 1 - d, beta)
-    return result.to(dtype)
+            if "BASE" in blockopt:
+                vals = [blocks[0] * value]
+            else:
+                vals = [blocks[0]]
 
-def extract(a: Tensor, b: Tensor, p: float, smoothness: float) -> Tensor:
-    assert a.shape == b.shape
-    assert 0 <= p <= 1
-    assert 0 <= smoothness <= 1
-    
-    r = relu if smoothness == 0 else partial(softplus, beta=1 / smoothness)
-    c = r(cosine_similarity(a, b, dim=-1)).unsqueeze(dim=-1).repeat_interleave(b.shape[-1], -1)
-    m = torch.lerp(c, torch.ones_like(c) - c, p)
-    return a * m
+            if "INP*" in blockopt:
+                inp = [blocks[i + 1] * value for i in range(12)]
+            else:
+                inp = [blocks[i + 1] for i in range(12)]
+            vals = vals + inp
 
-################################################
-##### Tensor Merge
-def tensormerge(mode,key,dim, theta_0,theta_1,current_alpha,current_beta):
-    if mode:
-        if current_alpha+current_beta <= 1 :
-            talphas = int(theta_0[key].shape[0]*(current_beta))
-            talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
-            if dim == 1:
-                theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+            if "MID" in blockopt:
+                mid = [blocks[13] * value]
+            else:
+                mid = [blocks[13]]
+            vals = vals + mid
 
-            elif dim == 2:
-                theta_0[key][talphas:talphae,:] = theta_1[key][talphas:talphae,:].clone()
+            if "OUT*" in blockopt:
+                out = [blocks[i + 14] * value for i in range(12)]
+            else:
+                out = [blocks[i + 14] for i in range(12)]
+            vals = vals + out
 
-            elif dim == 3:
-                theta_0[key][talphas:talphae,:,:] = theta_1[key][talphas:talphae,:,:].clone()
+            return setblockweights(vals, blockopt)
 
-            elif dim == 4:
-                theta_0[key][talphas:talphae,:,:,:] = theta_1[key][talphas:talphae,:,:,:].clone()
+        def resetblockweights(val, blockopt):
+            if val == "none":
+                val = 0
+            vals = [float(val)] * 26
+            return setblockweights(vals, blockopt)
 
-        else:
-            talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
-            talphae = int(theta_0[key].shape[0]*(current_beta))
-            theta_t = theta_1[key].clone()
-            if dim == 1:
-                theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+        def setblockweights(vals, blockopt):
+            if "BASE" in blockopt:
+                ret = [gr.update(value = vals[0])]
+            else:
+                ret = [gr.update()]
 
-            elif dim == 2:
-                theta_t[talphas:talphae,:] = theta_0[key][talphas:talphae,:].clone()
+            if "INP*" in blockopt:
+                inp = [gr.update(value = vals[i + 1]) for i in range(12)]
+            else:
+                inp = [gr.update() for _ in range(12)]
+            ret = ret + inp
 
-            elif dim == 3:
-                theta_t[talphas:talphae,:,:] = theta_0[key][talphas:talphae,:,:].clone()
+            if "MID" in blockopt:
+                mid = [gr.update(value = vals[13])]
+            else:
+                mid = [gr.update()]
+            ret = ret + mid
 
-            elif dim == 4:
-                theta_t[talphas:talphae,:,:,:] = theta_0[key][talphas:talphae,:,:,:].clone()
-            theta_0[key] = theta_t
+            if "OUT*" in blockopt:
+                out = [gr.update(value = vals[i + 14]) for i in range(12)]
+            else:
+                out = [gr.update() for _ in range(12)]
+            ret = ret + out
 
-    else:
-        if current_alpha+current_beta <= 1 :
-            talphas = int(theta_0[key].shape[0]*(current_beta))
-            talphae = int(theta_0[key].shape[0]*(current_alpha+current_beta))
-            if dim > 1:
-                if theta_0[key].shape[1] > 100:
-                    talphas = int(theta_0[key].shape[1]*(current_beta))
-                    talphae = int(theta_0[key].shape[1]*(current_alpha+current_beta))
-            if dim == 1:
-                theta_0[key][talphas:talphae] = theta_1[key][talphas:talphae].clone()
+            return ret
 
-            elif dim == 2:
-                theta_0[key][:,talphas:talphae] = theta_1[key][:,talphas:talphae].clone()
+        def resetvalopt(opt):
+            if opt == "none":
+                value = 0.0
+            else:
+                value = float(opt)
 
-            elif dim == 3:
-                theta_0[key][:,talphas:talphae,:] = theta_1[key][:,talphas:talphae,:].clone()
+            return gr.update(value = value)
 
-            elif dim == 4:
-                theta_0[key][:,talphas:talphae,:,:] = theta_1[key][:,talphas:talphae,:,:].clone()
+        def finetune_update(finetune, detail1, detail2, detail3, contrast, bri, col1, col2, col3):
+            arr = [detail1, detail2, detail3, contrast, bri, col1, col2, col3]
+            tmp = ",".join(map(lambda x: str(int(x)) if x == 0.0 else str(x), arr))
+            if finetune != tmp:
+                return gr.update(value=tmp)
+            return gr.update()
 
-        else:
-            talphas = int(theta_0[key].shape[0]*(current_alpha+current_beta-1))
-            talphae = int(theta_0[key].shape[0]*(current_beta))
-            theta_t = theta_1[key].clone()
-            if dim > 1:
-                if theta_0[key].shape[1] > 100:
-                    talphas = int(theta_0[key].shape[1]*(current_alpha+current_beta-1))
-                    talphae = int(theta_0[key].shape[1]*(current_beta))
-            if dim == 1:
-                theta_t[talphas:talphae] = theta_0[key][talphas:talphae].clone()
+        def finetune_reader(finetune):
+            tmp = [t.strip() for t in finetune.split(",")]
+            ret = [gr.update()]*7
+            for i, f in enumerate(tmp[0:7]):
+                try:
+                    f = float(f)
+                    ret[i] = gr.update(value=f)
+                except:
+                    pass
+            return ret
 
-            elif dim == 2:
-                theta_t[:,talphas:talphae] = theta_0[key][:,talphas:talphae].clone()
+        # update finetune
+        finetunes = [detail1, detail2, detail3, contrast, bri, col1, col2, col3]
+        finetune_reset.click(fn=lambda: [gr.update(value="")]+[gr.update(value=0.0)]*8, inputs=[], outputs=[finetune, *finetunes])
+        finetune_read.click(fn=finetune_reader, inputs=[finetune], outputs=[*finetunes])
+        finetune_write.click(fn=finetune_update, inputs=[finetune, *finetunes], outputs=[finetune])
+        detail1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        detail2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        detail3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        contrast.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        bri.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        col1.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        col2.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
+        col3.release(fn=finetune_update, inputs=[finetune, *finetunes], outputs=finetune, show_progress=False)
 
-            elif dim == 3:
-                theta_t[:,talphas:talphae,:] = theta_0[key][:,talphas:talphae,:].clone()
+        savecurrent.click(fn=save_current_merge, inputs=[custom_name, save_sets], outputs=[components.submit_result])
 
-            elif dim == 4:
-                theta_t[:,talphas:talphae,:,:] = theta_0[key][:,talphas:talphae,:,:].clone()
-            theta_0[key] = theta_t
+        resetopt.change(fn=resetvalopt,inputs=[resetopt],outputs=[resetval])
+        resetweight.click(fn=resetblockweights,inputs=[resetval,resetblockopt],outputs=menbers)
+        addweight.click(fn=addblockweights,inputs=[resetval,resetblockopt,*menbers],outputs=menbers)
+        mulweight.click(fn=mulblockweights,inputs=[resetval,resetblockopt,*menbers],outputs=menbers)
 
-################################################
-##### Multi Thread SmoothAdd
+        readalpha.click(fn=text2slider,inputs=[weights_a,isxl],outputs=menbers)
+        readbeta.click(fn=text2slider,inputs=[weights_b,isxl],outputs=menbers)
 
-def multithread_smoothadd(key_and_alpha, theta_0, theta_1, threads, tasks_per_thread, hear):  
-    lock_theta_0 = Lock()
-    lock_theta_1 = Lock()
-    lock_progress = Lock()
+        dd_preset_weight.change(fn=on_change_dd_preset_weight,inputs=[wpresets, dd_preset_weight],outputs=menbers)
+        dd_preset_weight_r.change(fn=on_change_dd_preset_weight_r,inputs=[wpresets, dd_preset_weight_r,luckab],outputs=[weights_a,weights_b])
 
-    def thread_callback(keys):
-        nonlocal theta_0, theta_1
-        if stopmerge:
-            return False
+        def refresh_presets(presets,rand,ab = ""):
+            choices = preset_name_list(presets,rand)
+            return gr.update(choices = choices)
 
-        for key in keys:
-            if key not in theta_1:
-                continue
-            caster(f"model A[{key}] +  {key_and_alpha[key]} + * (model B - model C)[{key}]", hear)
-            filtered_diff = scipy.ndimage.median_filter(theta_1[key].to(torch.float32).cpu().numpy(), size=3)
-            filtered_diff = scipy.ndimage.gaussian_filter(filtered_diff, sigma=1)
-            with lock_theta_1:
-                theta_1[key] = torch.tensor(filtered_diff)
-            with lock_theta_0:
-                theta_0[key] = theta_0[key] + key_and_alpha[key] * theta_1[key]
+        preset_refresh.click(fn=refresh_presets,inputs=[wpresets,components.dfalse],outputs=[dd_preset_weight])
+        preset_refresh_r.click(fn=refresh_presets,inputs=[wpresets,components.dtrue],outputs=[weights_a,weights_b])
 
-        with lock_progress:
-            progress.update(len(keys))
+        def changexl(isxl):
+            out = [True] * 26
+            if isxl:
+                for i,id in enumerate(BLOCKID[:-1]):
+                    if id not in BLOCKIDXLL[:-1]:
+                        out[i] = False
+            return [gr.update(visible = x) for x in out]
 
-        return True
+        isxl.change(fn=changexl,inputs=[isxl], outputs=menbers)
 
-    def extract_and_remove(input_list, count):
-        extracted = input_list[:count]
-        del input_list[:count]
+        x_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_blocks,row_calcmode])
+        y_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_blocks,row_calcmode])
+        z_type.change(fn=showxy,inputs=[x_type,y_type,z_type], outputs=[row_blockids,row_checkpoints,row_inputers,ygrid,zgrid,row_blocks,row_calcmode])
+        x_randseednum.change(fn=makerand,inputs=[x_randseednum],outputs=[xgrid])
 
-        return extracted
+        import subprocess
+        def openeditors():
+            subprocess.Popen(['start', filepath], shell=True)
 
-    keys = list(key_and_alpha.keys())
+        def reloadpresets():
+            try:
+                with open(filepath) as f:
+                    weights_presets = f.read()
+                    choices = preset_name_list(weights_presets)
+                    return [weights_presets, gr.update(choices = choices)]
+            except OSError as e:
+                pass
 
-    total_threads = ceil(len(keys) / int(tasks_per_thread))
-    print(f"max threads = {threads}, total threads = {total_threads}, tasks per thread = {tasks_per_thread}")
+        def savepresets(text):
+            with open(filepath,mode = 'w') as f:
+                f.write(text)
 
-    progress = tqdm(key_and_alpha.keys(), desc="smoothAdd MT")
+        s_reloadtext.click(fn=reloadpresets,inputs=[],outputs=[wpresets, dd_preset_weight])
+        s_reloadtags.click(fn=tagdicter,inputs=[wpresets],outputs=[weightstags])
+        s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
+        s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
 
-    futures = []
-    with ThreadPoolExecutor(max_workers=threads) as executor:
-        futures = [executor.submit(thread_callback, extract_and_remove(keys, int(tasks_per_thread))) for i in range(total_threads)]
-        for future in as_completed(futures):
-            if not future.result():
-                executor.shutdown()
-                return theta_0, theta_1, True
-        del progress
+        def savexyzpreset_f(xtype, xvals, ytype, yvals, ztype, zvals, name, mode_overwrite):
+            new_data = {"xtype": TYPESEG[xtype], "xvalues": xvals,
+                                "ytype": TYPESEG[ytype], "yvalues": yvals,
+                                "ztype": TYPESEG[ztype], "zvalues": zvals
+                                }
+            data = get_xyzpreset_data()
 
-    return theta_0, theta_1, False
+            if mode_overwrite:
+                data[name] = new_data
+            else:
+                if name in data:
+                    gr.Info(f"Supermerger: Preset {name} already exists.")
+                else:
+                    data[name] = new_data
 
-################################################
-##### Elementals
-def elementals(key,weight_index,weight_index_xl,deep,randomer,num,lucks,deepprint,current_alpha,extend):
-    for d in deep:
-        if d.count(":") != 2 :continue
-        dbs,dws,dr = d.split(":")
-        dbs = blocker(dbs,BLOCKIDXLLL if extend else BLOCKID)
-        dbs,dws = dbs.split(" "), dws.split(" ")
-        dbn,dbs = (True,dbs[1:]) if dbs[0] == "NOT" else (False,dbs)
-        dwn,dws = (True,dws[1:]) if dws[0] == "NOT" else (False,dws)
-        flag = dbn
-        for db in dbs:
-            if db == (BLOCKIDXLLL[weight_index_xl] if extend else BLOCKID[weight_index]):
-                flag = not dbn
-        if flag or dbs == [""]:flag = dwn
-        else:continue
-        for dw in dws:
-            if dw in key:
-                flag = not dwn
-        if flag:
-            dr = eratiodealer(dr,randomer,weight_index,num,lucks)
-            if deepprint :print(" ", dbs,dws,key,dr)
-            current_alpha = dr
-    return current_alpha
+            with open(xyzpath, 'w') as file:
+                json.dump(data, file, indent=4)
+            
+            data_keys = list(data.keys())
+            return gr.update(choices = sorted(data_keys))
+        
+        def deletexyzpreset_f(name):
+            data = get_xyzpreset_data()
 
-def forkforker(filename,device):
-    if forge or neo:
-        return load_torch_file(filename, device = torch.device(device))
-    try:
-        return sd_models.read_state_dict(filename, map_location = device)
-    except:
-        return sd_models.read_state_dict(filename)
+            try: del data[name] 
+            except KeyError: gr.Info(f"Supermerger: Preset {name} not found.")
 
-################################################
-##### Load Model
+            with open(xyzpath, 'w') as file:
+                json.dump(data, file, indent=4)
+                
+            keys_list = list(data.keys())
+            return gr.update(choices = sorted(keys_list))
 
-def load_model_weights_m(model,abc,cachetarget,device):
+        def loadxyzpreset_f(name):
+                data = get_xyzpreset_data()
+
+                preset_data = data.get(name)
+                if not preset_data:
+                    gr.Info(f"Supermerger: Preset {name} not found.")
+                    return [gr.update(value = x) for x in ["alpha","","none","","none",""]]
+
+                sets = [("xtype"),"xvalues","ytype","yvalues","ztype","zvalues"]
+
+                return [gr.update(value = preset_data.get(x)) for x in sets]
+        
+        def refreshxyzpresets_f(): 
+            return gr.update(choices = get_xyzpreset_keylist())
+        
+        savexyzpreset_b.click(fn=savexyzpreset_f,inputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid,xyzpresets,savexyzpreset_overwrite],outputs=[xyzpresets])
+        loadxyzpreset_b.click(fn=loadxyzpreset_f,inputs=[xyzpresets],outputs=[x_type, xgrid, y_type, ygrid, z_type, zgrid])
+        deletexyzpreset_b.click(fn=deletexyzpreset_f,inputs=[xyzpresets],outputs=[xyzpresets])
+        refreshxyzpresets_b.click(fn=refreshxyzpresets_f,outputs=[xyzpresets])
+
+        def process_images(files):
+            all_ids = []
+
+            for file in files:
+                try:
+                    img = Image.open(file.name)
+                    info_text = img.info.get('parameters', '')
+
+                    if info_text:
+                        # カンマで分割し、前後の空白を削除
+                        id = [item.strip() for item in info_text.split(' ID ')][-1]
+                        id = [item.strip() for item in id.split(',')][0]
+                        if id not in all_ids:
+                            all_ids.append(id)
+                    else:
+                        # 'parameters'キーがない場合や、情報が空の場合
+                        all_ids.append(["[この画像には指定のPNG Infoがありませんでした]"])
+
+                except Exception as e:
+                    # ファイルがPNGでない場合などのエラー処理
+                    all_ids.append([f"[エラー: {e}]"])
+                    
+            return ",".join(all_ids), None
+        
+        image_input.upload(fn=process_images, inputs=image_input, outputs=[output_textbox,image_input])
+
+    return (supermergerui, "SuperMerger", "supermerger"),
+
+msearch = []
+mlist=[]
+
+def loadmetadata(model):
+    import json
     checkpoint_info = sd_models.get_closet_checkpoint_match(model)
-    sd_model_name = checkpoint_info.model_name
+    if ".safetensors" not in checkpoint_info.filename: return "no metadata(not safetensors)"
+    sdict = sd_models.read_metadata_from_safetensors(checkpoint_info.filename)
+    if sdict == {}: return "no metadata"
+    return json.dumps(sdict,indent=4)
 
-    if checkpoint_info in modelcache:
-        print(f"Loading weights [{sd_model_name}] from cache")
-        return {k: v.to(device) for k, v in modelcache[checkpoint_info].items()}
-    else:
-        print(f"Loading weights [{sd_model_name}] from file")
-        state_dict = forkforker(checkpoint_info.filename,device)
-        if orig_cache >= abc:
-            modelcache[checkpoint_info] = state_dict
-            modelcache[checkpoint_info] = {k: v.to("cpu") for k, v in modelcache[checkpoint_info].items()}
-        dontdelete = []
-        for model in cachetarget:
-            dontdelete.append(sd_models.get_closet_checkpoint_match(model))
-        while len(modelcache) > orig_cache:
-            for key in modelcache.keys():
-                if key in dontdelete:continue
-                modelcache.pop(key)
-                break
-        return state_dict
-
-def makemodelname(weights_a,weights_b,model_a, model_b,model_c, alpha,beta,useblocks,mode,calc):
-    model_a=filenamecutter(model_a)
-    model_b=filenamecutter(model_b)
-    model_c=filenamecutter(model_c)
-
-    if type(alpha) == str:alpha = float(alpha)
-    if type(beta)== str:beta  = float(beta)
-
-    if useblocks:
-        if MODES[1] in mode:#add
-            currentmodel =f"{model_a} + ({model_b} - {model_c}) x alpha ({str(round(alpha,3))},{weights_a})"
-        elif MODES[2] in mode:#triple
-            currentmodel =f"{model_a} x (1-alpha-beta) + {model_b} x alpha + {model_c} x beta (alpha = {str(round(alpha,3))},{weights_a},beta = {beta},{weights_b})"
-        elif MODES[3] in mode:#twice
-            currentmodel =f"({model_a} x (1-alpha) + {model_b} x alpha)x(1-beta)+  {model_c} x beta ({str(round(alpha,3))},{weights_a})_({str(round(beta,3))},{weights_b})"
-        else:
-            currentmodel =f"{model_a} x (1-alpha) + {model_b} x alpha ({str(round(alpha,3))},{weights_a})"
-    else:
-        if MODES[1] in mode:#add
-            currentmodel =f"{model_a} + ({model_b} -  {model_c}) x {str(round(alpha,3))}"
-        elif MODES[2] in mode:#triple
-            currentmodel =f"{model_a} x {str(round(1-alpha-beta,3))} + {model_b} x {str(round(alpha,3))} + {model_c} x {str(round(beta,3))}"
-        elif MODES[3] in mode:#twice
-            currentmodel =f"({model_a} x {str(round(1-alpha,3))} +{model_b} x {str(round(alpha,3))}) x {str(round(1-beta,3))} + {model_c} x {str(round(beta,3))}"
-        else:
-            currentmodel =f"{model_a} x {str(round(1-alpha,3))} + {model_b} x {str(round(alpha,3))}"
-    if calc != "normal":
-        currentmodel = currentmodel + "_" + calc
-        if calc == "tensor":
-            currentmodel = currentmodel + f"_beta_{beta}"
-    return currentmodel
-
-path_root = scripts.basedir()
-
-
-################################################
-##### Logging
-
-def rwmergelog(mergedname = "",settings= [],id = 0):
-    # for compatible
-    mode_info = {
-        "Weight sum": "Weight sum:A*(1-alpha)+B*alpha",
-        "Add difference": "Add difference:A+(B-C)*alpha",
-        "Triple sum": "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
-        "sum Twice": "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
-    }
-    setting = settings.copy()
-    if len(setting) > 7 and setting[7] in mode_info:
-        setting[7] = mode_info[setting[7]] # fix mode entry for compatible
-    filepath = os.path.join(path_root, "mergehistory.csv")
-    is_file = os.path.isfile(filepath)
-
-    csv.field_size_limit(2244096)
-
-    if not is_file:
-        with open(filepath, 'a') as f:
-                                       #msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets, 12 deep 13 calcmode]
-            f.writelines('"ID","time","name","weights alpha","weights beta","model A","model B","model C","alpha","beta","mode","use MBW","plus lora","custum name","save setting","use ID"\n')
-    with  open(filepath, 'r+') as f:
-        reader = csv.reader(f)
-        mlist = [raw for raw in reader]
-        if mergedname != "":
-            mergeid = len(mlist)
-            setting.insert(0,mergedname)
-            for i,x in enumerate(setting):
-                if "," in str(x) or "\n" in str(x):setting[i] = f'"{str(setting[i])}"'
-            text = ",".join(map(str, setting))
-            text=str(mergeid)+","+datetime.datetime.now().strftime('%Y.%m.%d %H.%M.%S.%f')[:-7]+"," + text + "\n"
-            f.writelines(text)
-            return mergeid
-        try:
-            out = mlist[int(id)]
-        except:
-            out = "ERROR: OUT of ID index"
-        return out
-
-def overwrite_last_weights(weights_a, weights_b):
-    filepath = os.path.join(path_root, "mergehistory.csv")
-    if not os.path.isfile(filepath):
-        raise FileNotFoundError("mergehistory.csv not found.")
-
-    with open(filepath, 'r', newline='') as f:
-        reader = list(csv.reader(f))
-
-    if len(reader) <= 1:
-        raise ValueError("No data rows to update in mergehistory.csv.")
-
-    # 最後のデータ行に対して weights を上書き
-    last_row_index = len(reader) - 1
-    reader[last_row_index][3] = str(weights_a)  # "weights alpha"
-    reader[last_row_index][4] = str(weights_b)  # "weights beta"
-
-    # 上書き保存
-    with open(filepath, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerows(reader)
-
-def saveekeys(keyratio,modelid):
-    import csv
-    path_root = scripts.basedir()
-    dir_path = os.path.join(path_root,"extensions","sd-webui-supermerger","scripts", "data")
-
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    
-    filepath = os.path.join(dir_path,f"{modelid}.csv")
-
-    with open(filepath, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerows(keyratio)
-
-def savestatics(modelid):
-    for key in statistics.keys():
-        result = [[tkey] + list(statistics[key][tkey]) for tkey in statistics[key].keys()]
-        saveekeys(result,f"{modelid}_{key}")
-
-def get_font(fontsize):
-    fontpath = os.path.join(scriptpath, "Roboto-Regular.ttf")
+def load_historyf(data, count=20, reload=False):
+    filepath = os.path.join(path_root,"mergehistory.csv")
+    global mlist,msearch
     try:
-        return ImageFont.truetype(opts.font or fontpath, fontsize)
-    except Exception:
-        return ImageFont.truetype(fontpath, fontsize)
+        with  open(filepath, 'r') as f:
+            reader = csv.reader(f)
+            next(reader) # skip header
+            row_count = sum(1 for row in reader)
+            count = int(count)
 
-def draw_origin(grid, text,width,height,width_one):
-    grid_d= Image.new("RGB", (grid.width,grid.height), "white")
-    grid_d.paste(grid,(0,0))
+            nth = None
+            if not reload and data is not None and len(data) > 1:
+                old = data.loc[len(data)-1, 'ID']
+                if old != '':
+                    nth = int(old) - count - 1
 
-    d= ImageDraw.Draw(grid_d)
-    color_active = (0, 0, 0)
-    fontsize = (width+height)//25
-    fnt = get_font(fontsize)
+            if nth is None:
+                msearch = []
+                mlist = []
+                nth = row_count - count
+
+            f.seek(0)
+            next(reader)
+            nlist = [raw for n,raw in enumerate(reader, start=1) if n > nth and n <= (nth + count)]
+            nlist.reverse()
+            for m in nlist:
+                msearch.append(" ".join(m))
+            maxlen = len(nlist[-1][0])
+            for i,m in enumerate(nlist):
+                nlist[i][0] = nlist[i][0].zfill(maxlen)
+            mlist += nlist
+            return mlist
+    except:
+        return [["no data","",""],]
+
+def searchhistory(words,searchmode):
+    outs =[]
+    ando = "and" in searchmode
+    words = words.split(" ") if " " in words else [words]
+    for i, m in  enumerate(msearch):
+        hit = ando
+        for w in words:
+            if ando:
+                if w not in m:hit = False
+            else:
+                if w in m:hit = True
+        if hit :outs.append(mlist[i])
+
+    if outs == []:return [["no result","",""],]
+    return outs
+
+#msettings=[0 weights_a,1 weights_b,2 model_a,3 model_b,4 model_c,5 base_alpha,6 base_beta,7 mode,8 useblocks,9 custom_name,10 save_sets,11 id_sets,12 wpresets]
+#13  deep,14 calcmode,15 luckseed 16:opt_value 17 include/exclude 18: exclude_blocks, 19: exclude_elements
+MSETSNUM = 20
+
+def reversparams(id, only_w = False, readweight = False):
+    def selectfromhash(hash):
+        for model in sd_models.checkpoints_list.values():
+            if str(hash) == str(model.shorthash):
+                return model.name
+        return ""
+    try:
+        idsets = rwmergelog(id = id)
+    except Exception as e:
+        print(e)
+        return [gr.update(value = "ERROR: history file could not open"),*[gr.update() for x in range(MSETSNUM)]]
+    if type(idsets) == str:
+        print("ERROR")
+        return [gr.update(value = idsets),*[gr.update() for x in range(MSETSNUM)]]
+    if idsets[0] == "ID":return  [gr.update(value ="ERROR: no history"),*[gr.update() for x in range(MSETSNUM)]]
+    mgs = idsets[3:]
+    if mgs[0] == "":mgs[0] = "0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5"
+    if mgs[1] == "":mgs[1] = "0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2"
+    def cutter(text):
+        text = text.replace("[","").replace("]","").replace("'", "") 
+        return [x.strip() for x in text.split(",") if x != ""]
+    mgs[2] = selectfromhash(mgs[2]) if len(mgs[2]) > 5 else ""
+    mgs[3] = selectfromhash(mgs[3]) if len(mgs[3]) > 5 else ""
+    mgs[4] = selectfromhash(mgs[4]) if len(mgs[4]) > 5 else ""
+    mgs[7] = mgs[7].split(":")[0] # get mode name only
+    mgs[8] = mgs[8] =="True"
+    mgs[10] = cutter(mgs[10])
+    mgs[11] = cutter(mgs[11])
+    while len(mgs) < MSETSNUM:
+        mgs.append("")
+    mgs[13] = "normal" if mgs[13] == "" else mgs[13] 
+    mgs[14] = -1 if mgs[14] == "" else int(float(mgs[14]))
+    mgs[16] = 0.3 if mgs[16] == "" else float(mgs[16]) 
+    mgs[17] = "Off" if mgs[17] == "" else mgs[17]
+    mgs[18] = cutter(mgs[18])
+    mgs[18] = [x for x in mgs[18] if x in EXCLUDE_CHOICES + ["print"]]
     
-    if not text:
-        text = " "
+    if readweight:
+        return mgs[0]
+    
+    if only_w:
+        return gr.update(value = mgs[0])
+    else:
+        return [gr.update(value = "setting loaded") ,*[gr.update(value = x) for x in mgs[0:MSETSNUM]]]
 
-    if grid.width != width_one:
-        while d.multiline_textbbox((0,0), text, font=fnt)[2] > width_one*0.75 and fontsize > 0:
-            fontsize -=1
-            fnt = get_font(fontsize)
-    d.multiline_text((0,0), text, font=fnt, fill=color_active,align="center")
-    return grid_d
+def add_to_seq(seq,maker):
+    return gr.Textbox.update(value = maker if seq=="" else seq+"\r\n"+maker)
 
-def wpreseter(w,presets):
-    if "," not in w and w != "":
-        presets=presets.splitlines()
-        wdict={}
-        for l in presets:
-            if ":" in l :
-                key = l.split(":",1)[0]
-                wdict[key.strip()]=l.split(":",1)[1]
-            if "\t" in l:
-                key = l.split("\t",1)[0]
-                wdict[key.strip()]=l.split("\t",1)[1]
-        if w.strip() in wdict:
-            name = w
-            w = wdict[w.strip()]
-            print(f"weights {name} imported from presets : {w}")
-    return w
+def load_cachelist():
+    text = ""
+    for x in checkpoints_loaded.keys():
+        text = text +"\r\n"+ x.model_name
+    return text.replace("\r\n","",1)
 
-def fullpathfromname(name):
-    if hash == "" or hash ==[]: return ""
-    checkpoint_info = sd_models.get_closet_checkpoint_match(name)
-    return checkpoint_info.filename
+def makerand(num):
+    text = ""
+    for x in range(int(num)):
+        text = text +"-1,"
+    text = text[:-1]
+    return text
 
-def namefromhash(hash):
-    if hash == "" or hash ==[]: return ""
-    checkpoint_info = sd_models.get_closet_checkpoint_match(hash)
-    return checkpoint_info.model_name
+#0 row_blockids, 1 row_checkpoints, 2 row_inputers,3 ygrid, 4 zgrid, 5 row_blocks, 6 row_calcmode
+def showxy(x,y,z):
+    flags =[False]*7
+    t = TYPESEG
+    txy = t[x] + t[y] + t[z]
+    if "model" in txy : flags[1] = flags[2] = True
+    if "pinpoint" in txy : flags[0] = flags[2] = True
+    if "clude" in txy in txy : flags[5] = True
+    if "calcmode" in txy : flags[6] = True
+    if not "none" in t[y] : flags[3] = flags[2] = True
+    if not "none" in t[z] : flags[4] = flags[2] = True
+    return [gr.update(visible = x) for x in flags]
 
-def hashfromname(name):
-    from modules import sd_models
-    if name == "" or name ==[]: return ""
-    checkpoint_info = sd_models.get_closet_checkpoint_match(name)
-    if checkpoint_info.shorthash is not None:
-        return checkpoint_info.shorthash
-    return checkpoint_info.calculate_shorthash()
+def get_xyzpreset_data():
+    try:
+        with open(xyzpath, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        with open(xyzpath, 'w') as file:
+            json.dump({}, file, indent=4)
+        return {}
+    
+def get_xyzpreset_keylist():
+    keys_list = list(get_xyzpreset_data())
+    return sorted(keys_list)
 
-def longhashfromname(name):
-    from modules import sd_models
-    if name == "" or name ==[]: return ""
-    checkpoint_info = sd_models.get_closet_checkpoint_match(name)
-    if checkpoint_info.sha256 is not None:
-        return checkpoint_info.sha256
-    checkpoint_info.calculate_shorthash()
-    return checkpoint_info.sha256
+def text2slider(text, isxl=False):
+    vals = [t.strip() for t in text.split(",")]
+    vals = [0 if v in "RUX" else v for v in vals]
 
+    if isxl:
+        j = 0
+        ret = []
+        for i, v in enumerate(ISXLBLOCK):
+            if v:
+                ret.append(gr.update(value = float(vals[j])))
+                j += 1
+            else:
+                ret.append(gr.update())
+        return ret
 
-################################################
-##### Random
+    return [gr.update(value = float(v)) for v in vals]
+
+def slider2text(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,presets, preset, isxl):
+    az = find_preset_by_name(presets, preset)
+    if az is not None:
+        if any(element in az for element in RANCHA):return az
+    numbers = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z]
+    if isxl:
+        newnums = []
+        for i,id in enumerate(BLOCKID[:-1]):
+            if id in BLOCKIDXLL[:-1]:
+                newnums.append(numbers[i])
+        numbers = newnums
+    numbers = [str(x) for x in numbers]
+    return gr.update(value = ",".join(numbers) )
+
+def on_change_dd_preset_weight(presets, preset):
+    weights = find_preset_by_name(presets, preset)
+    if weights is not None:
+        return text2slider(weights)
+
+def on_change_dd_preset_weight_r(presets, preset, ab):
+    weights = find_preset_by_name(presets, preset)
+    if weights is not None:
+        if "none" in ab : return gr.update(),gr.update()
+        if "alpha" in ab : return gr.update(value = weights),gr.update()
+        if "beta" in ab : return gr.update(),gr.update(value = weights)
+    return gr.update(),gr.update()
 
 RANCHA = ["R","U","X"]
 
-def randdealer(w:str,randomer,ab,lucks,deep):
-    up,low = (lucks["upp"].split(","),lucks["low"].split(","))
-    upd,lowd = (lucks["uppd"].split(","),lucks["lowd"].split(","))
-    
-    if upd and len(upd) == 1:
-        upd = [upd[0]] * len(up)
-    if lowd and len(lowd) == 1:
-        lowd = [lowd[0]] * len(up)
-        
-    def limitter(ratio,i):
-        ratio = min(ratio, float(upd[i]))
-        ratio = max(ratio, float(lowd[i]))
-        return ratio
-    
-    out = []
-    outd = {"R":[],"U":[],"X":[]}
-    add = RANDMAP[ab]
-    for i, r in enumerate (w.split(",")):
-        if r.strip() =="R":
-            out.append(str(round(limitter(randomer[i+add],i),lucks["round"])))
-        elif r.strip() == "U":
-            out.append(str(round(limitter(-2 * randomer[i+add] + 1.5,i),lucks["round"])))
-        elif r.strip() == "X":
-            if "R" in low[i]:
-                if random.random() > float(low[i].split("R")[1]):
-                    low[i] = 0
-                    up[i] = 0
-                else:
-                    low[i] = low[i].split("R")[0]
-            out.append(str(round(limitter((float(low[i])-float(up[i]))* randomer[i+add] + float(up[i]),i),lucks["round"])))
-        elif "E" in r:
-            key = r.strip().replace("E","")
-            outd[key].append(BLOCKID[i])
-            out.append("0")
-        elif r.strip() == "D":
-            if "R" in low[i]:
-                low[i] = 0 if random.random() > float(low[i].split("R")[1]) else low[i].split("R")[0]
-            out.append(str(round(limitter(float(up[i]) + float(low[i]) * (randomer[i+add] - 0.5),i),lucks["round"])))
+def tagdicter(presets, rand = False):
+    presets=presets.splitlines()
+    wdict={}
+    for l in presets:
+        w=""
+        if ":" in l :
+            key = l.split(":",1)[0]
+            w = l.split(":",1)[1]
+        if "\t" in l:
+            key = l.split("\t",1)[0]
+            w = l.split("\t",1)[1]
+        if len([w for w in w.split(",")]) == 26:
+            if rand and not any(element in w for element in RANCHA) : continue
+            wdict[key.strip()]=w
+    return ",".join(list(wdict.keys()))
+
+def preset_name_list(presets, rand = False):
+    return tagdicter(presets, rand).split(",")
+
+def find_preset_by_name(presets, preset):
+    presets = presets.splitlines()
+    for l in presets:
+        if ":" in l:
+            key = l.split(":",1)[0]
+            w = l.split(":",1)[1]
+        elif "\t" in l:
+            key = l.split("\t",1)[0]
+            w = l.split("\t",1)[1]
         else:
-            out.append(r)
-    for key in outd.keys():
-        if outd[key] != []:
-            deep = deep + f",{' '.join(outd[key])}::{key}" if deep else f"{' '.join(outd[key])}::{key}"
-    return ",".join(out), deep
+            continue
+        if key == preset and len([w for w in w.split(",")]) == 26:
+            return w
 
-def eratiodealer(dr,randomer,block,num,lucks):
-    if  any(element in dr for element in RANCHA):
-        up,low = lucks["upp"],lucks["low"]
-        up,low = (up.split(","),low.split(","))
-        add = RANDMAP[2]
-        if dr.strip() =="R":
-            return round(randomer[num+add],lucks["round"])
-        elif dr.strip() == "U":
-            return round(-2 * randomer[num+add] + 1,lucks["round"])
-        elif dr.strip() == "X":
-            return round((float(low[block])-float(up[block]))* randomer[num+add] + float(up[block]),lucks["round"])
+    return None
+
+BLOCKID=["BASE","IN00","IN01","IN02","IN03","IN04","IN05","IN06","IN07","IN08","IN09","IN10","IN11","M00","OUT00","OUT01","OUT02","OUT03","OUT04","OUT05","OUT06","OUT07","OUT08","OUT09","OUT10","OUT11","Not Merge"]
+BLOCKIDXL=['BASE', 'IN0', 'IN1', 'IN2', 'IN3', 'IN4', 'IN5', 'IN6', 'IN7', 'IN8', 'M', 'OUT0', 'OUT1', 'OUT2', 'OUT3', 'OUT4', 'OUT5', 'OUT6', 'OUT7', 'OUT8', 'VAE']
+BLOCKIDXLL=['BASE', 'IN00', 'IN01', 'IN02', 'IN03', 'IN04', 'IN05', 'IN06', 'IN07', 'IN08', 'M00', 'OUT00', 'OUT01', 'OUT02', 'OUT03', 'OUT04', 'OUT05', 'OUT06', 'OUT07', 'OUT08', 'VAE']
+BLOCKIDXLLL = ["CLIPL","CLIPG","IN0","IN00","IN10","IN20","IN30","IN40","IN41","IN410","IN411","IN50","IN51", "IN510","IN511","IN60","IN70","IN71","IN710","IN711","IN712","IN713","IN714", "IN715","IN716","IN717","IN718","IN719","IN80","IN81","IN810","IN811","IN812","IN813","IN814", "IN815","IN816","IN817","IN818","IN819","MID00","MID10","MID100","MID101","MID102","MID103", "MID104","MID105","MID106","MID107","MID108","MID109","MID20","OUT00","OUT01","OUT010","OUT011", "OUT012","OUT013","OUT014","OUT015","OUT016","OUT017","OUT018","OUT019","OUT10", "OUT11","OUT110","OUT111","OUT112","OUT113","OUT114","OUT115","OUT116","OUT117","OUT118","OUT119", "OUT20","OUT21","OUT210","OUT211","OUT212","OUT213","OUT214","OUT215","OUT216", "OUT217","OUT218","OUT219","OUT22","OUT30","OUT31","OUT310","OUT311","OUT40","OUT41","OUT410", "OUT411","OUT50","OUT51","OUT510","OUT511","OUT52","OUT60","OUT70","OUT80","OUT9", "TIME","LABEL", "VAE"]
+ISXLBLOCK=[True,  True,  True,  True,  True,  True,  True,  True,  True,  True, False, False, False, True,   True,   True,   True,   True,   True,   True,   True,   True,   True,  False,  False,  False]
+BLOCKIDS = [BLOCKID,BLOCKIDXL,BLOCKIDXLL,BLOCKIDXLLL]
+
+def modeltype(sd):
+    if any(k.startswith("conditioner.embedders.1.") for k in sd.keys()):
+        return "XL"
+    elif any("double"in x for x in sd.keys()):
+        if any("nf4"in x for x in sd.keys()):return "flux.nf4"
+        if any("fp4"in x for x in sd.keys()):return "flux.fp4"
+        return "flux"
     else:
-        return float(dr)
+        return "1.X or 2.X"
 
-
-################################################
-##### Generate Image
-
-def simggen(s_prompt,s_nprompt,s_steps,s_sampler,s_cfg,s_seed,s_w,s_h,s_batch_size,
-            genoptions,s_hrupscaler,s_hr2ndsteps,s_denois_str,s_hr_scale,
-            mergeinfo,id_sets,modelid,
-            *txt2imgparams,
-            debug = False,
-            batch = False
-            ):
-    shared.state.begin()
-    from scripts.mergers.components import paramsnames
-    if debug: print(paramsnames)
-
-    #[None, 'Prompt', 'Negative prompt', 'Styles', 'Sampling steps', 'Sampling method', 'Batch count', 'Batch size', 'CFG Scale', 
-    # 'Height', 'Width', 'Hires. fix', 'Denoising strength', 'Upscale by', 'Upscaler', 'Hires steps', 'Resize width to', 'Resize height to', 
-    # 'Hires checkpoint', 'Hires sampling method', 'Hires prompt', 'Hires negative prompt', 'Override settings', 'Script', 'Refiner', 
-    # 'Checkpoint', 'Switch at', 'Seed', 'Extra', 'Variation seed', 'Variation strength', 'Resize seed from width', 'Resize seed from height', '', 'Active', 'Active', 'X Types', 'X Values', 'Y Types', 'Y Values']  
-
-    lowernames = [x.lower() if isinstance(x, str) else x for x in paramsnames]
-
-    def g(wanted,wantedv=None):
-        # Forge Neo renamed several labels (case changes, e.g. "Hires checkpoint"
-        # -> "Hires Checkpoint"), so fall back to a case-insensitive lookup
-        for target in (wanted, wantedv):
-            if not target: continue
-            if target in paramsnames: return txt2imgparams[paramsnames.index(target)]
-            if target.lower() in lowernames: return txt2imgparams[lowernames.index(target.lower())]
-        return None
-
-    sampler_index = g("Sampling method","Sampling Method")
-    if type(sampler_index) is str:
-        sampler_name = sampler_index
-    else:       
-        sampler_name = sd_samplers.samplers[sampler_index].name
-
-    hr_sampler_index = g("Hires sampling method")
-    if hr_sampler_index is None: hr_sampler_index = 0
-    if type(sampler_index) is str:
-        hr_sampler_name = hr_sampler_index
-    else:       
-        hr_sampler_name = "Use same sampler" if hr_sampler_index == 0 else  sd_samplers.samplers[hr_sampler_index+1].name
-
-    p = processing.StableDiffusionProcessingTxt2Img(
-        sd_model=shared.sd_model,
-        outpath_samples=opts.outdir_samples or opts.outdir_txt2img_samples,
-        outpath_grids=opts.outdir_grids or opts.outdir_txt2img_grids,
-        prompt=g("Prompt"),
-        styles=g("Styles"),
-        negative_prompt=g('Negative prompt','Negative Prompt'),
-        seed=g("Seed","Initial seed"),
-        subseed=g("Variation seed"),
-        subseed_strength=g("Variation strength"),
-        seed_resize_from_h=g("Resize seed from height"),
-        seed_resize_from_w=g("Resize seed from width"),
-        seed_enable_extras=g("Extra"),
-        sampler_name=sampler_name,
-        batch_size=g("Batch size","Batch Size"),
-        n_iter=g("Batch count","Batch Count"),
-        steps=g("Sampling steps","Sampling Steps"),
-        cfg_scale=g("CFG Scale"),
-        width=g("Width"),
-        height=g("Height"),
-        restore_faces=g("Restore faces","Face restore"),
-        tiling=g("Tiling"),
-        enable_hr=g("Hires. fix","Second pass"),
-        hr_scale=g("Upscale by"),
-        hr_upscaler=g("Upscaler"),
-        hr_second_pass_steps=g("Hires steps","Secondary steps"),
-        hr_resize_x=g("Resize width to"),
-        hr_resize_y=g("Resize height to"),
-        override_settings=create_override_settings_dict(g("Override settings")),
-        do_not_save_grid=True,
-        do_not_save_samples=True,
-        do_not_reload_embeddings=True,
-    )
-    p.hr_checkpoint_name=None if g("Hires checkpoint") == 'Use same checkpoint' else g("Hires checkpoint")
-    if neo:
-        # Neo splits guidance into CFG + distilled CFG (Flux/SD3/Qwen "shift")
-        for _attr, _label in (("distilled_cfg_scale", "Distilled CFG Scale"),
-                              ("hr_cfg", "Hires CFG Scale"),
-                              ("hr_distilled_cfg", "Hires Distilled CFG Scale")):
-            _v = g(_label)
-            if _v is not None: setattr(p, _attr, _v)
-        _hr_sched = g("Hires schedule type")
-        p.hr_scheduler = None if _hr_sched in (None, "Use same scheduler") else _hr_sched
-        _hr_mods = g("Hires VAE / Text Encoder")
-        _hr_mods = [] if _hr_mods in (None, ["Use same choices"]) else _hr_mods
-    p.hr_sampler_name=None if hr_sampler_name == 'Use same sampler' else  hr_sampler_name
-    p.hr_additional_modules = _hr_mods if neo else []
-
-    if s_sampler is None: s_sampler = 0
-
-    if s_batch_size != 1 :p.batch_size = int(s_batch_size)
-    if s_prompt: p.prompt = s_prompt
-    if s_nprompt: p.negative_prompt = s_nprompt
-    if s_steps: p.steps = s_steps
-    if s_sampler: p.sampler_name = sampler_name
-    if s_cfg: p.cfg_scale = s_cfg
-    if s_seed: p.seed = s_seed
-    if s_w: p.width = s_w
-    if s_h: p.height = s_h
-
-    if not p.cfg_scale: p.cfg_scale = 7
-
-    p.scripts = scripts.scripts_txt2img
-    p.script_args = txt2imgparams[paramsnames.index("Override settings")+1:]
-                
-    p.denoising_strength=g("Denoising strength") if p.enable_hr else None
-
-    p.hr_prompt=g("Hires prompt","Secondary Prompt")
-    p.hr_negative_prompt=g("Hires negative prompt","Secondary negative prompt")
-
-    if "Hires. fix" in genoptions:
-        p.enable_hr = True
-        if s_hrupscaler: p.hr_upscaler = s_hrupscaler
-        if s_hr2ndsteps:p.hr_second_pass_steps = s_hr2ndsteps
-        if s_denois_str:p.denoising_strength = s_denois_str
-        if s_hr_scale:p.hr_scale = s_hr_scale
-
-    if "Restore faces" in genoptions:
-        p.restore_faces = True
-
-    if "Tiling" in genoptions:
-        p.tiling = True
-
-    p.cached_c = [None,None]
-    p.cached_uc = [None,None]
-
-    p.cached_hr_c = [None, None]
-    p.cached_hr_uc = [None, None]
-
-    if batch:
-        prompts = p.prompt.split("\n\n")
-        p.all_prompts = prompts
-        p.prompt = prompts
-        p.batch_size = len(prompts)
-        p.all_seeds = p.seed = [p.seed] * len(prompts)
-        p.subseeds = [p.subseed] * len(prompts)
-        p.negative_prompt = [p.negative_prompt] * len(prompts)
-    elif type(p.prompt) == list:
-        p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
+def loadkeys(model_a, lora):
+    if lora:
+        import lora
+        sd =  load_torch_file(lora.available_loras[model_a].filename, device = torch.device("cpu")) if forge else sd_models.read_state_dict(lora.available_loras[model_a].filename,"cpu")
     else:
-        p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(p.prompt, p.styles)]
+        sd = loadmodel(model_a)
+    keys = []
+    mtype = modeltype(sd)
 
-    if type(p.negative_prompt) == list:
-        p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(x, p.styles) for x in p.negative_prompt]
+    if lora:
+        for i, key in enumerate(sd.keys()):
+            keys.append([i,"LoRA",key,sd[key].shape])
+    else:    
+        for i, key in enumerate(sd.keys()):
+            keys.append([i,blockfromkey(key,"XL" in mtype,"flux" in mtype),key,sd[key].shape])
+
+    return keys,keys
+
+def loadmodel(model):
+    checkpoint_info = sd_models.get_closet_checkpoint_match(model)
+    if not forge:
+        sd = sd_models.read_state_dict(checkpoint_info.filename,"cpu")
+        return sd
     else:
-        p.all_negative_prompts = [shared.prompt_styles.apply_negative_styles_to_prompt(p.negative_prompt, p.styles)]
+        return load_torch_file(checkpoint_info.filename)
 
-    print("SuperMerger: Start Image Generation")
-    global orig_reload_model_weights
+ADDRAND = "\n\
+ALL_R	R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R\n\
+ALL_U	U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U,U\n\
+ALL_X	X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X,X\n\
+"
 
-    if forge or reforge:
-        orig_reload_model_weights = sd_models.reload_model_weights
-        sd_models.reload_model_weights = reload_model_weights
+def calccosinedif(model_a,model_b,mode,settings,include,calc):
+    inc = " ".join(include)
+    settings = " ".join(settings)
+    a, b = loadmodel(model_a), loadmodel(model_b)
+    name = filenamecutter(model_a) + "-" + filenamecutter(model_b)
+    cosine_similarities = []
+    blocksim = {}
+    blockvals = []
+    attn2 = {}
+    isxl = "XL" == modeltype(a)
+    blockids = BLOCKIDXLL if isxl else BLOCKID
+    for bl in blockids:
+        blocksim[bl] = []
+    blocksim["VAE"] = []
 
-        processed:Processed = processing.process_images(p)
-
-        sd_models.reload_model_weights = orig_reload_model_weights
-    elif neo:
-        with patch.object(processing.sd_models, 'forge_model_reload', reload_model_weights), patch.object(processing, 'forge_model_reload', reload_model_weights):
-            processed: Processed = processing.process_images(p)
+    if "ASim" in mode:
+        result = asimilarity(a,b,isxl)
+        if len(settings) > 1: savecalc(result,name,settings,True,"Asim")
+        del a ,b
+        gc.collect()
+        return result
     else:
-        processed:Processed = processing.process_images(p)
+        for key in tqdm(a.keys(), desc="Calculating cosine similarity"):
+            block = None
+            if blockfromkey(key,isxl) == "Not Merge": continue
+            if "model_ema" in key: continue
+            if "model" not in key:continue
+            if "first_stage_model" in key and not ("VAE" in inc):
+                continue
+            elif "first_stage_model" in key and "VAE" in inc:
+                block = "VAE"
+            if "diffusion_model" in key and not ("U-Net" in inc): continue
+            if "encoder" in key and not ("encoder" in inc): continue
+            if key in b and a[key].size() == b[key].size():
+                a_flat = a[key].view(-1).to(torch.float32)
+                b_flat = b[key].view(-1).to(torch.float32)
+                simab = torch.nn.functional.cosine_similarity(a_flat.unsqueeze(0), b_flat.unsqueeze(0))
+                if block is None: block,blocks26 = blockfromkey(key,isxl)
+                if block =="Not Merge" :continue
+                cosine_similarities.append([block, key, round(simab.item()*100,3)])
+                blocksim[blocks26].append(round(simab.item()*100,3))
+                if "attn2.to_out.0.weight" in key: attn2[block] = round(simab.item()*100,3)
 
-    if "image" in id_sets:
-        for i, image in enumerate(processed.images):
-            processed.images[i] = draw_origin(image, str(modelid),p.width,p.height,p.width)
-
-    if "PNG info" in id_sets:mergeinfo = mergeinfo + " ID " + str(modelid)
-
-    infotext = create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds)
-    if infotext.count("Steps: ")>1:
-        infotext = infotext[:infotext.rindex("Steps")]
-
-    infotexts = infotext.split(",")
-    for i,x in enumerate(infotexts):
-        if "Model:"in x:
-            infotexts[i] = " Model: "+mergeinfo.replace(","," ")
-    infotext= ",".join(infotexts)
-
-    for i, image in enumerate(processed.images):
-        images.save_image(image, opts.outdir_txt2img_samples, "", p.seed[0] if isinstance(p.seed, list) else p.seed, p.prompt,shared.opts.samples_format, p=p,info=infotext)
-
-    if s_batch_size > 1:
-        grid = images.image_grid(processed.images, p.batch_size)
-        processed.images.insert(0, grid)
-        images.save_image(grid, opts.outdir_txt2img_grids, "grid", p.seed, p.prompt, opts.grid_format, info=infotext, short_filename=not opts.grid_extended_filename, p=p, grid=True)
-    shared.state.end()
-    return processed.images,infotext,plaintext_to_html(processed.info), plaintext_to_html(processed.comments),p
-
-
-################################################
-##### Block Ids
-
-def blocker(blocks,blockids):
-    blocks = blocks.split(" ")
-    output = ""
-    for w in blocks:
-        flagger=[False]*len(blockids)
-        changer = True
-        if "-" in w:
-            wt = [wt.strip() for wt in w.split('-')]
-            if  blockids.index(wt[1]) > blockids.index(wt[0]):
-                flagger[blockids.index(wt[0]):blockids.index(wt[1])+1] = [changer]*(blockids.index(wt[1])-blockids.index(wt[0])+1)
+        for bl in blockids:
+            val = None
+            if bl == "Not Merge": continue
+            if bl not in blocksim.keys():continue
+            if blocksim[bl] == []: continue
+            if "Mean" in calc:
+                val = mean(blocksim[bl])
+            elif "Min" in calc:
+                val = min(blocksim[bl])
             else:
-                flagger[blockids.index(wt[1]):blockids.index(wt[0])+1] = [changer]*(blockids.index(wt[0])-blockids.index(wt[1])+1)
+                if bl in attn2.keys():val = attn2[bl]
+            if val:blockvals.append([bl,"",round(val,3)])
+            if mode != "Element": cosine_similarities.insert(0,[bl,"",round(mean(blocksim[bl]),3)])
+
+        if mode == "Block":
+            if len(settings) > 1: savecalc(blockvals,name,settings,True,"Blocks")
+            del a ,b
+            gc.collect()
+            return blockvals
         else:
-            output = output + " " + w if output else w
-        for i in range(len(blockids)):
-            if flagger[i]: output = output + " " + blockids[i] if output else blockids[i]
+            if len(settings) > 1: savecalc(cosine_similarities,name,settings,False,"Elements",)
+            del a ,b
+            gc.collect()
+            return cosine_similarities
+
+def savecalc(data,name,settings,blocks,add):
+    name = name + "_" + add
+    csvpath = os.path.join(path_root,f"{name}.csv")
+    txtpath = os.path.join(path_root,f"{name}.txt")
+
+    txt = ""
+    for row in data:
+        row = [str(r) for r in row]
+        txt = txt + ",".join(row)+"\n"
+        if blocks: txt = txt.replace(",,",",")
+
+    if "txt" in settings:
+        with  open(txtpath, 'w+') as f:
+            f.writelines(txt)
+            print("file saved to ",txtpath)
+    if "csv" in settings:
+        with  open(csvpath, 'w+') as f:
+            f.writelines(txt)
+            print("file saved to ",csvpath)
+
+#code from https://huggingface.co/JosephusCheung/ASimilarityCalculatior
+
+def cal_cross_attn(to_q, to_k, to_v, rand_input):
+    hidden_dim, embed_dim = to_q.shape
+    attn_to_q = nn.Linear(hidden_dim, embed_dim, bias=False)
+    attn_to_k = nn.Linear(hidden_dim, embed_dim, bias=False)
+    attn_to_v = nn.Linear(hidden_dim, embed_dim, bias=False)
+    attn_to_q.load_state_dict({"weight": to_q})
+    attn_to_k.load_state_dict({"weight": to_k})
+    attn_to_v.load_state_dict({"weight": to_v})
+    
+    return torch.einsum(
+        "ik, jk -> ik", 
+        F.softmax(torch.einsum("ij, kj -> ik", attn_to_q(rand_input), attn_to_k(rand_input)), dim=-1),
+        attn_to_v(rand_input)
+    )
+       
+def eval(model, n, input, block):
+    qk = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_q.weight"
+    uk = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_k.weight"
+    vk = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_v.weight"
+    atoq, atok, atov = model[qk], model[uk], model[vk]
+
+    attn = cal_cross_attn(atoq, atok, atov, input)
+    return attn
+
+ATTN1BLOCKS = [[1,"input"],[2,"input"],[4,"input"],[5,"input"],[7,"input"],[8,"input"],["","middle"],
+[3,"output"],[4,"output"],[5,"output"],[6,"output"],[7,"output"],[8,"output"],[9,"output"],[10,"output"],[11,"output"]]
+
+def asimilarity(model_a,model_b,mtype):
+    torch.manual_seed(2244096)
+    sims = []
+  
+    for nblock in  tqdm(ATTN1BLOCKS, desc="Calculating cosine similarity"):
+        n,block = nblock[0],nblock[1]
+        if n != "": n = f"s.{n}"
+        key = f"model.diffusion_model.{block}_block{n}.1.transformer_blocks.0.attn1.to_q.weight"
+
+        hidden_dim, embed_dim = model_a[key].shape
+        rand_input = torch.randn([embed_dim, hidden_dim])
+
+        attn_a = eval(model_a, n, rand_input, block)
+        attn_b = eval(model_b, n, rand_input, block)
+
+        sim = torch.mean(torch.cosine_similarity(attn_a, attn_b))
+        sims.append([blockfromkey(key,mtype),"",round(sim.item() * 100,3)])
+        
+    return sims
+
+CONFIGS = ["prompt","neg_prompt","Steps","Sampling method","CFG scale","Seed","Width","Height","Batch size","Upscaler","Hires steps","Denoising strength","Upscale by"]
+RESETVALS = ["","",0," ",0,0,0,0,1,"Latent",0,0.7,2]
+
+def configdealer(prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size,
+                        hrupscaler,hr2ndsteps,denois_str,hr_scale,reset):
+
+    data = [prompt,neg_prompt,steps,sampler,cfg,seed,width,height,batch_size,
+                        hrupscaler,hr2ndsteps,denois_str,hr_scale]
+
+    current_directory = os.getcwd()
+    jsonpath = os.path.join(current_directory,"ui-config.json")
+    print(jsonpath)
+
+    with open(jsonpath, 'r') as file:
+        json_data = json.load(file)
+
+    for name,men,default in zip(CONFIGS,data,RESETVALS):
+        key = f"supermerger/{name}/value"
+        json_data[key] = default if reset else men
+
+    with open(jsonpath, 'w') as file:
+        json.dump(json_data, file, indent=4)
+
+sorted_output = []
+
+def encodetexts(exclude):
+    isxl = hasattr(shared.sd_model,"conditioner")
+    model = shared.sd_model.conditioner.embedders[0] if isxl else shared.sd_model.cond_stage_model
+    encoder = model.encode_with_transformers
+    tokenizer = model.tokenizer
+    vocab = tokenizer.get_vocab()
+    byte_decoder = tokenizer.byte_decoder
+
+    batch = 500
+
+    b_texts = [list(vocab.items())[i:i + batch] for i in range(0, len(vocab), batch)]
+
+    output = []
+
+    for texts in tqdm(b_texts):    
+        batch = []
+        words = []
+        for word, idx in texts:
+            tokens = [model.id_start, idx, model.id_end] + [model.id_end] * 74
+            batch.append(tokens)
+            words.append((idx, word))
+        
+        embedding = encoder(torch.IntTensor(batch).to("cuda"))[:,1,:] # (bs,768)
+        embedding = embedding.to('cuda')
+        emb_norms = torch.linalg.vector_norm(embedding, dim=-1) # (bs,)
+        
+        for i, (word, token) in enumerate(texts):
+            try:
+                word = bytearray([byte_decoder[x] for x in word]).decode("utf-8")
+            except UnicodeDecodeError:
+                pass
+            if exclude:
+                if has_alphanumeric(word) : output.append([word,token,emb_norms[i].item()])
+            else:
+                output.append([word,token,emb_norms[i].item()])
+
+    output = sorted(output, key=lambda x: x[2], reverse=True)
+    for i in range(len(output)):
+        output[i].insert(0,i)
+
+    global sorted_output
+    sorted_output = output
+
+    return output[:1000]
+
+def pickupencode(texts):
+    wordlist = [x[1] for x in sorted_output]
+    texts = texts.split(",")
+    output = []
+    for text in texts:
+        if text in wordlist:
+            output.append(sorted_output[wordlist.index(text)])
+        if text+"</w>" in wordlist:
+            output.append(sorted_output[wordlist.index(text+"</w>")])
     return output
 
-
-def blockfromkey(key,isxl,isflux=False,isdit=False):
-    if isdit:
-        if "vae" in key or "first_stage_model" in key:
-            return "VAE", "Not Merge"
-        # the text side that lives inside the diffusion model
-        if "llm_adapter" in key or "txtfusion" in key:
-            return "T5", "T5"
-        if "text_encoders" in key or "conditioner" in key:
-            return "CLIP", "CLIP"
-
-        # Z-Image calls them layers, Anima and Krea2 call them blocks
-        match = re.search(r"\.(?:layers|blocks)\.(\d+)\.", key)
-        if match:
-            block = "B{:002}".format(int(match.group(1)))
-            return block, block
-        if "final_layer" in key or ".last." in key:
-            return "OUT", "OUT"
-        # everything else belongs to the diffusion model as well: the patch, time and
-        # rope embedders, the refiner stacks of Z-Image, the pad tokens
-        return "IN", "IN"
-
-    if not isxl and not isflux:
-        re_inp = re.compile(r'\.input_blocks\.(\d+)\.')  # 12
-        re_mid = re.compile(r'\.middle_block\.(\d+)\.')  # 1
-        re_out = re.compile(r'\.output_blocks\.(\d+)\.') # 12
-
-        weight_index = -1
-
-        NUM_INPUT_BLOCKS = 12
-        NUM_MID_BLOCK = 1
-        NUM_OUTPUT_BLOCKS = 12
-        NUM_TOTAL_BLOCKS = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + NUM_OUTPUT_BLOCKS
-
-        if 'time_embed' in key:
-            weight_index = 0                # before input blocks
-        elif '.out.' in key:
-            weight_index = NUM_TOTAL_BLOCKS - 1     # after output blocks
-        else:
-            m = re_inp.search(key)
-            if m:
-                inp_idx = int(m.groups()[0])
-                weight_index = inp_idx
-            else:
-                m = re_mid.search(key)
-                if m:
-                    weight_index = NUM_INPUT_BLOCKS
-                else:
-                    m = re_out.search(key)
-                    if m:
-                        out_idx = int(m.groups()[0])
-                        weight_index = NUM_INPUT_BLOCKS + NUM_MID_BLOCK + out_idx
-        return BLOCKID[weight_index+1] ,BLOCKID[weight_index+1] 
-    
-    elif isflux:
-        # Extract the two-digit number using regex
-        if "vae" in key:
-            return "VAE", "Not Merge"
-        if "t5xxl" in key:
-            return "T5", "T5"
-        if "text_encoders.clip" in key:
-            return "CLIP", "CLIP"
-        
-        match = re.search(r'\.(\d+)\.', key)
-        if "double_blocks" in key:
-            return f"D{match.group(1).zfill(2) }", f"D{match.group(1).zfill(2) }"
-        if "single_blocks" in key:
-            return f"S{match.group(1).zfill(2) }", f"S{match.group(1).zfill(2) }"
-        if "_in" in key:
-            return "IN", "IN"
-        if "final_layer" in key:
-            return "OUT", "OUT"
-        return "Not Merge"
-    
-    else:
-        if not ("weight" in key or "bias" in key):return "Not Merge","Not Merge"
-        if "label_emb" in key:return "LABEL","IN00"
-        if "time_embed" in key:return "TIME","IN00"
-        if "conditioner.embedders.0." in key : return "CLIPL","BASE"
-        if "conditioner.embedders.1." in key : return "CLIPG","BASE"
-        if "first_stage_model" in key : return "VAE","BASE"
-        if "model.diffusion_model" in key:
-            if "model.diffusion_model.out." in key: return "OUT9","OUT08"
-            block = re.findall(r'input|mid|output', key)
-            block = block[0].upper().replace("PUT","") if block else ""
-            nums = re.sub(r"\D", "", key)[:1 if "MID" in block else 2] + ("0" if "MID" in block else "")
-            if len(nums) == 0:return "M00"
-            add = re.findall(r"transformer_blocks\.(\d+)\.",key)[0] if "transformer" in key else ""
-            return block + nums + add, block + "0" + nums[0] if "MID" not in block else "M00"
-
-    return "Not Merge", "Not Merge"
-
-################################################
-##### Assert Inpaint
-def assert_inpaint(a, b, key):
-    """ this enables merging an inpainting model (A) with another one (B);
-        where normal model would have 4 channels, for latenst space, inpainting model would
-        have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9 
-    """
-    if a != b and a[0:1] + a[2:] == b[0:1] + b[2:]:
-        if a[1] == 4 and b[1] == 9:
-            raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
-        if a[1] == 4 and b[1] == 8:
-            raise RuntimeError("When merging instruct-pix2pix model with a normal one, A must be the instruct-pix2pix model.")
-
-        if a[1] == 8 and b[1] == 4:#If we have an Instruct-Pix2Pix model...
-            result_is_instruct_pix2pix_model = True
-        else:
-            assert a[1] == 9 and b[1] == 4, f"Bad dimensions for merged layer {key}: A={a}, B={b}"
-            result_is_inpainting_model = True
-
-################################################
-##### Adjust
-
-def fineman(fine,isxl):
-    if fine.find(",") != -1:
-        tmp = [t.strip() for t in fine.split(",")]
-        fines = [0.0]*8
-        for i,f in enumerate(tmp[0:8]):
-            try:
-                f = float(f)
-                fines[i] = f
-            except Exception:
-                pass
-
-        fine = fines
-    else:
-        return None
-
-    fine = [
-        1 - fine[0] * 0.01,
-        1+ fine[0] * 0.02,
-        1 - fine[1] * 0.01,
-        1+ fine[1] * 0.02,
-        1 - fine[2] * 0.01,
-        [fine[3]*0.02] + colorcalc(fine[4:8],isxl)
-        ]
-    return fine
-
-def colorcalc(cols,isxl):
-    colors = COLSXL if isxl else COLS
-    outs = [[y * cols[i] * 0.02 for y in x] for i,x in enumerate(colors)]
-    return [sum(x) for x in zip(*outs)]
-
-COLS = [[-1,1/3,2/3],[1,1,0],[0,-1,-1],[1,0,1]]
-COLSXL = [[0,0,1],[1,0,0],[-1,-1,0],[-1,1,0]]
-
-def weighttoxl(weight):
-    weight = weight[:9] + weight[12:22] +[0]
-    return weight
-
-FINETUNES = [
-"model.diffusion_model.input_blocks.0.0.weight",
-"model.diffusion_model.input_blocks.0.0.bias",
-"model.diffusion_model.out.0.weight",
-"model.diffusion_model.out.0.bias",
-"model.diffusion_model.out.2.weight",
-"model.diffusion_model.out.2.bias",
-]
-
-################################################
-##### Include/Exclude
-def excluder(block:str, block26:str,inex:bool,ex_blocks:list,ex_elems:list, key:str):
-    if ex_blocks == [] and ex_elems == [""]:
-        return False
-    include = True if inex == "Include" else False
-    if block26 in ex_blocks:return ex_returner(include, ex_blocks, block26, key)
-    if block in ex_elems or block in ex_blocks:return ex_returner(include, ex_blocks, block, key)
-    if "Adjust" in ex_blocks and key in FINETUNES:return ex_returner(include, ex_blocks, "Adjust", key)
-    for ke in ex_elems:
-        if ke != "" and ke in key:return ex_returner(include, ex_blocks, ke, key)
-    if "VAE" in ex_blocks and "first_stage_model"in key:return ex_returner(include, ex_blocks, "VAE", key)
-    return include
-
-def ex_returner(include, ex_blocks, target, key):
-    if "print" in ex_blocks:
-        print("Include" if include else "Exclude", target, key)
-    return not include
-
-################################################
-##### Reset Broken CliP IDs
-
-def resetclip(theta):
-    idkey = "cond_stage_model.transformer.text_model.embeddings.position_ids"
-    broken = []
-    if idkey in theta.keys():
-        correct = torch.Tensor([list(range(77))]).to(torch.int64)
-        current = theta[idkey].to(torch.int64)
-
-        broken = correct.ne(current)
-        broken = [i for i in range(77) if broken[0][i]]
-
-        if broken != []: print("Clip IDs broken and fixed: ",broken)
-        
-        theta[idkey] = correct
-
-
-################################################
-##### cache
-def cachedealer(start):
-    if neo:
-        return
-    if start:
-        global orig_cache
-        orig_cache = shared.opts.sd_checkpoint_cache
-        shared.opts.sd_checkpoint_cache = 0
-    else:
-        shared.opts.sd_checkpoint_cache = orig_cache
-
-def clearcache(model_c):
-    global modelcache
-    del modelcache
-    modelcache = {}
-    
-    if forge or neo:
-        unload_forge()
-        unload_forge()
-        from modules.sd_models import forge_model_reload, model_data
-        from modules_forge.main_entry import forge_unet_storage_dtype_options
-        unet_storage_dtype, _ = forge_unet_storage_dtype_options.get(shared.opts.forge_unet_storage_dtype, (None, False))
-        forge_model_params = dict(
-            checkpoint_info=revert_target,
-            additional_modules=shared.opts.forge_additional_modules,
-            unet_storage_dtype=unet_storage_dtype
-        )
-        model_data.forge_hash = None
-        model_data.forge_loading_parameters = forge_model_params
-        forge_model_reload()
-
-    gc.collect()
-    devices.torch_gc()
-
-def getcachelist():
-    output = []
-    for key in modelcache.keys():
-        if hasattr(key, "model_name"):
-            output.append(key.model_name)
-    return ",".join(output)
-
-################################################
-##### print
-
-def printstart(model_a,model_b,model_c,base_alpha,base_beta,weights_a,weights_b,mode,useblocks,calcmode,deep,lucks,fine,inex,ex_blocks,ex_elems,device):
-    print(f"  model A  \t: {model_a}")
-    print(f"  model B  \t: {model_b}")
-    print(f"  model C  \t: {model_c}")
-    print(f"  alpha,beta\t: {base_alpha,base_beta}")
-    print(f"  weights_alpha\t: {weights_a}")
-    print(f"  weights_beta\t: {weights_b}")
-    print(f"  mode\t\t: {mode}")
-    print(f"  MBW \t\t: {useblocks}")
-    print(f"  CalcMode \t: {calcmode}")
-    print(f"  Elemental \t: {deep}")
-    print(f"  Weights Seed\t: {lucks}")
-    print(f"  {inex} \t: {ex_blocks,ex_elems}")
-    print(f"  Adjust \t: {fine}")
-    print(f"  Device \t: {device}")
-
-def caster(news,hear):
-    if hear: print(news)
-
-def casterr(*args,hear=hear):
-    if hear:
-        names = {id(v): k for k, v in currentframe().f_back.f_locals.items()}
-        print('\n'.join([names.get(id(arg), '???') + ' = ' + repr(arg) for arg in args]))
-
-################################################
-##### model_loader
-def model_loader(checkpoint_info, state_dict,metadata, currentmodel): 
-    if ui_version >= 150: checkpoint_info = fake_checkpoint_info(checkpoint_info,metadata,currentmodel)
-
-    if neo:
-        # do NOT re-init model_data here: it would wipe forge_loading_parameters
-        # (additional_modules / unet_storage_dtype) that load_forge_model reads back
-        memory_management.free_memory(1e30, torch.device("cpu"))
-        load_forge_model(state_dict, checkpoint_info)
-    elif not forge:
-        sd_models.model_data.__init__()
-        sd_models.load_model(checkpoint_info, already_loaded_state_dict=state_dict)
-    else:
-        memory_management.free_memory(1e30,torch.device("cpu"))
-        load_forge_model(state_dict,checkpoint_info)
-    print("SuperMerger: Merged Model Loaded.")
-
-################################################
-##### forge
-def unload_forge():
-    sd_models.model_data.sd_model = None
-    sd_models.model_data.loaded_sd_models = []
-    memory_management.unload_all_models()
-    memory_management.soft_empty_cache()
-    gc.collect()
-
-def reload_model_weights(info=None):
-    return sd_models.model_data.sd_model, False
-
-orig_reload_model_weights = None
-
-
-if forge or neo:
-    from modules import sd_models as fsd
-    from modules.timer import Timer
-    from backend import loader as fld
-    import huggingface_guess
-    from modules_forge.main_entry import refresh_model_loading_parameters
-
-@torch.inference_mode()
-def load_forge_model(state_dict,checkpoint_info = None):
-    current_hash = str(fsd.model_data.forge_loading_parameters)
-    print('Loading Model: ' + str(fsd.model_data.forge_loading_parameters))
-
-    timer = Timer()
-
-    if fsd.model_data.sd_model:
-        fsd.model_data.sd_model = None
-        fsd.memory_management.unload_all_models()
-        fsd.memory_management.soft_empty_cache()
-        gc.collect()
-
-    timer.record("unload existing model")
-
-    checkpoint_info = fsd.model_data.forge_loading_parameters.get('checkpoint_info', checkpoint_info)
- 
-    if checkpoint_info is None:
-        raise ValueError('You do not have any model! Please download at least one model in [models/Stable-diffusion].')
-
-    additional_state_dicts = fsd.model_data.forge_loading_parameters.get('additional_modules', [])
-    timer.record("cache state dict")
-
-    unet_storage_dtype = fsd.model_data.forge_loading_parameters.get('unet_storage_dtype', None)
-    if neo:
-        # Neo's dynamic_args is a class with typed attributes, not a dict
-        fsd.dynamic_args.forge_unet_storage_dtype = unet_storage_dtype
-        fsd.dynamic_args.embedding_dir = fsd.cmd_opts.embeddings_dir
-    else:
-        fsd.dynamic_args['forge_unet_storage_dtype'] = unet_storage_dtype
-        fsd.dynamic_args['embedding_dir'] = fsd.cmd_opts.embeddings_dir
-        fsd.dynamic_args['emphasis_name'] = opts.emphasis
-    sd_model = forge_loader(state_dict, additional_state_dicts)
-    timer.record("forge model load")
-
-    sd_model.extra_generation_params = {}
-    sd_model.comments = []
-    sd_model.sd_checkpoint_info = checkpoint_info
-    sd_model.filename = checkpoint_info.filename
-    sd_model.sd_model_hash = checkpoint_info.calculate_shorthash()
-    timer.record("calculate hash")
-
-    shared.opts.data["sd_checkpoint_hash"] = checkpoint_info.sha256
-
-    fsd.model_data.set_sd_model(sd_model)
-
-    fsd.script_callbacks.model_loaded_callback(sd_model)
-
-    timer.record("scripts callbacks")
-
-    print(f"Model loaded in {timer.summary()}.")
-
-    fsd.model_data.forge_hash = current_hash
-
-    fsd.model_data.forge_loading_parameters = dict(
-        checkpoint_info=checkpoint_info,
-        additional_modules=shared.opts.forge_additional_modules,
-        unet_storage_dtype=unet_storage_dtype
-    )
-
-COMP_NAME_AND_PREFIX = {"transformer":PREFIX_M, "text_encoder": "clip_l" , "text_encoder2": "t5xxl", "vae": "vae."}
-
-def split_state_dict_neo(sd, additional_state_dicts: list = None):
-    """Forge Neo's backend.loader.split_state_dict() only accepts a file path;
-    SuperMerger holds the merged model in memory, so mirror it over a state dict."""
-    from backend.state_dict import convert_quantization, try_filter_state_dict
-
-    sd, _ = convert_quantization(sd, {})
-    sd = fld.preprocess_state_dict(sd)
-    guess = huggingface_guess.guess(sd)
-
-    if isinstance(additional_state_dicts, list):
-        for asd in additional_state_dicts:
-            _asd, _meta = load_torch_file(asd, return_metadata=True)
-            _asd, _ = convert_quantization(_asd, _meta)
-            sd = fld.replace_state_dict(sd, _asd, guess, asd)
-            del _asd
-
-    guess.clip_target = guess.clip_target(sd)
-    guess.model_type = guess.model_type(sd)
-    guess.ztsnr = "ztsnr" in sd
-
-    sd = guess.process_vae_state_dict(sd)
-
-    state_dict = {
-        guess.unet_target: try_filter_state_dict(sd, guess.unet_key_prefix),
-        guess.vae_target: try_filter_state_dict(sd, guess.vae_key_prefix),
-    }
-
-    sd = guess.process_clip_state_dict(sd)
-
-    for k, v in guess.clip_target.items():
-        state_dict[v] = try_filter_state_dict(sd, [k + "."])
-
-    state_dict["ignore"] = sd
-
-    if "Anima" in guess.huggingface_repo:
-        fld.process_anima(state_dict["transformer"], state_dict["text_encoder"])
-    if "PiD" in guess.huggingface_repo:
-        fld.process_pid(state_dict["transformer"])
-        state_dict["vae"]["_dim"] = guess.unet_config["lq_latent_channels"]
-
-    print(f'StateDict Keys: {({k: len(v) for k, v in state_dict.items()})}')
-
-    del state_dict["ignore"]
-
-    return state_dict, guess
-
-
-@torch.inference_mode()
-def forge_loader_neo(state_dict, additional_state_dicts):
-    import backend.args
-    from diffusers import DiffusionPipeline
-
-    state_dicts, estimated_config = split_state_dict(state_dict, additional_state_dicts)
-    state_dict = None
-    del state_dict
-
-    repo_name: str = estimated_config.huggingface_repo
-
-    backend.args.dynamic_args.reset()
-    backend.args.dynamic_args.nunchaku = getattr(estimated_config, "nunchaku", False)
-    backend.args.dynamic_args.klein = "klein" in repo_name
-    backend.args.dynamic_args.wan = "Wan" in repo_name
-    backend.args.dynamic_args.pid = "PiD" in repo_name
-
-    local_path = os.path.join(fld.HF, repo_name)
-    config: dict = DiffusionPipeline.load_config(local_path)
-
-    huggingface_components = {}
-    for component_name, v in config.items():
-        if isinstance(v, list) and len(v) == 2:
-            lib_name, cls_name = v
-            component_sd = state_dicts.pop(component_name, None)
-            component = fld.load_huggingface_component(estimated_config, component_name, lib_name, cls_name, local_path, component_sd)
-            if component_sd is not None:
-                del component_sd
-            if component is not None:
-                huggingface_components[component_name] = component
-
-    del state_dicts
-
-    PRED_TYPES = {
-        "EPS": "epsilon",
-        "V_PREDICTION": "v_prediction",
-        "FLUX": "const",
-        "FLOW": "const",
-    }
-
-    if "prediction_type" in getattr(huggingface_components.get("scheduler", None), "config", {}):
-        if estimated_config.model_type.name in PRED_TYPES:
-            huggingface_components["scheduler"].config.prediction_type = PRED_TYPES[estimated_config.model_type.name]
-
-    for M in fld.possible_models:
-        if any(type(estimated_config) is x for x in M.matched_guesses):
-            return M(estimated_config=estimated_config, huggingface_components=huggingface_components)
-
-    print('Failed to recognize model type!')
-    return None
-
-
-@torch.inference_mode()
-def forge_loader(state_dict, additional_state_dicts):
-    if neo:
-        return forge_loader_neo(state_dict, additional_state_dicts)
-
-    state_dicts, estimated_config = split_state_dict(state_dict, additional_state_dicts)
-    state_dict = None
-    del state_dict
-    
-    repo_name = estimated_config.huggingface_repo
-
-    local_path = os.path.join(fld.dir_path, 'huggingface', repo_name)
-    config: dict = fld.DiffusionPipeline.load_config(local_path)
-    huggingface_components = {}
-    for component_name, v in config.items():
-        if isinstance(v, list) and len(v) == 2:
-            lib_name, cls_name = v
-            component_sd = state_dicts.get(component_name, None)
-            component = fld.load_huggingface_component(estimated_config, component_name, lib_name, cls_name, local_path, component_sd)
-            if component_sd is not None:
-                del state_dicts[component_name]
-            if component is not None:
-                huggingface_components[component_name] = component
-
-    for M in fld.possible_models:
-        if any(isinstance(estimated_config, x) for x in M.matched_guesses):
-            return M(estimated_config=estimated_config, huggingface_components=huggingface_components)
-
-    print('Failed to recognize model type!')
-    return None
-
-def split_state_dict(sd, additional_state_dicts: list = None):
-    if neo:
-        return split_state_dict_neo(sd, additional_state_dicts)
-
-    sd = fld.preprocess_state_dict(sd)
-    guess = huggingface_guess.guess(sd)
-
-    if isinstance(additional_state_dicts, list):
-        for asd in additional_state_dicts:
-            asd = load_torch_file(asd)
-            sd = fld.replace_state_dict(sd, asd, guess)
-
-    guess.clip_target = guess.clip_target(sd)
-
-    state_dict = {
-        guess.unet_target: fld.try_filter_state_dict(sd, guess.unet_key_prefix),
-        guess.vae_target: fld.try_filter_state_dict(sd, guess.vae_key_prefix)
-    }
-
-    sd = guess.process_clip_state_dict(sd)
-
-    for k, v in guess.clip_target.items():
-        state_dict[v] = fld.try_filter_state_dict(sd, [k + '.'])
-
-    state_dict['ignore'] = sd
-    print_dict = {k: len(v) for k, v in state_dict.items()}
-    print(f'StateDict Keys: {print_dict}')
-
-    del state_dict['ignore']
-
-    return state_dict, guess
-
-def prefixer(t, revert = False):
-    keys = list(t.keys())
-    if revert: 
-        for key in keys:
-            t[key.replace(PREFIX_M,"")] = t.pop(key)
-        print('"model.diffusion_model." removed from prifix.')
-        return
-
-    need_revert = False
-
-    # Some checkpoints name the diffusion model "net." instead of
-    # "model.diffusion_model.". Both conventions are in the wild for Anima, and two
-    # files that disagree share no key at all: nothing gets merged and the second one
-    # is appended whole. Normalise before merging.
-    if any(key.startswith("net.") for key in keys):
-        for key in keys:
-            if key.startswith("net."):
-                t[PREFIX_M + key[len("net."):]] = t.pop(key)
-        print('"net." replaced with "model.diffusion_model." in prifix.')
-        need_revert = True
-        keys = list(t.keys())
-
-    # A checkpoint that holds only the diffusion model has no prefix at all. The merge
-    # keys off "model" being in the name and the backend adds the prefix when loading,
-    # so add it here as well. Matching a fixed list of Flux prefixes missed Z-Image
-    # entirely, whose keys start with layers/cap_embedder/noise_refiner.
-    if any(key.startswith(PREFIX_M) for key in keys):
-        return need_revert
-
-    for key in keys:
-        t[PREFIX_M + key] = t.pop(key)
-    print('"model.diffusion_model." added to prifix.')
-    gc.collect()
-    return True
-
-def forge_save(filename):
-    print("Saveing Model...")
-    from modules.paths import models_path
-    if ".safetensors" not in filename:
-        filename = filename +".safetensors"
-    long_filename = os.path.join(models_path, 'Stable-diffusion', filename)
-    os.makedirs(os.path.dirname(long_filename), exist_ok=True)
-    from modules import shared
-    p = shared.sd_model.save_checkpoint(long_filename)
-    print(f'Saved checkpoint at: {p}')
-    return f'Saved checkpoint at: {p}'
-
-###############################################################
-######## QLoRA   
-FP8_SCALE = "_scale"
-
-def unify_fp8_scales(*sds):
-    """Put float8 weights that carry a separate scale on a common scale.
-
-    Krea2 and other releases store a weight as float8 plus a scalar
-    "<key>_scale". Two such checkpoints normally use different scales, so mixing
-    the raw float8 values mixes numbers that mean different things and the merge
-    comes out as noise. Once both sides share a scale the ordinary weighted sum
-    is exact again. Done one tensor at a time so nothing is expanded in bulk.
-    """
-    fp8 = getattr(torch, "float8_e4m3fn", None)
-    sds = [sd for sd in sds if sd is not None]
-    if fp8 is None or len(sds) < 2:
-        return
-
-    base = sds[0]
-    targets = [k[: -len(FP8_SCALE)] for k in base
-               if k.endswith(FP8_SCALE) and k[: -len(FP8_SCALE)] in base
-               and getattr(base[k[: -len(FP8_SCALE)]], "dtype", None) is fp8]
-    if not targets:
-        return
-
-    fmax = torch.finfo(fp8).max
-    changed = 0
-    for key in targets:
-        skey = key + FP8_SCALE
-        if not all(key in sd and skey in sd for sd in sds):
-            continue
-        scales = [sd[skey].to(torch.float32) for sd in sds]
-        common = torch.stack([scale.reshape(-1).max() for scale in scales]).max()
-        for sd, scale in zip(sds, scales):
-            if torch.equal(scale.reshape(-1).max(), common):
-                continue
-            weight = sd[key].to(torch.float32) * (scale / common)
-            sd[key] = weight.clamp(-fmax, fmax).to(fp8)
-            sd[skey] = common.clone().to(sd[skey].dtype)
-            changed += 1
-
-    if changed:
-        print(f"SuperMerger: put {changed} float8 tensor(s) on a common scale before merging")
-
-def quant_formats(sd):
-    """The quantization a checkpoint declares through its comfy_quant markers.
-
-    ComfyUI style quantized checkpoints keep one marker per quantized tensor, for
-    example {"format": "int8_tensorwise"} or {"format": "float8_e4m3fn"}. Two
-    checkpoints quantized differently share no common numeric meaning, so merging
-    their raw values produces noise.
-    """
-    formats = set()
-    for key, value in sd.items():
-        if not key.endswith("comfy_quant"):
-            continue
-        try:
-            formats.add(json.loads(bytes(value.cpu().numpy()).decode("utf-8")).get("format", "unknown"))
-        except Exception:
-            formats.add("unknown")
-    return formats
-
-def qdtyper(sd):
-    if any("fp4" in k for k in sd):
-        return "fp4"
-    elif any("nf4" in k for k in sd):
-        return "nf4"
-    for key in sd:
-        if hasattr(sd[key],"dtype"):
-            return sd[key].dtype
-
-def to_qdtype(sd_1, sd_2, qd_1, qd_2, device, m1, m2):
-    if qd_1 in QTYPES and qd_2 in QTYPES:
-        t1 = t2 = torch.float16
-    else:
-        t1 = t2 = None
-    
-    if qd_1 in QTYPES: 
-        print(f"Changing dtype of {m1} to {qd_2 if t1 is None else t1}")
-        q_dequantize(sd_1,qd_1,device,qd_2)
-
-    if qd_2 in QTYPES: 
-        print(f"Changing dtype of {m2} to {qd_1 if t2 is None else t2}")
-        q_dequantize(sd_2,qd_2,device,qd_1)
-
-    devices.torch_gc()
-    
-def q_dequantize(sd,qtype,device,dtype,setbnb = True):
-    dellist = [] 
-    from bitsandbytes.functional import dequantize_4bit
-    for key in tqdm(sd):
-        if ("weight" in key) and ("weight." not in key) and (key + BNB + qtype in sd):
-            qs = q_tensor_to_dict(sd[key + BNB + qtype])
-            out = torch.empty(qs["shape"],device="cuda:0")
-            sd[key] = dequantize_4bit(sd[key].to("cuda:0"),out=out, absmax=sd[key + ".absmax"].to("cuda:0"),blocksize=qs["blocksize"],quant_type=qs["quant_type"]).to(device,dtype)
-            dellist.append(key + ".absmax")
-            if setbnb:dellist.append(key + BNB + qtype)
-            dellist.append(key + ".quant_map")
-        elif isinstance(sd[key], torch.Tensor):
-            sd[key] = sd[key].to(dtype)
-
-    for key in dellist:
-        if key in sd:
-            del sd[key]
-
-def q_quantize(sd:dict,qtype,device,setbnb = True):
-    from bitsandbytes.functional import quantize_4bit
-    sd_plus = {}
-    for key in tqdm(sd):
-        if "weight" in key and "weight." not in key:
-            weight, state = quantize_4bit(sd[key].to("cuda:0"), quant_type=qtype)
-            sd[key] = weight.to(device)
-            sd_plus[key + ".absmax"] = state.absmax
-            sd_plus[key + ".quant_map"] = state.code
-            if setbnb: sd_plus[key + BNB + qtype] = state.as_dict(True)["quant_state." + "bitsandbytes__" + qtype]
-    sd.update(sd_plus)
-
-def q_tensor_to_dict(tensor):
-    num_list = tensor.tolist()
-    char_list = [chr(num) for num in num_list]
-    json_string = ''.join(char_list)
-
-    tensor_dict = json.loads(json_string)
-    return tensor_dict
+def has_alphanumeric(text):
+    pattern = re.compile(r'[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;"\'<>,.?/\|\\]')
+    return bool(pattern.search(text.replace("</w>","")))
+
+if __package__ == "supermerger":
+    script_callbacks.on_ui_tabs(on_ui_tabs)
