@@ -31,6 +31,13 @@
 
 
 # Recent Update
+2026.10.25.0100(JST)
+- Forge NeoのMOSS-Imageのマージと階層マージに対応しました
+- fp16/bf16/fp32の混在したモデル同士のマージ(Triple Sumなど)がdtypeの不一致で落ちる問題を修正しました(#480)
+- Clear Cacheボタンが動作しない問題を修正しました(#474)
+- LoRAを強度とブロック重みを両方指定してマージした場合に強度が無視されていた問題を修正しました(#463)
+- LoKrがLyCORISとして認識されるようになりました。複数のLoKrのマージは非対応である旨を表示し、KeyErrorで止まらなくなりました(#459)
+
 2023.11.10
 - LoRA抽出スクリプトの変更: SDXL,2.Xをサポート
 - SD2.XでのモデルへのLoRAマージをサポート
@@ -153,12 +160,12 @@ Flux (61個)
 |-|-|-|-|-|-|
 |BASE|T5|IN|D00 - D18|S00 - S37|OUT|
 
-Forge NEOのDiTモデル: Z-Image, Anima, Krea2 (61個)
+Forge NEOのDiTモデル: Z-Image, Anima, Krea2, MOSS-Image (61個)
 |1|2|3|4 - 60|61|
 |-|-|-|-|-|
 |BASE|T5|IN|B00 - B56|OUT|
 
-これらのアーキテクチャはFluxのようなdouble/singleの分割がなく、transformerブロックが一列に並んでいます。`Bnn`はその`nn`番目のブロックで、ブロック数はZ-Imageが30、AnimaとKrea2が28です。`IN`はパッチ/時刻/rope embedderと、Z-Imageのnoise refiner・context refinerを含みます。`OUT`はfinal layerです。`T5`は拡散モデル内部に同梱されるテキスト側で、AnimaではLLM adapter、Krea2ではtext fusion towerが該当します。個数はFluxと同じなので、Flux用に書いた重み文字列をそのまま使えます。
+これらのアーキテクチャはFluxのようなdouble/singleの分割がなく、transformerブロックが一列に並んでいます。`Bnn`はその`nn`番目のブロックで、ブロック数はZ-Imageが30、AnimaとKrea2が28、MOSS-Imageが42です。`IN`はパッチ/時刻/rope embedderと、Z-Imageのnoise refiner・context refinerを含みます。`OUT`はfinal layerです。`T5`は拡散モデル内部に同梱されるテキスト側で、AnimaではLLM adapter、Krea2ではtext fusion tower、MOSS-Imageではtext embedderが該当します。個数はFluxと同じなので、Flux用に書いた重み文字列をそのまま使えます。
 
 ## XYZ Plot
 ## XYZプロット
