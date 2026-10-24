@@ -214,15 +214,17 @@ BLOCKIDXLLL=["CLIPL","CLIPG","IN0","IN00","IN10","IN20","IN30","IN40","IN41","IN
 BLOCKIDXLLS=["BASE", "BASE" ,"IN0","IN00","IN01","IN02","IN03","IN04","IN04","IN04" ,"IN04" ,"IN05","IN05","IN05" ,"IN05" ,"IN06","IN07","IN07","IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN07" ,"IN08","IN08","IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"IN08" ,"M00"  ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"   ,"M00"  ,"M00"  ,"OUT00","OUT00","OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT00" ,"OUT01","OUT01","OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT01" ,"OUT02","OUT02","OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02" ,"OUT02","OUT03","OUT03","OUT03" ,"OUT03" ,"OUT04","OUT04","OUT04" ,"OUT04" ,"OUT05","OUT05","OUT05" ,"OUT05","OUT05","OUT06","OUT07","OUT08","OUT08", "Not Merge", "Not Merge", "VAE"]
 BLOCKIDFLUX = ["CLIP", "T5", "IN"] + ["D{:002}".format(x) for x in range(19)] + ["S{:002}".format(x) for x in range(38)] + ["OUT"] # Len: 61
 
-# The DiT models of Forge Neo (Z-Image, Anima, Krea2) have a single stack of
-# transformer blocks instead of the double/single split of Flux. Same length as
-# BLOCKIDFLUX so a weight string written for Flux can be used here unchanged.
-# T5 covers the text side that ships inside the diffusion model: the LLM adapter
-# of Anima and the text fusion tower of Krea2.
+# The DiT models of Forge Neo (Z-Image, Anima, Krea2, MOSS-Image) have a single
+# stack of transformer blocks instead of the double/single split of Flux. Same
+# length as BLOCKIDFLUX so a weight string written for Flux can be used here
+# unchanged. T5 covers the text side that ships inside the diffusion model: the
+# LLM adapter of Anima, the text fusion tower of Krea2 and the text embedder of
+# MOSS-Image.
 BLOCKIDDIT = ["CLIP", "T5", "IN"] + ["B{:002}".format(x) for x in range(57)] + ["OUT"] # Len: 61
 
 # keys that only appear in one of the Forge Neo DiT architectures
-DIT_MARKERS = ("cap_embedder", "noise_refiner", "llm_adapter", "txtfusion", "adaln_modulation_cross_attn")
+DIT_MARKERS = ("cap_embedder", "noise_refiner", "llm_adapter", "txtfusion", "adaln_modulation_cross_attn",
+               "shared_block_modulation", "video_head_modulation")
 RANDMAP = [0,50,100] #alpha,beta,elements
 
 statistics = {"sum":{},"mean":{},"max":{},"min":{}}
@@ -429,7 +431,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
 
     if qdtypes[0] != qdtypes[1]:
         print(f"Precision of model B (or B-C) is changing to {qdtypes[0]}...")
-        to_qdtype(theta_0, theta_1, qdtypes[0], qdtypes[1], device, "Model A", "Model B")
+    # also when the first tensors agree, the rest of the checkpoint may not
+    to_qdtype(theta_0, theta_1, qdtypes[0], qdtypes[1], device, "Model A", "Model B")
 
     if theta_2 is not None: 
         to_qdtype(theta_0, theta_2, qdtypes[0], qdtypes[2], device, "Model A", "Model C")
@@ -1522,8 +1525,9 @@ def blockfromkey(key,isxl,isflux=False,isdit=False):
     if isdit:
         if "vae" in key or "first_stage_model" in key:
             return "VAE", "Not Merge"
-        # the text side that lives inside the diffusion model
-        if "llm_adapter" in key or "txtfusion" in key:
+        # the text side that lives inside the diffusion model. The two blocks of
+        # the MOSS-Image text_embedder would otherwise be read as B00 and B01
+        if "llm_adapter" in key or "txtfusion" in key or "text_embedder" in key:
             return "T5", "T5"
         if "text_encoders" in key or "conditioner" in key:
             return "CLIP", "CLIP"
@@ -1533,7 +1537,7 @@ def blockfromkey(key,isxl,isflux=False,isdit=False):
         if match:
             block = "B{:002}".format(int(match.group(1)))
             return block, block
-        if "final_layer" in key or ".last." in key:
+        if "final_layer" in key or ".last." in key or "final_linear" in key or "final_norm" in key or "video_head" in key:
             return "OUT", "OUT"
         # everything else belongs to the diffusion model as well: the patch, time and
         # rope embedders, the refiner stacks of Z-Image, the pad tokens
@@ -1726,12 +1730,16 @@ def cachedealer(start):
     else:
         shared.opts.sd_checkpoint_cache = orig_cache
 
-def clearcache(model_c):
+def clearcache(model_c=None):
+    # the Clear Cache button calls this with no argument, which raised a
+    # TypeError before anything was cleared (#474)
     global modelcache
     del modelcache
     modelcache = {}
-    
-    if forge or neo:
+
+    # put the checkpoint back only when a merge replaced it; before any merge
+    # there is nothing to revert to and reloading "" would fail
+    if (forge or neo) and revert_target:
         unload_forge()
         unload_forge()
         from modules.sd_models import forge_model_reload, model_data
@@ -1948,6 +1956,11 @@ def forge_loader_neo(state_dict, additional_state_dicts):
     backend.args.dynamic_args.klein = "klein" in repo_name
     backend.args.dynamic_args.wan = "Wan" in repo_name
     backend.args.dynamic_args.pid = "PiD" in repo_name
+    # the same flags backend.loader.forge_loader sets; MOSS-Image needs its own for
+    # Skip Layer Guidance and Anima for its LoRA. getattr: older Neo has fewer
+    for flag, name in (("qwen21", "Qwen-Image-2.1"), ("anima", "Anima"), ("krea2", "Krea-2"), ("moss", "MOSS-Image")):
+        if hasattr(backend.args.dynamic_args, flag):
+            setattr(backend.args.dynamic_args, flag, name in repo_name)
 
     local_path = os.path.join(fld.HF, repo_name)
     config: dict = DiffusionPipeline.load_config(local_path)
@@ -2175,11 +2188,33 @@ def to_qdtype(sd_1, sd_2, qd_1, qd_2, device, m1, m2):
         print(f"Changing dtype of {m1} to {qd_2 if t1 is None else t1}")
         q_dequantize(sd_1,qd_1,device,qd_2)
 
-    if qd_2 in QTYPES: 
+    if qd_2 in QTYPES:
         print(f"Changing dtype of {m2} to {qd_1 if t2 is None else t2}")
         q_dequantize(sd_2,qd_2,device,qd_1)
 
+    if qd_1 not in QTYPES and qd_2 not in QTYPES:
+        match_float_dtypes(sd_1, sd_2, m2)
+
     devices.torch_gc()
+
+FLOAT_DTYPES = (torch.float16, torch.bfloat16, torch.float32)
+
+def match_float_dtypes(sd_1, sd_2, m2):
+    """Plain fp16, bf16 and fp32 checkpoints were left as they were, and the
+    merge then failed wherever two of them met, torch.lerp for one refuses to mix
+    them (#480). Bring every tensor of the second model to the dtype the first
+    one has for that key; going by key also covers checkpoints that mix dtypes.
+    Quantized and float8 weights are left to the code that handles them."""
+    changed = 0
+    for key, tensor in sd_2.items():
+        other = sd_1.get(key)
+        if not (isinstance(tensor, torch.Tensor) and isinstance(other, torch.Tensor)):
+            continue
+        if tensor.dtype != other.dtype and tensor.dtype in FLOAT_DTYPES and other.dtype in FLOAT_DTYPES:
+            sd_2[key] = tensor.to(other.dtype)
+            changed += 1
+    if changed:
+        print(f"Changed the dtype of {changed} tensors of {m2} to match")
     
 def q_dequantize(sd,qtype,device,dtype,setbnb = True):
     dellist = [] 

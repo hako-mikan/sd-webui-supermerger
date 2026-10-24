@@ -1,4 +1,17 @@
 # Changelog
+### 2026.10.25.0000(JST)
+- Forge NeoのMOSS-Imageのマージと階層マージに対応しました
+- fp16/bf16/fp32の混在したモデル同士のマージ(Triple Sumなど)がdtypeの不一致で落ちる問題を修正しました(#480)
+- Clear Cacheボタンが動作しない問題を修正しました(#474)
+- LoRAを強度とブロック重みを両方指定してマージした場合に強度が無視されていた問題を修正しました(#463)
+- LoKrがLyCORISとして認識されるようになりました。複数のLoKrのマージは非対応である旨を表示し、KeyErrorで止まらなくなりました(#459)
+
+- Support merging and block merging MOSS-Image on Forge Neo
+- Fix merging fp16, bf16 and fp32 models with each other (Triple Sum and others) failing on mismatched dtypes (#480)
+- Fix the Clear Cache button doing nothing (#474)
+- Fix the strength being ignored when a LoRA is merged with both a strength and block weights (#463)
+- LoKr files are now recognised as LyCORIS: merging several of them reports that this is not supported instead of stopping with a KeyError (#459)
+
 ### 2023.10.15  
 Adjust機能が改良されました。CD TunerのようにBrightness, Cyan-Red, Magenta-Gree, Yellow-Blueのような色指定に変わります。  
 その他バグfix  

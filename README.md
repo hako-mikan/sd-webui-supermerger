@@ -29,6 +29,18 @@ This extension significantly improves the efficiency of model merging by elimina
 - [Elemental Merge](elemental_en.md)
 
 # Recent Update
+2026.10.25.0100(JST)
+- Support merging and block merging MOSS-Image on Forge Neo
+- Fix merging fp16, bf16 and fp32 models with each other (Triple Sum and others) failing on mismatched dtypes (#480)
+- Fix the Clear Cache button doing nothing (#474)
+- Fix the strength being ignored when a LoRA is merged with both a strength and block weights (#463)
+- LoKr files are now recognised as LyCORIS: merging several of them reports that this is not supported instead of stopping with a KeyError (#459)
+- Forge NeoのMOSS-Imageのマージと階層マージに対応しました
+- fp16/bf16/fp32の混在したモデル同士のマージ(Triple Sumなど)がdtypeの不一致で落ちる問題を修正しました(#480)
+- Clear Cacheボタンが動作しない問題を修正しました(#474)
+- LoRAを強度とブロック重みを両方指定してマージした場合に強度が無視されていた問題を修正しました(#463)
+- LoKrがLyCORISとして認識されるようになりました。複数のLoKrのマージは非対応である旨を表示し、KeyErrorで止まらなくなりました(#459)
+
 2024.02.02 0000(JST)
 - bug fix
 - MakeLoRaの標識が変わりました。Dreanboothに習ってモデル名をTunedとOriginalに変更しています。
@@ -151,17 +163,17 @@ Flux (61 values)
 |-|-|-|-|-|-|
 |BASE|T5|IN|D00 - D18|S00 - S37|OUT|
 
-Forge NEO DiT models: Z-Image, Anima, Krea2 (61 values)
+Forge NEO DiT models: Z-Image, Anima, Krea2, MOSS-Image (61 values)
 |1|2|3|4 - 60|61|
 |-|-|-|-|-|
 |BASE|T5|IN|B00 - B56|OUT|
 
 These architectures have a single stack of transformer blocks rather than the
 double/single split of Flux, so `Bnn` is block `nn` of that stack: 30 blocks on
-Z-Image, 28 on Anima and Krea2. `IN` covers the patch, time and rope embedders,
+Z-Image, 28 on Anima and Krea2, 42 on MOSS-Image. `IN` covers the patch, time and rope embedders,
 plus the noise and context refiners of Z-Image. `OUT` is the final layer. `T5`
 covers the text side that ships inside the diffusion model, which is the LLM
-adapter on Anima and the text fusion tower on Krea2. The list is the same length
+adapter on Anima, the text fusion tower on Krea2 and the text embedder on MOSS-Image. The list is the same length
 as the Flux one, so a weight string written for Flux can be used unchanged.
 
 ## XYZ Plot

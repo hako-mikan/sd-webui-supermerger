@@ -453,7 +453,8 @@ def lmerge(loranames,loraratioss,settings,filename,dim,save_precision,calc_preci
                     ratio = to26(ratio)
                 else:ratio = [float(n[1])]*26
             elif len(n[2:]) in BLOCKNUMS:
-                ratio = [float(x) for x in n[2:]]
+                # scaled by the strength, like a preset name above (#463)
+                ratio = [float(x)*float(n[1]) for x in n[2:]]
                 ratio = to26(ratio)
             else:
                 print("ERROR:Number of Blocks must be 12,17,20,26")
@@ -819,7 +820,9 @@ def pluslora(lnames,loraratios,settings,output,model,save_precision,calc_precisi
                 ratio = to26(ratio)
             else:ratio = [float(n[1])]*26
         elif len(n[2:]) in BLOCKNUMS:
-            ratio = [float(x) for x in n[2:]]
+            # the strength scales the block weights here too, as it does for a
+            # preset name above; it was dropped and every block merged at 1.0 (#463)
+            ratio = [float(x)*float(n[1]) for x in n[2:]]
             ratio = to26(ratio)
         else:ratio = [float(n[1])]*26
  
@@ -1260,7 +1263,9 @@ def dimgetter(filename, device = "cpu"):
                 dim = value.size()[0]
             elif type(value) == dict:
                 dim = value.get("shape",[0,0])[0]
-        if "hada_" in key:
+        # LoKr has no lora_down either; taken for a LoRA it reached the LoRA
+        # merge and failed there with a KeyError (#459)
+        if "hada_" in key or "lokr_" in key:
             dim,ltype = "LyCORIS","LyCORIS"
         if alpha is not None and dim is not None:
             break
